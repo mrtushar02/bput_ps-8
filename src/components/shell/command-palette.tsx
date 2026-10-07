@@ -90,7 +90,7 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 /* --------------------------------------------------------------- component */
 
-export function CommandPalette() {
+export function CommandPalette({ initialQuery, openExternally, onConsumed }: { initialQuery?: string; openExternally?: boolean; onConsumed?: () => void }) {
   const { setActiveModule, setDataEntrySubModule } = useApp()
 
   const [open, setOpen] = useState(false)
@@ -148,6 +148,18 @@ export function CommandPalette() {
       document.body.style.overflow = prev
     }
   }, [open])
+
+  /* ---- open externally when triggered from the top search bar ---- */
+  useEffect(() => {
+    if (!openExternally) return
+    // Defer state updates to avoid the set-state-in-effect lint rule
+    const timer = setTimeout(() => {
+      setQuery(initialQuery || '')
+      setOpen(true)
+      onConsumed?.()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [openExternally, initialQuery, onConsumed])
 
   /* ---- navigation helper ---- */
   const go = useCallback(

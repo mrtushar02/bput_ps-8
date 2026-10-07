@@ -992,3 +992,56 @@ Stage Summary:
 - 2 new files: `src/lib/role-nav.ts` (role→nav mapping), fully rewritten `src/components/shell/app-shell.tsx`.
 - Dynamic badge counts from real notifications instead of hardcoded "12"/"3".
 - Mobile-responsive: sidebar collapses to a drawer on <768px viewports.
+
+---
+Task ID: 21 (Search fix + Maximum Glassmorphism + Sky-Blue Premium Theme)
+Agent: Lead Architect (main)
+Task: Fix non-functional search bar, maximize liquid glass effect, apply sky-blue color scheme per reference image
+
+Work Log:
+- User reported: (1) top search bar not working, (2) need maximum liquid glass glassmorphism, (3) need sky-blue color scheme like the reference image, (4) use the reference design for card/component style.
+- Analyzed reference image via VLM: identified sky-blue palette (#0EA5E9 / #38BDF8), semi-transparent white glass with subtle blur, soft diffuse shadows, 16-20px radius cards, sparkline mini charts in KPI cards.
+
+- Fixed + enhanced 3 areas:
+
+  1. **Search Bar Now Functional** — the top search bar was previously a dead input (no event handlers). Now:
+     - Typing a query + pressing **Enter** opens the Command Palette with the typed text pre-filled as the search query
+     - The ⌘K badge button next to the search input is now clickable and also opens the palette
+     - The CommandPalette component accepts `initialQuery`, `openExternally`, and `onConsumed` props
+     - When triggered, the palette opens with the query pre-filtering navigation items, quick actions, and recent projects
+     - Verified: typing "water" + Enter → palette opens showing "Enter new Water data" filtered result; typing "brsr" + Enter → palette opens showing BRSR-related results
+
+  2. **Maximum Liquid Glass Glassmorphism** — massively enhanced all glass classes in globals.css:
+     - `.glass`: blur(24px) saturate(200%) brightness(1.05) — was blur(20px) saturate(180%)
+     - `.glass-strong`: blur(30px) saturate(220%) brightness(1.05) — was blur(24px) saturate(200%)
+     - `.glass-subtle`: blur(16px) saturate(170%) — was blur(14px) saturate(150%)
+     - `.glass-nav`: blur(26px) saturate(200%) — was blur(22px) saturate(180%)
+     - Added inner highlight shadows (`inset 0 1px 2px rgba(255,255,255,0.5)`) for a liquid glass "wet" look
+     - Added sky-blue-tinted outer ring shadows (`rgba(14,165,233,0.06)`) on all glass surfaces
+     - New `.glass-sky` class: sky-blue accent glass for KPI tiles with `rgba(224,242,254,0.7)` → `rgba(186,230,253,0.5)` gradient
+     - All glass backgrounds now use 3-stop linear gradients (white → sky-blue-tint → ice-blue) for depth
+     - VLM-verified: "soft frosted glass effect with subtle translucency and light diffused blur"
+
+  3. **Sky-Blue Premium Color Scheme** — shifted the entire palette from generic blue to sky-blue:
+     - Body background: changed from `#f0f7ff` to `#e0f2fe` (sky-100) with 5 radial gradient layers using sky-blue tones (`rgba(125,211,252)`, `rgba(186,230,253)`, `rgba(224,242,254)`)
+     - Root CSS variables: `--primary` shifted to `oklch(0.6 0.19 235)` (sky-blue), `--background` to `oklch(0.975 0.02 235)`
+     - Search icon color: changed from slate to `text-sky-500`
+     - Search focus ring: changed from blue-100 to `sky-200`
+     - ⌘K badge: changed to `bg-sky-500/10 text-sky-600`
+     - Glass border shadows use `rgba(14,165,233)` (sky-500) instead of `rgba(59,130,246)` (blue-500)
+     - VLM-verified: "clean, premium sky-blue palette with very light, airy blue background"
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: typing "water" + Enter → Command Palette opens with filtered water results
+- agent-browser verified: typing "brsr" + Enter → palette shows BRSR results
+- VLM-verified: maximum glassmorphism with soft frosted translucency + sky-blue tint
+- VLM-verified: premium sky-blue color scheme throughout
+- VLM-verified: left sidebar with profile card (avatar, name, role, demo badge)
+
+Stage Summary:
+- Search bar is now fully functional (Enter triggers Command Palette with pre-filled query)
+- Glassmorphism maximized: blur up to 30px, saturate up to 220%, inner highlight shadows, 3-stop gradients
+- Sky-blue color scheme applied throughout (background, cards, shadows, accents, search)
+- All changes in 3 files: globals.css (glass + colors), app-shell.tsx (search wiring), command-palette.tsx (external open support)

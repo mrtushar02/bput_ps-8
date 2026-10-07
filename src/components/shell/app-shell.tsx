@@ -21,6 +21,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifFilter, setNotifFilter] = useState<'all' | 'ERROR' | 'WARNING' | 'INFO'>('all')
   const [search, setSearch] = useState('')
+  const [searchTriggered, setSearchTriggered] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [year, setYear] = useState('FY 2026-27')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -97,16 +98,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Search */}
+          {/* Search — wired to Command Palette */}
           <div className="relative hidden flex-1 max-w-md md:block">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-sky-500" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && search.trim()) { e.preventDefault(); setSearchTriggered(true) } }}
               placeholder="Search projects, submissions, evidence…"
-              className="glass-subtle w-full rounded-full py-2 pl-9 pr-14 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-blue-100"
+              className="glass-subtle w-full rounded-full py-2 pl-9 pr-14 text-sm text-slate-700 outline-none transition focus:ring-2 focus:ring-sky-200"
             />
-            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 rounded bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">⌘K</kbd>
+            <button onClick={() => search.trim() ? setSearchTriggered(true) : setSearchTriggered(true)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 transition hover:bg-sky-500/20">
+              ⌘K
+            </button>
           </div>
 
           <div className="flex-1 md:hidden" />
@@ -342,7 +347,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
 
-      <CommandPalette />
+      <CommandPalette initialQuery={search} openExternally={searchTriggered} onConsumed={() => setSearchTriggered(false)} />
     </div>
   )
 }
