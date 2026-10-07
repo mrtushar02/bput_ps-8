@@ -1139,3 +1139,50 @@ Stage Summary:
   - Distinct information focus (operational, review queue, executive briefing, audit trail, data quality)
 - Role-based routing in page.tsx ensures each role sees their unique dashboard
 - All dashboards use real data from APIs, glassmorphism, framer-motion, and compact card sizing
+
+---
+Task ID: 24 (Site User Dashboard — Reference Replica Rebuild)
+Agent: Lead Architect (main) + subagent
+Task: Completely rebuild site-user-overview.tsx to EXACTLY match the reference image's 2-column layout
+
+Work Log:
+- User provided a detailed 51-section prompt specifying the exact visual target: replicate the reference image's design language, layout, card placement, glassmorphism, and component structure — using real MEIL data (not demo content).
+- Analyzed the reference image via VLM: identified the correct layout is 2-column (58%/42%), NOT the 3-column (58/25/17%) that was previously implemented.
+
+- COMPLETELY REWROTE `src/components/dashboard/site-user-overview.tsx` (~1,140 lines):
+  - Changed from 3-column grid to correct **2-column layout**: `lg:grid-cols-[1fr_minmax(380px,42%)]`
+  - LEFT column (58%): Site ESG Overview card (2×3 KPI grid with Emissions/Electricity/Diesel/Water + mini charts) + Recent Site Activities card (vertical timeline with avatars, status pills, timestamps, 30s auto-refresh)
+  - RIGHT column (42%): Site ESG Analytics card (2×2 mini chart grid: Scope 1 vs 2 area chart, Monthly Energy bar chart, Water Balance donut, CEA v19 Baseline line + 3-col metrics row) + Site Operations card (5 quick-action buttons: Open Data Entry, Upload Evidence, View Pending Submission, Check Validation, View Reports + Available chips row)
+  - BELOW (full-width): Active Submissions table (wide, Project/Period/Module/Status/Completion, dense rows)
+  - BELOW (2-col): Data Entry Status (5 compact progress bars) + Team / Site Users (horizontal member cards with avatars)
+  - Glassmorphism: white/translucent surfaces (rgba(255,255,255,0.75-0.88)), subtle blur(12px), thin borders, soft shadows
+  - Background: predominantly white (#F8FAFC) with extremely subtle sky-blue ambient
+  - Card geometry: 20-24px radius for large cards, consistent throughout
+  - Typography: 15-17px card titles, 20px metric values, 10-12px metadata
+  - Spacing: 16-20px card gaps, 20-24px internal padding
+  - framer-motion: staggered entrance (30-50ms per card)
+  - Real-time polling: 30s activity, 60s overview
+  - All data from real APIs — no hardcoded values
+  - Loading skeleton + error state + empty state
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: all 7 sections render (Site ESG Overview, Recent Site Activities, Site ESG Analytics, Site Operations, Active Submissions, Data Entry Status, Team / Site Users)
+- VLM-verified against ALL 6 design criteria:
+  1. ✅ 2-column layout (left wide, right narrower)
+  2. ✅ Left column: Site ESG Overview + Recent Site Activities
+  3. ✅ Right column: Site ESG Analytics + Site Operations
+  4. ✅ Active Submissions table below, full-width
+  5. ✅ Premium glass cards with white/translucent surfaces + soft shadows
+  6. ✅ Predominantly white background with subtle blue ambient tint
+- No console errors
+
+Stage Summary:
+- Site User Overview completely rebuilt to match the reference image's 2-column layout
+- 7 sections in correct placement matching the reference's visual hierarchy
+- Glassmorphism is subtle and premium (not maximum blur — matches reference's blur(12px) feel)
+- Background is predominantly white with ambient blue (not heavy blue)
+- All card sizing is compact and consistent (20-24px radius)
+- Real-time data from APIs with 30s/60s polling
+- The design now feels like "THE SAME PRODUCT, THE SAME DESIGN SYSTEM, THE SAME VISUAL LANGUAGE" as the reference — adapted for MEIL Site User data

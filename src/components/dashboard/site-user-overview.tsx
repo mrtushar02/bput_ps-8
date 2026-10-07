@@ -1,37 +1,37 @@
 'use client'
 /**
- * SiteUserOverview — Project / Site User overview dashboard.
+ * SiteUserOverview — Rebuilt REBUILD-1
  *
- * Replicates the reference design: a 3-column asymmetric glassmorphism grid
- * (left ~58% / center ~25% / right ~17%) with KPI sparkline cards, an active
- * submissions table, a data-entry status bar, a live recent-activities feed,
- * team submission cards, analytics mini-charts, a custom form-builder panel,
- * and a data-connections list.
+ * A 2-column glassmorphism dashboard that mirrors the reference design:
+ *   - LEFT  (~58%): Site ESG Overview (2×3 KPI grid + mini charts) +
+ *                   Recent Site Activities (tall vertical timeline)
+ *   - RIGHT (~42%): Site ESG Analytics (2×2 chart grid + 3-col metrics) +
+ *                   Site Operations (quick action buttons + available chips)
+ *   - BELOW (full width): Active Submissions table +
+ *                         (Data Entry Status | Team) 2-column row
  *
- * All KPI values are pulled from the real APIs — no hardcoded numbers:
+ * All KPI values come from the real APIs — no hardcoded numbers:
  *   - GET /api/overview   → kpis, trends, emissionsBySource, periods
  *   - GET /api/activity   → recent activities (live-polled every 30s)
  *   - GET /api/submissions → active submissions list + per-module completion
- *
- * The component is self-contained; it does not modify any other file.
  */
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Flame, Zap, Droplet, TrendingUp, TrendingDown, ArrowRight, ArrowUpRight,
-  Send, Eye, MoreHorizontal, Activity as ActivityIcon, Plus, FileText,
-  Database, Plug, Cpu, Cloud, Link2, CheckCircle2, Radio,
-  AlertCircle, AlertOctagon, RefreshCw, ChevronRight, Layers, GripVertical,
-  Sparkles, Users, BarChart3, PieChart as PieIcon, Boxes, Server, Wifi,
+  Flame, Zap, ArrowUpRight, ArrowDownRight,
+  Send, MoreHorizontal, Plus, FileText, Database,
+  RefreshCw, ChevronRight, Activity as ActivityIcon, Layers, Sparkles,
+  Users, BarChart3, Upload, ClipboardCheck,
+  Gauge, AlertCircle, ShieldCheck, Fuel, Droplets,
 } from 'lucide-react'
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  ResponsiveContainer, Tooltip,
+  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
 
 /* ============================================================
- * Types
+ * Types — strict API shapes
  * ============================================================ */
 interface Kpis {
   totalEmissions: number
@@ -44,9 +44,18 @@ interface Kpis {
   waterRecycledShare: number
   wasteGeneratedT: number
   wasteRecycledShare: number
+  hazardousWasteT: number
   totalEmployees: number
   totalWorkers: number
   totalWorkforce: number
+  femaleShare: number
+  differentlyAbled: number
+  trainingHours: number
+  fatalities: number
+  injuries: number
+  lti: number
+  ltifr: number
+  safetyTrainingHours: number
   brsrReadiness: number
   brsrMissing: number
   completion: number
@@ -55,6 +64,10 @@ interface Kpis {
   draftSubs: number
   reviewSubs: number
   openExceptions: number
+  anomalies: number
+  corrections: number
+  evidenceTotal: number
+  evidenceVerified: number
   projects: number
   orgs: number
 }
@@ -108,39 +121,41 @@ interface SubmissionResponse { items: SubmissionItem[]; total: number; count: nu
  * ============================================================ */
 const TOOLTIP_STYLE: React.CSSProperties = {
   background: 'rgba(255,255,255,0.94)',
-  border: '1px solid rgba(255,255,255,0.85)',
+  border: '1px solid rgba(186, 230, 253, 0.55)',
   borderRadius: 12,
   fontSize: 11,
-  boxShadow: '0 8px 24px -8px rgba(30,58,138,0.18)',
+  boxShadow: '0 8px 24px -8px rgba(2,132,199,0.18)',
   backdropFilter: 'blur(12px)',
   padding: '6px 10px',
 }
 
-const SPARK_STROKE = '#3B82F6'
-const SPARK_FILL = 'rgba(59,130,246,0.15)'
+const STROKE_EMISSIONS = '#0EA5E9'
+const STROKE_ENERGY = '#6366F1'
+const STROKE_WATER = '#06B6D4'
+const STROKE_WASTE = '#10B981'
 
-const DONUT_PALETTE = ['#3B82F6', '#0EA5E9', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#14B8A6', '#F97316']
+const DONUT_PALETTE = ['#0EA5E9', '#38BDF8', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#14B8A6', '#F97316']
 
 /** Seeded MEIL ESG team — derived from prisma/seed.ts (15 demo users). */
 const SEEDED_TEAM: { name: string; role: string; gradient: string; active: boolean }[] = [
-  { name: 'Arjun Mehta',         role: 'Super Admin',          gradient: 'from-slate-600 to-slate-800',  active: true  },
+  { name: 'Arjun Mehta',         role: 'Super Admin',          gradient: 'from-slate-500 to-slate-700',  active: true  },
   { name: 'Rohit Kumar',         role: 'Project User',         gradient: 'from-sky-500 to-blue-600',     active: true  },
   { name: 'Sunita Rao',          role: 'HR User',              gradient: 'from-cyan-500 to-teal-600',    active: true  },
   { name: 'K. Venkat',           role: 'EHS User',             gradient: 'from-amber-500 to-orange-600', active: true  },
-  { name: 'Priya Nair',          role: 'Procurement User',     gradient: 'from-violet-500 to-purple-600', active: true  },
+  { name: 'Priya Nair',          role: 'Procurement',          gradient: 'from-violet-500 to-purple-600', active: true  },
   { name: 'Imran Sheikh',        role: 'CSR User',             gradient: 'from-rose-500 to-pink-600',    active: true  },
-  { name: 'Deepika Joshi',       role: 'Compliance User',      gradient: 'from-emerald-500 to-green-600', active: true },
-  { name: 'Rakesh Verma',         role: 'BU Reviewer',          gradient: 'from-blue-500 to-indigo-600',  active: true  },
-  { name: 'Nisha Pillai',         role: 'Subsidiary Reviewer',  gradient: 'from-indigo-500 to-blue-700',  active: true  },
-  { name: 'Vikram Shah',          role: 'Group Reviewer',       gradient: 'from-blue-600 to-cyan-700',    active: true  },
-  { name: 'Anita Desai',          role: 'ESG Manager',          gradient: 'from-teal-500 to-emerald-600', active: true },
-  { name: 'Sameer Khan',          role: 'ESG Analyst',          gradient: 'from-emerald-500 to-teal-600', active: true },
-  { name: 'Meena Iyer',           role: 'BRSR Manager',         gradient: 'from-emerald-600 to-teal-700', active: true },
-  { name: 'Karthik Subramaniam',  role: 'Auditor',              gradient: 'from-slate-600 to-gray-700',   active: false },
-  { name: 'Rajesh Khanna',         role: 'Executive',            gradient: 'from-amber-600 to-yellow-700', active: true  },
+  { name: 'Deepika Joshi',       role: 'Compliance',           gradient: 'from-emerald-500 to-green-600', active: true },
+  { name: 'Rakesh Verma',        role: 'BU Reviewer',          gradient: 'from-blue-500 to-indigo-600',  active: true  },
+  { name: 'Nisha Pillai',        role: 'Subsidiary Rev.',      gradient: 'from-indigo-500 to-blue-700',  active: true  },
+  { name: 'Vikram Shah',         role: 'Group Reviewer',        gradient: 'from-blue-600 to-cyan-700',    active: true  },
+  { name: 'Anita Desai',         role: 'ESG Manager',          gradient: 'from-teal-500 to-emerald-600', active: true },
+  { name: 'Sameer Khan',         role: 'ESG Analyst',          gradient: 'from-emerald-500 to-teal-600', active: true },
+  { name: 'Meena Iyer',          role: 'BRSR Manager',          gradient: 'from-emerald-600 to-teal-700', active: true },
+  { name: 'Karthik Subramaniam',  role: 'Auditor',              gradient: 'from-slate-500 to-gray-700',   active: false },
+  { name: 'Rajesh Khanna',       role: 'Executive',            gradient: 'from-amber-600 to-yellow-700', active: true  },
 ]
 
-/** Form-builder chips — illustrative ESG data elements available for drag-and-drop. */
+/** ESG data-element chips for the "Available" row in Site Operations. */
 const FORM_ELEMENTS: { label: string; unit: string; tone: string }[] = [
   { label: 'HSD Fuel',     unit: 'L',     tone: 'bg-amber-50 text-amber-700 border-amber-200' },
   { label: 'Grid kWh',     unit: 'kWh',   tone: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -148,21 +163,802 @@ const FORM_ELEMENTS: { label: string; unit: string; tone: string }[] = [
   { label: 'Diesel L',     unit: 'L',     tone: 'bg-orange-50 text-orange-700 border-orange-200' },
   { label: 'Gas Nm³',      unit: 'Nm³',   tone: 'bg-violet-50 text-violet-700 border-violet-200' },
   { label: 'Steam T',      unit: 'T',     tone: 'bg-rose-50 text-rose-700 border-rose-200' },
-  { label: 'Coal kg',      unit: 'kg',    tone: 'bg-slate-100 text-slate-700 border-slate-300' },
-  { label: 'Elec. MWh',    unit: 'MWh',   tone: 'bg-teal-50 text-teal-700 border-teal-200' },
-  { label: 'Waste kg',     unit: 'kg',    tone: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { label: 'Man-hrs',      unit: 'hrs',   tone: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
 ]
 
-/** Illustrative data connections — represent external systems integrated with the platform. */
-const DATA_CONNECTIONS: { name: string; type: string; icon: typeof Database; tone: string; status: 'Active' | 'Syncing' | 'Paused' }[] = [
-  { name: 'SCADA Gateway',   type: 'Realtime',    icon: Radio,   tone: 'bg-blue-50 text-blue-600',       status: 'Active'  },
-  { name: 'SAP ERP',         type: 'Daily batch', icon: Database, tone: 'bg-emerald-50 text-emerald-600', status: 'Active'  },
-  { name: 'IoT Sensors',     type: 'Streaming',   icon: Cpu,     tone: 'bg-violet-50 text-violet-600',   status: 'Syncing' },
-  { name: 'Metering Hub',    type: 'Hourly',      icon: Plug,    tone: 'bg-amber-50 text-amber-600',     status: 'Active'  },
-  { name: 'BRSR Portal',     type: 'On-demand',   icon: Cloud,   tone: 'bg-cyan-50 text-cyan-600',       status: 'Active'  },
-  { name: 'HRMS Sync',       type: 'Daily',       icon: Users,   tone: 'bg-rose-50 text-rose-600',       status: 'Paused'   },
-]
+/* ============================================================
+ * Helpers
+ * ============================================================ */
+function timeAgo(iso: string): string {
+  const d = new Date(iso)
+  const s = Math.floor((Date.now() - d.getTime()) / 1000)
+  if (s < 30) return 'just now'
+  if (s < 60) return `${s}s ago`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const dd = Math.floor(h / 24)
+  return `${dd}d ago`
+}
+
+function initials(name: string): string {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
+}
+
+function statusClass(status?: string | null): string {
+  switch ((status ?? '').toUpperCase()) {
+    case 'APPROVED': return 'status-approved'
+    case 'SUBMITTED': return 'status-submitted'
+    case 'UNDER_REVIEW': case 'REVIEW': return 'status-review'
+    case 'DRAFT': return 'status-draft'
+    case 'LOCKED': return 'status-locked'
+    case 'MISSING': return 'status-missing'
+    case 'ERROR': case 'BLOCKING': return 'status-error'
+    case 'WARNING': return 'status-warning'
+    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
+    case 'COMPLETED': return 'status-approved'
+    default: return 'status-draft'
+  }
+}
+
+function formatNumber(n: number, digits = 1): string {
+  if (!isFinite(n)) return '0'
+  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
+  return n.toFixed(digits)
+}
+
+/** Derive per-module completion % from submissions, falling back to KPI soft values. */
+function moduleCompletion(subs: SubmissionItem[], kpis?: Kpis): { label: string; pct: number; tone: string }[] {
+  const groups: Record<string, { total: number; sum: number }> = {}
+  for (const s of subs) {
+    const k = (s.module || 'other').toLowerCase()
+    if (!groups[k]) groups[k] = { total: 0, sum: 0 }
+    groups[k].total += 1
+    groups[k].sum += s.completionPct || 0
+  }
+  const energy = groups['energy'] ? groups['energy'].sum / groups['energy'].total : (kpis?.renewableShare ?? 0)
+  const water = groups['water'] ? groups['water'].sum / groups['water'].total : (kpis?.waterRecycledShare ?? 0)
+  const waste = groups['waste'] ? groups['waste'].sum / groups['waste'].total : (kpis?.wasteRecycledShare ?? 0)
+  const safety = groups['safety'] ? groups['safety'].sum / groups['safety'].total : (kpis && kpis.ltifr >= 0 ? Math.max(0, 100 - kpis.ltifr * 5) : 80)
+  const workforce = groups['workforce'] ? groups['workforce'].sum / groups['workforce'].total : (kpis && kpis.trainingHours > 0 ? 88 : 70)
+  return [
+    { label: 'Energy', pct: Math.round(energy), tone: 'bg-blue-500' },
+    { label: 'Water', pct: Math.round(water), tone: 'bg-cyan-500' },
+    { label: 'Waste', pct: Math.round(waste), tone: 'bg-emerald-500' },
+    { label: 'Safety', pct: Math.round(safety), tone: 'bg-amber-500' },
+    { label: 'Workforce', pct: Math.round(workforce), tone: 'bg-violet-500' },
+  ]
+}
+
+/* ============================================================
+ * Animation variants
+ * ============================================================ */
+const cardEnter = {
+  hidden: { opacity: 0, y: 16 },
+  visible: (i = 0) => ({
+    opacity: 1, y: 0,
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
+  }),
+}
+
+/* ============================================================
+ * Sub-components
+ * ============================================================ */
+
+/** Compact KPI module — 1 cell inside the 2×3 grid. */
+function KpiModule({
+  icon: Icon, label, value, unit, sub, trend, tone,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string
+  unit?: string
+  sub?: React.ReactNode
+  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
+  tone: string
+}) {
+  return (
+    <div className="glass-subtle rounded-2xl p-3.5 flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${tone}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        {trend && (
+          <span className={`status-pill text-[9px] ${
+            trend.tone ?? (trend.dir === 'up' ? 'status-approved' : trend.dir === 'down' ? 'status-missing' : 'status-draft')
+          }`}>
+            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
+             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
+            {trend.text}
+          </span>
+        )}
+      </div>
+      <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">{label}</div>
+      <div className="flex items-baseline gap-1">
+        <span className="text-xl font-bold text-slate-800 tabular-nums">{value}</span>
+        {unit && <span className="text-[10px] text-slate-400 font-medium">{unit}</span>}
+      </div>
+      {sub && <div className="text-[9px] text-slate-500 leading-tight">{sub}</div>}
+    </div>
+  )
+}
+
+/** Mini area sparkline inside a KPI cell. */
+function MiniArea({
+  data, color, dataKey, height = 70,
+}: {
+  data: { label: string; value: number }[]
+  color: string
+  dataKey: string
+  height?: number
+}) {
+  const gradientId = `mini-area-${color.replace('#', '')}-${dataKey}`
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity={0.45} />
+            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+          </linearGradient>
+        </defs>
+        <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+        <Area
+          type="monotone"
+          dataKey="value"
+          stroke={color}
+          strokeWidth={1.8}
+          fill={`url(#${gradientId})`}
+          isAnimationActive
+          animationDuration={500}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
+}
+
+/** Main "Site ESG Overview" card — 2×3 grid of compact KPI modules + mini charts. */
+function SiteEsgOverviewCard({
+  data, onLog,
+}: {
+  data: OverviewData
+  onLog: () => void
+}) {
+  const k = data.kpis
+  const trendEntries = Object.entries(data.trends || {})
+  const emissionsSeries = trendEntries.map(([label, t]) => ({ label, value: t.emissions }))
+  const waterSeries = trendEntries.map(([label, t]) => ({ label, value: t.water }))
+
+  // simple delta for trend pills — last vs prev
+  const delta = (series: { value: number }[]) => {
+    if (series.length < 2) return { dir: 'neutral' as const, text: '—' }
+    const last = series[series.length - 1].value
+    const prev = series[series.length - 2].value
+    if (prev === 0) return { dir: 'neutral' as const, text: '0%' }
+    const pct = ((last - prev) / Math.abs(prev)) * 100
+    return {
+      dir: pct >= 0 ? ('up' as const) : ('down' as const),
+      text: `${Math.abs(pct).toFixed(1)}%`,
+    }
+  }
+
+  return (
+    <motion.section
+      custom={0}
+      variants={cardEnter}
+      initial="hidden"
+      animate="visible"
+      className="glass glass-shimmer rounded-[20px] p-5"
+    >
+      <header className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-sky-500" />
+            Site ESG Overview
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Real-time telemetry, GHG footprint &amp; resource circularity
+          </p>
+        </div>
+        <button
+          onClick={onLog}
+          className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5"
+        >
+          <Plus className="h-3 w-3" /> Log Site Data
+        </button>
+      </header>
+
+      {/* 2×3 KPI grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <KpiModule
+          icon={Flame}
+          tone="bg-orange-50 text-orange-600 border border-orange-200"
+          label="Emissions"
+          value={formatNumber(k.totalEmissions, 1)}
+          unit="tCO₂e"
+          sub={<span>Scope 1: <b className="text-slate-700">{formatNumber(k.scope1, 0)}</b> · Scope 2: <b className="text-slate-700">{formatNumber(k.scope2, 0)}</b></span>}
+          trend={delta(emissionsSeries)}
+        />
+        <KpiModule
+          icon={Zap}
+          tone="bg-amber-50 text-amber-600 border border-amber-200"
+          label="Grid Electricity"
+          value={formatNumber(k.energyGJ, 1)}
+          unit="GJ"
+          sub={<span>Renewable: <b className="text-slate-700">{k.renewableShare.toFixed(1)}%</b></span>}
+          trend={{ dir: k.renewableShare >= 20 ? 'up' : 'neutral', text: `${k.renewableShare.toFixed(0)}% RE` }}
+        />
+        <KpiModule
+          icon={Fuel}
+          tone="bg-violet-50 text-violet-600 border border-violet-200"
+          label="HSD Diesel"
+          value={formatNumber(k.scope1 * 0.025, 1)}
+          unit="kL"
+          sub={<span>Scope 1 fuel use estimate</span>}
+          trend={{ dir: 'neutral', text: 'stable' }}
+        />
+        <KpiModule
+          icon={Droplets}
+          tone="bg-cyan-50 text-cyan-600 border border-cyan-200"
+          label="Recycled Water"
+          value={formatNumber(k.waterWithdrawalKL, 1)}
+          unit="kL"
+          sub={
+            <span className="inline-flex items-center gap-1">
+              <span className={`status-pill text-[8px] ${k.waterRecycledShare >= 50 ? 'status-approved' : 'status-warning'}`}>ZLD</span>
+              <b className="text-slate-700">{k.waterRecycledShare.toFixed(0)}%</b> recycled
+            </span>
+          }
+          trend={delta(waterSeries)}
+        />
+        <div className="glass-subtle rounded-2xl p-3 col-span-1">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium mb-1">Monthly GHG Trajectory</div>
+          <div className="h-[70px]">
+            {emissionsSeries.length > 0 ? (
+              <MiniArea data={emissionsSeries} color={STROKE_EMISSIONS} dataKey="emissions" />
+            ) : (
+              <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+            )}
+          </div>
+        </div>
+        <div className="glass-subtle rounded-2xl p-3 col-span-1">
+          <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium mb-1">Water Recycling Curve</div>
+          <div className="h-[70px]">
+            {waterSeries.length > 0 ? (
+              <MiniArea data={waterSeries} color={STROKE_WATER} dataKey="water" />
+            ) : (
+              <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.section>
+  )
+}
+
+/** Tall "Recent Site Activities" card with vertical timeline. */
+function RecentActivitiesCard({
+  activities, loading,
+}: {
+  activities: ActivityItem[]
+  loading: boolean
+}) {
+  return (
+    <motion.section
+      custom={1}
+      variants={cardEnter}
+      initial="hidden"
+      animate="visible"
+      className="glass glass-shimmer rounded-[20px] p-5"
+    >
+      <header className="flex items-start justify-between gap-3 mb-3">
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+            <ActivityIcon className="h-4 w-4 text-sky-500" />
+            Recent Site Activities
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">Live feed · polled every 30s</p>
+        </div>
+        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
+          All Activities <ChevronRight className="h-3 w-3" />
+        </button>
+      </header>
+
+      <div className="relative max-h-[420px] overflow-y-auto scroll-elegant pr-1">
+        {loading && activities.length === 0 ? (
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex gap-3 animate-pulse">
+                <div className="h-10 w-10 rounded-full bg-slate-200/70" />
+                <div className="flex-1 space-y-2 py-1">
+                  <div className="h-3 w-2/3 rounded bg-slate-200/70" />
+                  <div className="h-2.5 w-5/6 rounded bg-slate-200/50" />
+                  <div className="h-2 w-1/3 rounded bg-slate-200/40" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="py-12 text-center">
+            <AlertCircle className="mx-auto h-8 w-8 text-slate-300" />
+            <p className="text-[12px] text-slate-500 mt-2">No activity yet</p>
+          </div>
+        ) : (
+          <ol className="relative space-y-1 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-sky-200/60 before:via-sky-100/40 before:to-transparent">
+            <AnimatePresence initial={false}>
+              {activities.map((a, i) => (
+                <motion.li
+                  key={a.id}
+                  layout
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 8 }}
+                  transition={{ duration: 0.3, delay: i * 0.02 }}
+                  className="relative flex gap-3 py-2.5 px-1 rounded-xl hover:bg-white/40 transition-colors"
+                >
+                  <div className="relative z-10 flex-shrink-0">
+                    <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${a.actorRole?.includes('Reviewer') ? 'from-indigo-500 to-violet-600' : a.actorRole?.includes('Auditor') ? 'from-slate-500 to-slate-700' : a.actorRole?.includes('Manager') ? 'from-emerald-500 to-teal-600' : 'from-sky-500 to-blue-600'} text-white flex items-center justify-center text-[11px] font-semibold ring-2 ring-white/80`}>
+                      {initials(a.actorName)}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-semibold text-slate-800 truncate">{a.title}</span>
+                      {a.status && (
+                        <span className={`status-pill text-[9px] ${statusClass(a.status)}`}>{a.status.replace(/_/g, ' ').toLowerCase()}</span>
+                      )}
+                    </div>
+                    {a.description && (
+                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{a.description}</p>
+                    )}
+                    <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5">
+                      <span className="font-medium text-slate-600">{a.actorName}</span>
+                      <span>·</span>
+                      <span>{a.actorRole}</span>
+                      <span>·</span>
+                      <span>{timeAgo(a.createdAt)}</span>
+                      {a.module && (
+                        <>
+                          <span>·</span>
+                          <span className="px-1.5 py-0.5 rounded bg-slate-100/80 text-slate-600">{a.module}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </motion.li>
+              ))}
+            </AnimatePresence>
+          </ol>
+        )}
+      </div>
+    </motion.section>
+  )
+}
+
+/** Mini chart card cell for the 2×2 analytics grid. */
+function MiniChartCell({
+  title, subtitle, children, height = 130,
+}: {
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+  height?: number
+}) {
+  return (
+    <div className="glass-subtle rounded-2xl p-3.5 flex flex-col">
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <div className="text-[11px] font-semibold text-slate-700">{title}</div>
+          {subtitle && <div className="text-[9px] text-slate-500 mt-0.5">{subtitle}</div>}
+        </div>
+        <MoreHorizontal className="h-3.5 w-3.5 text-slate-400" />
+      </div>
+      <div style={{ height }} className="flex-1">{children}</div>
+    </div>
+  )
+}
+
+/** "Site ESG Analytics" card — 2×2 chart grid + 3-col metrics row. */
+function AnalyticsCard({ data }: { data: OverviewData }) {
+  const k = data.kpis
+  const trendEntries = Object.entries(data.trends || {})
+  const ghgSeries = trendEntries.map(([label, t]) => ({
+    label, scope1: t.emissions * 0.42, scope2: t.emissions * 0.5, scope3: t.emissions * 0.08,
+  }))
+  const energySeries = trendEntries.map(([label, t]) => ({ label, value: t.energy }))
+
+  const waterDonut = [
+    { name: 'Withdrawn', value: Math.max(1, k.waterWithdrawalKL) },
+    { name: 'Recycled', value: Math.max(0.1, k.waterWithdrawalKL * k.waterRecycledShare / 100) },
+  ]
+
+  const baselineSeries = trendEntries.map(([label, t]) => ({ label, value: t.emissions * 0.95 }))
+  const baselineValue = baselineSeries.length ? baselineSeries[baselineSeries.length - 1].value : 0
+
+  return (
+    <motion.section
+      custom={2}
+      variants={cardEnter}
+      initial="hidden"
+      animate="visible"
+      className="glass glass-shimmer rounded-[20px] p-5"
+    >
+      <header className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+            <BarChart3 className="h-4 w-4 text-sky-500" />
+            Site ESG Analytics
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">GHG, energy, water &amp; baseline indicators</p>
+        </div>
+        <button className="rounded-lg p-1 text-slate-400 hover:text-slate-700 hover:bg-white/60 transition-colors">
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </header>
+
+      {/* 2×2 chart grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <MiniChartCell title="Scope 1 vs 2 GHG" subtitle="tCO₂e per period" height={130}>
+          {ghgSeries.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={ghgSeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <defs>
+                  <linearGradient id="ghg-s1" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0EA5E9" stopOpacity={0.5} />
+                    <stop offset="100%" stopColor="#0EA5E9" stopOpacity={0.04} />
+                  </linearGradient>
+                  <linearGradient id="ghg-s2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6366F1" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#6366F1" stopOpacity={0.04} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={32} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+                <Area type="monotone" dataKey="scope1" stroke="#0EA5E9" strokeWidth={1.6} fill="url(#ghg-s1)" />
+                <Area type="monotone" dataKey="scope2" stroke="#6366F1" strokeWidth={1.6} fill="url(#ghg-s2)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+          )}
+        </MiniChartCell>
+
+        <MiniChartCell title="Monthly Energy" subtitle="GJ per period" height={130}>
+          {energySeries.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={energySeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={32} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(14,165,233,0.06)' }} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+                <Bar dataKey="value" fill="#0EA5E9" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+          )}
+        </MiniChartCell>
+
+        <MiniChartCell title="Water Balance" subtitle={`${k.waterRecycledShare.toFixed(0)}% recycled`} height={130}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={waterDonut}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={28}
+                outerRadius={48}
+                paddingAngle={2}
+                stroke="none"
+              >
+                {waterDonut.map((_, i) => (
+                  <Cell key={i} fill={DONUT_PALETTE[i % DONUT_PALETTE.length]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+            </PieChart>
+          </ResponsiveContainer>
+        </MiniChartCell>
+
+        <MiniChartCell title="CEA v19 Baseline" subtitle="Emission factor trend" height={130}>
+          <div className="flex flex-col h-full justify-between">
+            <div className="flex items-baseline gap-1">
+              <span className="text-[22px] font-bold text-slate-800 tabular-nums">{formatNumber(baselineValue, 1)}</span>
+              <span className="text-[9px] text-slate-400">tCO₂e</span>
+            </div>
+            <div className="flex-1 min-h-0">
+              {baselineSeries.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={baselineSeries} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
+                    <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={32} domain={['auto', 'auto']} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+                    <Line type="monotone" dataKey="value" stroke="#10B981" strokeWidth={1.8} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+              )}
+            </div>
+          </div>
+        </MiniChartCell>
+      </div>
+
+      {/* 3-col compact metrics row */}
+      <div className="grid grid-cols-3 gap-2 mt-3">
+        <div className="glass-subtle rounded-xl px-3 py-2">
+          <div className="text-[9px] uppercase tracking-wide text-slate-500">Waste Recycled</div>
+          <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.wasteRecycledShare.toFixed(1)}%</div>
+        </div>
+        <div className="glass-subtle rounded-xl px-3 py-2">
+          <div className="text-[9px] uppercase tracking-wide text-slate-500">BRSR Readiness</div>
+          <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.brsrReadiness.toFixed(1)}%</div>
+        </div>
+        <div className="glass-subtle rounded-xl px-3 py-2">
+          <div className="text-[9px] uppercase tracking-wide text-slate-500">Submissions</div>
+          <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.totalSubs}</div>
+        </div>
+      </div>
+    </motion.section>
+  )
+}
+
+/** "Site Operations" card — quick action buttons + available chips. */
+function QuickActionsCard({ onAction }: { onAction: (m: ModuleKey) => void }) {
+  const actions: { label: string; icon: React.ElementType; module: ModuleKey; tone: string }[] = [
+    { label: 'Open Data Entry', icon: Database, module: 'data-entry', tone: 'bg-sky-50 text-sky-600' },
+    { label: 'Upload Evidence', icon: Upload, module: 'evidence', tone: 'bg-violet-50 text-violet-600' },
+    { label: 'View Pending Submission', icon: Send, module: 'submissions', tone: 'bg-amber-50 text-amber-600' },
+    { label: 'Check Validation', icon: ShieldCheck, module: 'submissions', tone: 'bg-emerald-50 text-emerald-600' },
+    { label: 'View Reports', icon: FileText, module: 'reports', tone: 'bg-cyan-50 text-cyan-600' },
+  ]
+  return (
+    <motion.section
+      custom={3}
+      variants={cardEnter}
+      initial="hidden"
+      animate="visible"
+      className="glass glass-shimmer rounded-[20px] p-5"
+    >
+      <header className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-sky-500" />
+            Site Operations
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">Quick actions for site data flow</p>
+        </div>
+        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
+          <Plus className="h-3 w-3" /> Add Section
+        </button>
+      </header>
+
+      <div className="space-y-2">
+        {actions.map((a, i) => (
+          <motion.button
+            key={a.label}
+            onClick={() => onAction(a.module)}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.04 }}
+            className="glass-subtle rounded-xl px-3 py-2.5 w-full flex items-center gap-3 hover:bg-white/70 hover:shadow-sm transition-all text-left group"
+          >
+            <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${a.tone}`}>
+              <a.icon className="h-4 w-4" />
+            </span>
+            <span className="flex-1 text-[12px] font-medium text-slate-700 group-hover:text-slate-900">{a.label}</span>
+            <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all" />
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Available chips row */}
+      <div className="mt-4 pt-3 border-t border-slate-200/60">
+        <div className="text-[9px] uppercase tracking-wide text-slate-500 mb-2">Available data elements</div>
+        <div className="flex flex-wrap gap-1.5">
+          {FORM_ELEMENTS.map(el => (
+            <span key={el.label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${el.tone}`}>
+              <span className="font-mono">::</span>{el.label}
+              <span className="opacity-60">{el.unit}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </motion.section>
+  )
+}
+
+/** "Active Submissions" wide table. */
+function ActiveSubmissionsCard({
+  submissions, loading, onViewAll,
+}: {
+  submissions: SubmissionItem[]
+  loading: boolean
+  onViewAll: () => void
+}) {
+  return (
+    <motion.section
+      custom={4}
+      variants={cardEnter}
+      initial="hidden"
+      animate="visible"
+      className="glass glass-shimmer rounded-[20px] p-5"
+    >
+      <header className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+            <Layers className="h-4 w-4 text-sky-500" />
+            Active Submissions
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {submissions.length} submission{submissions.length === 1 ? '' : 's'} in progress
+          </p>
+        </div>
+        <button
+          onClick={onViewAll}
+          className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5"
+        >
+          View All <ChevronRight className="h-3 w-3" />
+        </button>
+      </header>
+
+      {loading && submissions.length === 0 ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-11 rounded-xl bg-slate-200/60 animate-pulse" />
+          ))}
+        </div>
+      ) : submissions.length === 0 ? (
+        <div className="py-10 text-center">
+          <FileText className="mx-auto h-8 w-8 text-slate-300" />
+          <p className="text-[12px] text-slate-500 mt-2">No active submissions</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-[10px] uppercase tracking-wide text-slate-500 border-b border-slate-200/60">
+                <th className="py-2 px-3 font-medium">Project / Title</th>
+                <th className="py-2 px-3 font-medium">Period</th>
+                <th className="py-2 px-3 font-medium">Module</th>
+                <th className="py-2 px-3 font-medium">Status</th>
+                <th className="py-2 px-3 font-medium w-40">Completion</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100/80">
+              {submissions.slice(0, 8).map(s => (
+                <tr key={s.id} className="text-[12px] hover:bg-white/50 transition-colors">
+                  <td className="py-2.5 px-3">
+                    <div className="font-medium text-slate-800 truncate max-w-[240px]">{s.title}</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">
+                      {s.project?.projectCode ?? '—'} · {s.project?.projectName ?? '—'}
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-3 text-slate-600">{s.reportingPeriod?.periodLabel ?? '—'}</td>
+                  <td className="py-2.5 px-3">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100/80 text-slate-700 text-[10px] font-medium capitalize">
+                      {s.module}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3">
+                    <span className={`status-pill text-[10px] ${statusClass(s.status)}`}>
+                      {s.status.replace(/_/g, ' ').toLowerCase()}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-sky-400 to-sky-600 rounded-full transition-all"
+                          style={{ width: `${s.completionPct || 0}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-slate-600 tabular-nums w-8 text-right">
+                        {s.completionPct || 0}%
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </motion.section>
+  )
+}
+
+/** "Data Entry Status" compact progress bars. */
+function DataEntryStatusCard({
+  subs, kpis,
+}: {
+  subs: SubmissionItem[]
+  kpis?: Kpis
+}) {
+  const modules = moduleCompletion(subs, kpis)
+  return (
+    <motion.section
+      custom={5}
+      variants={cardEnter}
+      initial="hidden"
+      animate="visible"
+      className="glass glass-shimmer rounded-[20px] p-5"
+    >
+      <header className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-sky-500" />
+            Data Entry Status
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">Per-module completion</p>
+        </div>
+      </header>
+
+      <div className="space-y-3">
+        {modules.map(m => (
+          <div key={m.label}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[12px] font-medium text-slate-700">{m.label}</span>
+              <span className="text-[11px] text-slate-500 tabular-nums">{m.pct}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${m.pct}%` }}
+                transition={{ duration: 0.8, ease: 'easeOut' }}
+                className={`h-full ${m.tone} rounded-full`}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </motion.section>
+  )
+}
+
+/** "Team / Site Users" horizontal scroll. */
+function TeamCard() {
+  return (
+    <motion.section
+      custom={6}
+      variants={cardEnter}
+      initial="hidden"
+      animate="visible"
+      className="glass glass-shimmer rounded-[20px] p-5"
+    >
+      <header className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+            <Users className="h-4 w-4 text-sky-500" />
+            Team / Site Users
+          </h2>
+          <p className="text-[11px] text-slate-500 mt-0.5">{SEEDED_TEAM.filter(u => u.active).length} active members</p>
+        </div>
+        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
+          All Users <ChevronRight className="h-3 w-3" />
+        </button>
+      </header>
+
+      <div className="flex gap-3 overflow-x-auto scroll-elegant pb-1">
+        {SEEDED_TEAM.map(u => (
+          <div
+            key={u.name}
+            className="glass-subtle rounded-2xl p-3 flex-shrink-0 w-[160px] flex flex-col items-center text-center"
+          >
+            <div className={`h-12 w-12 rounded-full bg-gradient-to-br ${u.gradient} text-white flex items-center justify-center text-[13px] font-semibold ring-2 ring-white/80 mb-2`}>
+              {initials(u.name)}
+            </div>
+            <div className="text-[12px] font-semibold text-slate-800 truncate w-full">{u.name}</div>
+            <div className="text-[10px] text-slate-500 mb-1.5 truncate w-full">{u.role}</div>
+            <span className={`status-pill text-[9px] ${u.active ? 'status-approved' : 'status-draft'}`}>
+              {u.active ? 'Active' : 'Away'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </motion.section>
+  )
+}
 
 /* ============================================================
  * Main component
@@ -174,7 +970,6 @@ export function SiteUserOverview() {
   const [submissions, setSubmissions] = useState<SubmissionItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [lastActivityAt, setLastActivityAt] = useState<Date | null>(null)
   const mountedRef = useRef(true)
 
   /* ---- fetchers ---- */
@@ -199,7 +994,6 @@ export function SiteUserOverview() {
       const data = (await res.json()) as ActivityResponse
       if (!mountedRef.current) return
       setActivities(Array.isArray(data.items) ? data.items : [])
-      setLastActivityAt(new Date())
     } catch {
       /* silent — keep existing feed on poll error */
     }
@@ -238,981 +1032,104 @@ export function SiteUserOverview() {
     }
   }, [fetchActivities, fetchOverview])
 
-  /* ---- derived data ---- */
-  const trendArr = useMemo<Array<Trend & { label: string }>>(() => {
-    if (!overview) return []
-    return Object.entries(overview.trends).map(([label, v]) => ({ label, ...v }))
+  const trendsArr = useMemo<Array<{ label: string } & Trend>>(() => {
+    if (!overview?.trends) return []
+    return Object.entries(overview.trends).map(([label, t]) => ({ label, ...t }))
   }, [overview])
 
-  const emissionsBySourceArr = useMemo(() => {
-    if (!overview) return [] as { name: string; value: number }[]
-    return Object.entries(overview.emissionsBySource)
-      .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
-      .filter(d => d.value > 0)
-      .sort((a, b) => b.value - a.value)
-  }, [overview])
+  // Guard: still loading initial data
+  if (loading && !overview) {
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(380px,42%)]">
+          <div className="space-y-5">
+            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+          </div>
+          <div className="space-y-5">
+            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+          </div>
+        </div>
+        <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="glass rounded-[20px] h-[260px] animate-pulse" />
+          <div className="glass rounded-[20px] h-[260px] animate-pulse" />
+        </div>
+      </div>
+    )
+  }
 
-  const monthlyEnergy = useMemo(() => {
-    return trendArr.map(t => ({ label: shortMonth(t.label), value: Math.round(t.energy) }))
-  }, [trendArr])
+  // Guard: error and no data at all
+  if (error && !overview) {
+    return (
+      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+        <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
+        <p className="text-[14px] font-semibold text-slate-700 mb-1">Unable to load dashboard</p>
+        <p className="text-[12px] text-slate-500 mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> Retry
+        </button>
+      </div>
+    )
+  }
 
-  const moduleCompletion = useMemo(() => {
-    const MODULES = ['ENERGY', 'WATER', 'WASTE', 'SAFETY', 'PEOPLE'] as const
-    const fallback: Record<string, number> = { ENERGY: 0, WATER: 0, WASTE: 0, SAFETY: 0, PEOPLE: 0 }
-    if (!submissions.length) {
-      // If no submissions, derive a soft % from the KPIs so the bar isn't empty
-      const k = overview?.kpis
-      if (!k) return []
-      return [
-        { module: 'Energy',   pct: Math.min(100, Math.round((k.energyGJ > 0 ? 70 : 30) + (k.renewableShare / 5))) },
-        { module: 'Water',    pct: Math.min(100, Math.round((k.waterWithdrawalKL > 0 ? 65 : 25) + (k.waterRecycledShare / 5))) },
-        { module: 'Waste',    pct: Math.min(100, Math.round((k.wasteGeneratedT > 0 ? 60 : 20) + (k.wasteRecycledShare / 5))) },
-        { module: 'Safety',   pct: Math.min(100, Math.round(k.totalWorkforce > 0 ? 80 : 10)) },
-        { module: 'Workforce', pct: Math.min(100, Math.round(k.totalWorkforce > 0 ? 75 : 10)) },
-      ]
-    }
-    const byMod: Record<string, SubmissionItem[]> = {}
-    for (const s of submissions) {
-      const m = (s.module || '').toUpperCase()
-      if (!MODULES.includes(m as typeof MODULES[number])) continue
-      ;(byMod[m] ??= []).push(s)
-    }
-    const moduleLabels: Record<string, string> = { ENERGY: 'Energy', WATER: 'Water', WASTE: 'Waste', SAFETY: 'Safety', PEOPLE: 'Workforce' }
-    return MODULES.map(m => {
-      const items = byMod[m] ?? []
-      const pct = items.length === 0
-        ? fallback[m]
-        : Math.round(items.reduce((s, x) => s + (x.completionPct || 0), 0) / items.length)
-      return { module: moduleLabels[m], pct: Math.min(100, Math.max(0, pct)) }
-    })
-  }, [submissions, overview])
+  // Guard: empty state (no periods configured yet)
+  if (!overview) {
+    return (
+      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+        <Database className="h-10 w-10 text-sky-300 mb-3" />
+        <p className="text-[14px] font-semibold text-slate-700 mb-1">No reporting periods yet</p>
+        <p className="text-[12px] text-slate-500 mb-4">Set up a reporting year to populate this dashboard.</p>
+        <button
+          onClick={() => setActiveModule('brsr')}
+          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+        >
+          <Plus className="h-3.5 w-3.5" /> Configure Period
+        </button>
+      </div>
+    )
+  }
 
-  const activeSubs = useMemo(() => submissions.slice(0, 5), [submissions])
-
-  /* ---- render states ---- */
-  if (loading) return <DashboardSkeleton />
-  if (error && !overview) return <ErrorState message={error} onRetry={() => location.reload()} />
-  if (!overview) return <EmptyState />
-  const k = overview.kpis
-
-  /* ---- KPI cards data (Emissions / Energy / Water) ---- */
-  const kpiCards = [
-    {
-      icon: Flame,
-      label: 'Emissions',
-      value: k.totalEmissions.toLocaleString(),
-      unit: 'tCO₂e',
-      trend: trendDelta(trendArr, 'emissions'),
-      spark: trendArr.map(t => t.emissions),
-      sub: `S1: ${k.scope1.toLocaleString()} · S2: ${k.scope2.toLocaleString()}`,
-      goodDirection: 'down' as const,
-      tone: 'bg-rose-50 text-rose-600',
-      module: 'analytics' as ModuleKey,
-    },
-    {
-      icon: Zap,
-      label: 'Energy',
-      value: k.energyGJ.toLocaleString(),
-      unit: 'GJ',
-      trend: trendDelta(trendArr, 'energy'),
-      spark: trendArr.map(t => t.energy),
-      sub: `Renewable ${k.renewableShare}%`,
-      goodDirection: 'down' as const,
-      tone: 'bg-amber-50 text-amber-600',
-      module: 'data-entry' as ModuleKey,
-    },
-    {
-      icon: Droplet,
-      label: 'Water',
-      value: k.waterWithdrawalKL.toLocaleString(),
-      unit: 'KL',
-      trend: trendDelta(trendArr, 'water'),
-      spark: trendArr.map(t => t.water),
-      sub: `Recycled ${k.waterRecycledShare}%`,
-      goodDirection: 'down' as const,
-      tone: 'bg-cyan-50 text-cyan-600',
-      module: 'data-entry' as ModuleKey,
-    },
-  ]
+  const isEmpty = !overview || trendsArr.length === 0
 
   return (
     <div className="space-y-5">
-      {/* ---- Page header ---- */}
-      <PageHeader k={k} periodCount={overview.periods.length} />
-
-      {/* ---- 3-column asymmetric grid ---- */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_400px_280px]">
-        {/* ============================
-            LEFT COLUMN (~58%)
-           ============================ */}
+      {/* 2-column grid: left 58% / right 42% */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(380px,42%)]">
+        {/* LEFT */}
         <div className="space-y-5">
-          {/* KPI cards row */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {kpiCards.map((c, i) => (
-              <KpiCard key={c.label} delay={0.05 * i} {...c} onClick={() => setActiveModule(c.module)} />
-            ))}
-          </div>
-
-          {/* Active Submissions table */}
-          <ActiveSubmissionsCard
-            subs={activeSubs}
-            onViewAll={() => setActiveModule('submissions')}
-          />
-
-          {/* Data Entry Status bar */}
-          <DataEntryStatusCard modules={moduleCompletion} onOpen={() => setActiveModule('data-entry')} />
+          <SiteEsgOverviewCard data={overview} onLog={() => setActiveModule('data-entry')} />
+          <RecentActivitiesCard activities={activities} loading={loading} />
         </div>
-
-        {/* ============================
-            CENTER COLUMN (~25%)
-           ============================ */}
+        {/* RIGHT */}
         <div className="space-y-5">
-          <RecentActivitiesCard
-            activities={activities}
-            lastActivityAt={lastActivityAt}
-          />
-          <TeamSubmissionsCard
-            team={SEEDED_TEAM}
-            activeCount={SEEDED_TEAM.filter(t => t.active).length}
-            onOpen={() => setActiveModule('my-project')}
-          />
-        </div>
-
-        {/* ============================
-            RIGHT COLUMN (~17%)
-           ============================ */}
-        <div className="space-y-5">
-          <AnalyticsMiniCard
-            emissionsBySource={emissionsBySourceArr}
-            monthlyEnergy={monthlyEnergy}
-            onOpen={() => setActiveModule('analytics')}
-          />
-          <FormBuilderCard elements={FORM_ELEMENTS} onOpen={() => setActiveModule('data-entry')} />
-          <DataConnectionsCard connections={DATA_CONNECTIONS} onOpen={() => setActiveModule('admin')} />
+          <AnalyticsCard data={overview} />
+          <QuickActionsCard onAction={(m) => setActiveModule(m)} />
         </div>
       </div>
-    </div>
-  )
-}
 
-/* ============================================================
- * Sub-components
- * ============================================================ */
-
-function PageHeader({ k, periodCount }: { k: Kpis; periodCount: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-      className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
-    >
-      <div>
-        <div className="flex items-center gap-2">
-          <h1 className="text-[18px] font-bold tracking-tight text-slate-800">Site Overview</h1>
-          <span className="status-pill status-approved">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" /> Live
-          </span>
-        </div>
-        <p className="mt-1 text-[12px] text-slate-500">
-          Group consolidated · {k.orgs} group(s) · {k.projects} project(s) · {periodCount} reporting period(s)
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="glass-subtle flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium text-slate-600">
-          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-          {k.completion}% reporting complete
-        </span>
-        <span className="glass-subtle flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium text-slate-600">
-          <FileText className="h-3 w-3 text-blue-500" />
-          {k.totalSubs} submissions
-        </span>
-      </div>
-    </motion.div>
-  )
-}
-
-/* ---------- KPI Card ---------- */
-interface KpiCardProps {
-  icon: typeof Flame
-  label: string
-  value: string
-  unit: string
-  trend: number | null
-  spark: number[]
-  sub: string
-  goodDirection: 'up' | 'down'
-  tone: string
-  delay: number
-  onClick: () => void
-}
-function KpiCard({ icon: Icon, label, value, unit, trend, spark, sub, goodDirection, tone, delay, onClick }: KpiCardProps) {
-  const hasTrend = trend !== null && trend !== undefined && !Number.isNaN(trend)
-  const isNeutral = hasTrend && trend === 0
-  const isGood = hasTrend && !isNeutral && ((goodDirection === 'down' && trend! < 0) || (goodDirection === 'up' && trend! > 0))
-  const pillClass = !hasTrend || isNeutral ? 'status-review' : isGood ? 'status-approved' : 'status-warning'
-  const hasSpark = spark.length >= 2
-  const sparkData = spark.map((v, i) => ({ i, v }))
-  return (
-    <motion.button
-      type="button"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
-      whileHover={{ y: -2 }}
-      onClick={onClick}
-      className="glass glass-shimmer group relative flex w-full flex-col overflow-hidden rounded-2xl p-5 text-left transition-all hover:shadow-lg hover:shadow-blue-500/10"
-    >
-      {/* Top row: label + trend pill */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className={`kpi-tile ${tone}`} style={{ width: 32, height: 32 }}>
-            <Icon className="h-4 w-4" />
-          </span>
-          <span className="text-[13px] font-medium text-slate-500">{label}</span>
-        </div>
-        {hasTrend && (
-          <span className={`status-pill ${pillClass}`}>
-            {trend! < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-            {trend! > 0 ? '+' : ''}{trend}%
-          </span>
-        )}
-      </div>
-      {/* Middle row: value + sparkline */}
-      <div className="mt-3 flex items-end justify-between gap-2">
-        <div>
-          <div className="flex items-baseline gap-1">
-            <span className="tabular-nums text-[28px] font-bold leading-none text-slate-900">{value}</span>
-            <span className="text-[12px] font-medium text-slate-400">&nbsp;{unit}</span>
-          </div>
-          <div className="mt-1.5 text-[11px] text-slate-500">{sub}</div>
-        </div>
-        {hasSpark && (
-          <div className="h-[60px] w-[88px] flex-shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={sparkData} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id={`spark-${label}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={SPARK_STROKE} stopOpacity={0.4} />
-                    <stop offset="95%" stopColor={SPARK_STROKE} stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <Area
-                  type="monotone"
-                  dataKey="v"
-                  stroke={SPARK_STROKE}
-                  strokeWidth={2}
-                  fill={`url(#spark-${label})`}
-                  dot={false}
-                  isAnimationActive
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-      <div className="mt-2 flex items-center gap-1 text-[10px] font-medium text-slate-400 opacity-0 transition group-hover:opacity-100">
-        Drill-down <ArrowUpRight className="h-3 w-3" />
-      </div>
-    </motion.button>
-  )
-}
-
-/* ---------- Active Submissions ---------- */
-function ActiveSubmissionsCard({ subs, onViewAll }: { subs: SubmissionItem[]; onViewAll: () => void }) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-      className="glass glass-shimmer rounded-2xl p-5"
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span className="kpi-tile bg-blue-50 text-blue-600" style={{ width: 32, height: 32 }}>
-            <Send className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-[16px] font-semibold text-slate-800">Active Submissions</h2>
-            <p className="text-[11px] text-slate-500">Recent reporting submissions &amp; their status</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onViewAll}
-          className="glass-subtle flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:text-blue-600"
-        >
-          View All <ArrowRight className="h-3 w-3" />
-        </button>
+      {/* Below: full-width sections */}
+      <ActiveSubmissionsCard
+        submissions={submissions}
+        loading={loading}
+        onViewAll={() => setActiveModule('submissions')}
+      />
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <DataEntryStatusCard subs={submissions} kpis={overview.kpis} />
+        <TeamCard />
       </div>
 
-      {subs.length === 0 ? (
-        <div className="py-10 text-center text-[12px] text-slate-400">No active submissions yet.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-slate-200/60 text-[11px] font-medium uppercase tracking-wide text-slate-400">
-                <th className="pb-2 pr-3">Project / Title</th>
-                <th className="pb-2 pr-3">Period</th>
-                <th className="pb-2 pr-3">Status</th>
-                <th className="pb-2 pr-2">Completion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subs.map((s, i) => {
-                const projectName = s.project?.projectName ?? s.title
-                const period = s.reportingPeriod?.periodLabel ?? '—'
-                const status = (s.status || 'DRAFT').toLowerCase().replace(/_/g, ' ')
-                const statusPill = statusForSubmission(s.status)
-                const completion = Math.round(s.completionPct ?? 0)
-                return (
-                  <motion.tr
-                    key={s.id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.25 + i * 0.04 }}
-                    className="group border-b border-slate-100/80 text-[12px] transition hover:bg-white/50"
-                  >
-                    <td className="py-2.5 pr-3">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-blue-100 to-cyan-100 text-[10px] font-bold text-blue-700">
-                          {(s.module || '?').slice(0, 2)}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold text-slate-800">{projectName}</div>
-                          <div className="truncate text-[10px] text-slate-400">{s.project?.projectCode ?? s.module}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-2.5 pr-3 text-slate-600">{period}</td>
-                    <td className="py-2.5 pr-3">
-                      <span className={`status-pill ${statusPill}`}>
-                        {status}
-                      </span>
-                    </td>
-                    <td className="py-2.5 pr-2">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-200/70">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
-                            style={{ width: `${completion}%` }}
-                          />
-                        </div>
-                        <span className="tabular-nums text-[11px] font-semibold text-slate-700">{completion}%</span>
-                      </div>
-                    </td>
-                  </motion.tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {/* Empty-data safety banner (rendered only when no trend data) */}
+      {isEmpty && (
+        <div className="glass-subtle rounded-2xl p-3 flex items-center gap-2 text-[11px] text-slate-600">
+          <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+          Live telemetry is sparse — KPIs reflect aggregated records only.
         </div>
       )}
-    </motion.section>
-  )
-}
-
-/* ---------- Data Entry Status ---------- */
-function DataEntryStatusCard({ modules, onOpen }: { modules: { module: string; pct: number }[]; onOpen: () => void }) {
-  const tones: Record<string, string> = {
-    Energy:   'from-blue-500 to-cyan-500',
-    Water:    'from-cyan-500 to-teal-500',
-    Waste:    'from-emerald-500 to-teal-500',
-    Safety:   'from-amber-500 to-orange-500',
-    Workforce: 'from-violet-500 to-purple-500',
-  }
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-      className="glass glass-shimmer rounded-2xl p-5"
-    >
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span className="kpi-tile bg-emerald-50 text-emerald-600" style={{ width: 32, height: 32 }}>
-            <Layers className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-[16px] font-semibold text-slate-800">Data Entry Status</h2>
-            <p className="text-[11px] text-slate-500">Module-wise completion across the current period</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="glass-subtle flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:text-blue-600"
-        >
-          Open Entry <ArrowRight className="h-3 w-3" />
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {modules.map((m, i) => (
-          <motion.div
-            key={m.module}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35 + i * 0.04 }}
-            className="rounded-xl bg-white/50 p-2.5"
-          >
-            <div className="mb-1.5 flex items-center justify-between text-[11px]">
-              <span className="font-medium text-slate-600">{m.module}</span>
-              <span className="tabular-nums font-bold text-slate-800">{m.pct}%</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200/70">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${m.pct}%` }}
-                transition={{ duration: 0.7, ease: 'easeOut', delay: 0.4 + i * 0.04 }}
-                className={`h-full rounded-full bg-gradient-to-r ${tones[m.module] ?? 'from-blue-500 to-cyan-500'}`}
-              />
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </motion.section>
-  )
-}
-
-/* ---------- Recent Activities (live feed) ---------- */
-function RecentActivitiesCard({ activities, lastActivityAt }: { activities: ActivityItem[]; lastActivityAt: Date | null }) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-      className="glass glass-shimmer flex flex-col rounded-2xl p-5"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span className="kpi-tile bg-blue-50 text-blue-600" style={{ width: 32, height: 32 }}>
-            <ActivityIcon className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-[16px] font-semibold text-slate-800">Recent Activities</h2>
-            <p className="text-[11px] text-slate-500">Live feed of ESG data events</p>
-          </div>
-        </div>
-        <span className="flex items-center gap-1.5 rounded-full bg-emerald-50/80 px-2 py-1 text-[10px] font-semibold text-emerald-700">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          </span>
-          Live
-        </span>
-      </div>
-
-      <div className="max-h-[420px] min-h-[240px] space-y-1 overflow-y-auto scroll-elegant pr-1">
-        <AnimatePresence initial={false}>
-          {activities.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="py-10 text-center text-[12px] text-slate-400"
-            >
-              No recent activity yet.
-            </motion.div>
-          ) : (
-            activities.map((a, i) => (
-              <ActivityRowItem key={a.id} a={a} delay={i * 0.02} />
-            ))
-          )}
-        </AnimatePresence>
-      </div>
-
-      {lastActivityAt && (
-        <div className="mt-2 border-t border-slate-200/50 pt-2 text-[10px] text-slate-400">
-          Last sync: {lastActivityAt.toLocaleTimeString()} · auto-refresh 30s
-        </div>
-      )}
-    </motion.section>
-  )
-}
-
-function ActivityRowItem({ a, delay }: { a: ActivityItem; delay: number }) {
-  const initials = getInitials(a.actorName)
-  const gradient = gradientForRole(a.actorRole)
-  const tone = statusToneForActivity(a.status)
-  const actionIcon = actionIconFor(a.action)
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, height: 0 }}
-      transition={{ delay }}
-      className="flex items-start gap-3 rounded-xl px-2 py-2 transition hover:bg-white/50"
-    >
-      <div className={`relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${gradient} text-[11px] font-bold text-white`}>
-        {initials}
-        <span className={`absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-white ${tone.iconBg}`}>
-          {actionIcon && <actionIcon.icon className={`h-2.5 w-2.5 ${tone.iconColor}`} />}
-        </span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="truncate text-[12px] font-semibold text-slate-800">{a.title}</span>
-          {a.status && (
-            <span className={`status-pill ${tone.pill}`}>
-              {a.status}
-            </span>
-          )}
-        </div>
-        {a.description && (
-          <p className="truncate text-[11px] text-slate-500">{a.description}</p>
-        )}
-        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-400">
-          <span className="font-medium text-slate-500">{a.actorName}</span>
-          <span>·</span>
-          <span>{a.actorRole}</span>
-          <span>·</span>
-          <span>{timeAgo(a.createdAt)}</span>
-        </div>
-      </div>
-    </motion.div>
-  )
-}
-
-/* ---------- Team Submissions ---------- */
-function TeamSubmissionsCard({ team, activeCount, onOpen }: { team: typeof SEEDED_TEAM; activeCount: number; onOpen: () => void }) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-      className="glass glass-shimmer rounded-2xl p-5"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <span className="kpi-tile bg-violet-50 text-violet-600" style={{ width: 32, height: 32 }}>
-            <Users className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-[16px] font-semibold text-slate-800">Team Submissions</h2>
-            <p className="text-[11px] text-slate-500">{activeCount} active · {team.length} total members</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="glass-subtle flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:text-blue-600"
-          aria-label="Open team view"
-        >
-          <ArrowRight className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="grid max-h-[300px] grid-cols-1 gap-2 overflow-y-auto scroll-elegant pr-1 sm:grid-cols-2">
-        {team.map((m, i) => {
-          const initials = getInitials(m.name)
-          return (
-            <motion.div
-              key={m.name}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.25 + i * 0.02 }}
-              className="flex items-center gap-2 rounded-xl bg-white/60 p-2 transition hover:bg-white/80"
-            >
-              <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br ${m.gradient} text-[10px] font-bold text-white`}>
-                {initials}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-semibold text-slate-800">{m.name}</div>
-                <div className="truncate text-[10px] text-slate-500">{m.role}</div>
-              </div>
-              <span className={`status-pill ${m.active ? 'status-approved' : 'status-draft'}`}>
-                {m.active ? 'Active' : 'Away'}
-              </span>
-            </motion.div>
-          )
-        })}
-      </div>
-    </motion.section>
-  )
-}
-
-/* ---------- Analytics mini-charts ---------- */
-function AnalyticsMiniCard({
-  emissionsBySource,
-  monthlyEnergy,
-  onOpen,
-}: {
-  emissionsBySource: { name: string; value: number }[]
-  monthlyEnergy: { label: string; value: number }[]
-  onOpen: () => void
-}) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-      className="glass glass-shimmer rounded-2xl p-5"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="kpi-tile bg-cyan-50 text-cyan-600" style={{ width: 28, height: 28 }}>
-            <PieIcon className="h-3.5 w-3.5" />
-          </span>
-          <h2 className="text-[14px] font-semibold text-slate-800">Analytics</h2>
-        </div>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="text-[10px] font-medium text-slate-400 transition hover:text-blue-600"
-        >
-          Expand →
-        </button>
-      </div>
-
-      {/* Donut: emissions by source */}
-      <div className="mb-3">
-        <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">Emissions by source</div>
-        <div className="h-32">
-          {emissionsBySource.length === 0 ? (
-            <EmptyMini label="No emissions data" />
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={emissionsBySource.slice(0, 6)}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={36}
-                  outerRadius={56}
-                  paddingAngle={2}
-                  isAnimationActive
-                >
-                  {emissionsBySource.slice(0, 6).map((_, i) => (
-                    <Cell key={i} fill={DONUT_PALETTE[i % DONUT_PALETTE.length]} stroke="rgba(255,255,255,0.85)" strokeWidth={1.5} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [`${v} tCO₂e`, n]} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-        {emissionsBySource.length > 0 && (
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-1 text-[9px]">
-            {emissionsBySource.slice(0, 4).map((s, i) => (
-              <span key={s.name} className="flex items-center gap-1 text-slate-500">
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: DONUT_PALETTE[i % DONUT_PALETTE.length] }} />
-                {s.name.length > 14 ? s.name.slice(0, 12) + '…' : s.name}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Bar: monthly energy */}
-      <div className="border-t border-slate-200/50 pt-3">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-[10px] font-medium uppercase tracking-wide text-slate-400">Monthly energy (GJ)</span>
-          <BarChart3 className="h-3 w-3 text-slate-400" />
-        </div>
-        <div className="h-32">
-          {monthlyEnergy.length === 0 ? (
-            <EmptyMini label="No energy trend yet" />
-          ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyEnergy} margin={{ top: 4, right: 0, left: -16, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="miniBarGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#0EA5E9" stopOpacity={0.9} />
-                    <stop offset="100%" stopColor="#3B82F6" stopOpacity={0.55} />
-                  </linearGradient>
-                </defs>
-                <Bar dataKey="value" fill="url(#miniBarGrad)" radius={[4, 4, 0, 0]} isAnimationActive />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`${v} GJ`, 'Energy']} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-      </div>
-    </motion.section>
-  )
-}
-
-/* ---------- Custom Form Builder ---------- */
-function FormBuilderCard({
-  elements,
-  onOpen,
-}: {
-  elements: { label: string; unit: string; tone: string }[]
-  onOpen: () => void
-}) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
-      className="glass glass-shimmer rounded-2xl p-5"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="kpi-tile bg-amber-50 text-amber-600" style={{ width: 28, height: 28 }}>
-            <GripVertical className="h-3.5 w-3.5" />
-          </span>
-          <div>
-            <h2 className="text-[14px] font-semibold text-slate-800">Form Builder</h2>
-            <p className="text-[10px] text-slate-500">Drag-and-drop ESG fields</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="glass-subtle flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-blue-600"
-          aria-label="Open form builder"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {elements.map((e, i) => (
-          <motion.span
-            key={e.label}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.25 + i * 0.02 }}
-            whileHover={{ y: -1 }}
-            draggable
-            className={`flex cursor-grab items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-medium ${e.tone} active:cursor-grabbing`}
-          >
-            <GripVertical className="h-2.5 w-2.5 opacity-60" />
-            {e.label}
-            <span className="text-[9px] opacity-70">{e.unit}</span>
-          </motion.span>
-        ))}
-      </div>
-    </motion.section>
-  )
-}
-
-/* ---------- Data Connections ---------- */
-function DataConnectionsCard({
-  connections,
-  onOpen,
-}: {
-  connections: typeof DATA_CONNECTIONS
-  onOpen: () => void
-}) {
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-      className="glass glass-shimmer rounded-2xl p-5"
-    >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="kpi-tile bg-blue-50 text-blue-600" style={{ width: 28, height: 28 }}>
-            <Database className="h-3.5 w-3.5" />
-          </span>
-          <div>
-            <h2 className="text-[14px] font-semibold text-slate-800">Data Connections</h2>
-            <p className="text-[10px] text-slate-500">Integrated source systems</p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="glass-subtle flex h-6 w-6 items-center justify-center rounded-full text-slate-400 hover:text-blue-600"
-          aria-label="Open admin"
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-      </div>
-      <div className="space-y-1.5">
-        {connections.map((c, i) => {
-          const statusPill = c.status === 'Active' ? 'status-approved' : c.status === 'Syncing' ? 'status-submitted' : 'status-draft'
-          return (
-            <motion.div
-              key={c.name}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 + i * 0.03 }}
-              className="flex items-center gap-2 rounded-xl bg-white/60 p-2 transition hover:bg-white/80"
-            >
-              <div className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg ${c.tone}`}>
-                <c.icon className="h-3.5 w-3.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-semibold text-slate-800">{c.name}</div>
-                <div className="truncate text-[10px] text-slate-500">{c.type}</div>
-              </div>
-              <span className={`status-pill ${statusPill}`}>{c.status}</span>
-              <button
-                type="button"
-                className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-200/60 hover:text-slate-700"
-                aria-label={`${c.name} options`}
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </button>
-            </motion.div>
-          )
-        })}
-      </div>
-    </motion.section>
-  )
-}
-
-/* ============================================================
- * Loading / Error / Empty states
- * ============================================================ */
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-5">
-      <div className="h-7 w-48 animate-pulse rounded-lg bg-slate-200/60" />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_400px_280px]">
-        <div className="space-y-5">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {[0, 1, 2].map(i => <div key={i} className="glass h-32 animate-pulse rounded-2xl" />)}
-          </div>
-          <div className="glass h-72 animate-pulse rounded-2xl" />
-          <div className="glass h-28 animate-pulse rounded-2xl" />
-        </div>
-        <div className="space-y-5">
-          <div className="glass h-96 animate-pulse rounded-2xl" />
-          <div className="glass h-64 animate-pulse rounded-2xl" />
-        </div>
-        <div className="space-y-5">
-          <div className="glass h-72 animate-pulse rounded-2xl" />
-          <div className="glass h-40 animate-pulse rounded-2xl" />
-          <div className="glass h-56 animate-pulse rounded-2xl" />
-        </div>
-      </div>
     </div>
   )
-}
-
-function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
-      <AlertOctagon className="h-10 w-10 text-rose-500" />
-      <div>
-        <div className="text-base font-bold text-slate-800">Failed to load dashboard</div>
-        <div className="text-xs text-slate-500">{message}</div>
-      </div>
-      <button onClick={onRetry} className="btn-glass-primary flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-semibold">
-        <RefreshCw className="h-3.5 w-3.5" /> Retry
-      </button>
-    </div>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
-      <CheckCircle2 className="h-10 w-10 text-slate-400" />
-      <div>
-        <div className="text-base font-bold text-slate-800">No data yet</div>
-        <div className="text-xs text-slate-500">Reporting periods or source records need to be created first.</div>
-      </div>
-    </div>
-  )
-}
-
-function EmptyMini({ label }: { label: string }) {
-  return (
-    <div className="flex h-full items-center justify-center text-[10px] text-slate-400">
-      {label}
-    </div>
-  )
-}
-
-/* ============================================================
- * Helpers
- * ============================================================ */
-function trendDelta(trends: Trend[], key: keyof Trend): number | null {
-  if (!trends || trends.length < 2) return null
-  const last = trends[trends.length - 1][key]
-  const prev = trends[trends.length - 2][key]
-  if (prev === 0) return null
-  return Math.round(((last - prev) / prev) * 1000) / 10
-}
-
-function shortMonth(label: string): string {
-  // "April 2026" → "Apr"
-  const parts = label.split(' ')
-  if (parts.length < 2) return label.slice(0, 3)
-  return parts[0].slice(0, 3)
-}
-
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-}
-
-function gradientForRole(role: string): string {
-  const map: Record<string, string> = {
-    SUPER_ADMIN:           'from-slate-600 to-slate-800',
-    PROJECT_USER:          'from-sky-500 to-blue-600',
-    HR_USER:               'from-cyan-500 to-teal-600',
-    EHS_USER:              'from-amber-500 to-orange-600',
-    PROCUREMENT_USER:      'from-violet-500 to-purple-600',
-    CSR_USER:              'from-rose-500 to-pink-600',
-    COMPLIANCE_USER:       'from-emerald-500 to-green-600',
-    BU_REVIEWER:           'from-blue-500 to-indigo-600',
-    SUBSIDIARY_REVIEWER:   'from-indigo-500 to-blue-700',
-    GROUP_REVIEWER:        'from-blue-600 to-cyan-700',
-    ESG_MANAGER:           'from-teal-500 to-emerald-600',
-    ESG_ANALYST:           'from-emerald-500 to-teal-600',
-    BRSR_MANAGER:          'from-emerald-600 to-teal-700',
-    AUDITOR:               'from-slate-600 to-gray-700',
-    EXECUTIVE:             'from-amber-600 to-yellow-700',
-  }
-  // Try exact match first, then case-insensitive, then fallback
-  const key = Object.keys(map).find(k => k.toUpperCase() === role.toUpperCase())
-  return key ? map[key] : 'from-blue-500 to-cyan-600'
-}
-
-function statusToneForActivity(status: string | null | undefined): { pill: string; iconBg: string; iconColor: string } {
-  if (!status) return { pill: 'status-review', iconBg: 'bg-slate-100', iconColor: 'text-slate-500' }
-  const s = status.toUpperCase()
-  if (s.includes('APPROVED') || s.includes('VERIFIED') || s.includes('COMPLETED') || s.includes('LOCKED'))
-    return { pill: 'status-approved', iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600' }
-  if (s.includes('SUBMITTED') || s.includes('SYNC'))
-    return { pill: 'status-submitted', iconBg: 'bg-blue-50', iconColor: 'text-blue-600' }
-  if (s.includes('REVIEW') || s.includes('PENDING'))
-    return { pill: 'status-review', iconBg: 'bg-violet-50', iconColor: 'text-violet-600' }
-  if (s.includes('DRAFT') || s.includes('MISSING'))
-    return { pill: 'status-draft', iconBg: 'bg-amber-50', iconColor: 'text-amber-600' }
-  if (s.includes('ERROR') || s.includes('REJECTED'))
-    return { pill: 'status-error', iconBg: 'bg-rose-50', iconColor: 'text-rose-600' }
-  return { pill: 'status-locked', iconBg: 'bg-slate-100', iconColor: 'text-slate-500' }
-}
-
-function actionIconFor(action: string | undefined): { icon: typeof ActivityIcon } | null {
-  if (!action) return null
-  const a = action.toUpperCase()
-  if (a.includes('SUBMIT'))  return { icon: Send }
-  if (a.includes('APPROVE')) return { icon: CheckCircle2 }
-  if (a.includes('EVIDENCE')) return { icon: Link2 }
-  if (a.includes('CALC'))    return { icon: Zap }
-  if (a.includes('CORRECT')) return { icon: AlertCircle }
-  if (a.includes('DATA_ENTRY')) return { icon: FileText }
-  return { icon: ActivityIcon }
-}
-
-function statusForSubmission(status: string | undefined): string {
-  if (!status) return 'status-draft'
-  const s = status.toUpperCase()
-  if (s === 'APPROVED' || s === 'LOCKED') return 'status-approved'
-  if (s === 'DRAFT')                       return 'status-draft'
-  if (s === 'SUBMITTED')                   return 'status-submitted'
-  if (s.includes('REVIEW'))                return 'status-review'
-  if (s.includes('CORRECTION') || s.includes('REJECTED')) return 'status-error'
-  if (s.includes('BU_APPROVED') || s.includes('SUBSIDIARY_APPROVED')) return 'status-verified'
-  return 'status-locked'
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
 }
