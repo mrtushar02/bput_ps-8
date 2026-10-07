@@ -1081,3 +1081,61 @@ Stage Summary:
 - Role-based dashboard routing: site users see the new 3-column dashboard; reviewers/executives see the command center
 - Premium glassmorphism + sky-blue color scheme preserved
 - Ready for next step: apply the same reference design to other role dashboards (reviewer, executive, etc.)
+
+---
+Task ID: 23 (Unique Role-Based Dashboards — 4 New Premium Designs)
+Agent: Lead Architect (main) + 3 subagents
+Task: Build unique dashboards for each role group with distinct color themes, layouts, and card designs
+
+Work Log:
+- User requested: each user role should have a UNIQUE dashboard design (not the same for all), with different premium colors, compact card sizing, and premium components.
+- Previously: only 2 dashboards existed (SiteUserOverview for site users, OverviewDashboard for everyone else). All non-site-user roles saw the same dashboard.
+
+- Dispatched 3 subagents in parallel to build 3 new unique dashboards:
+
+  1. **ReviewerDashboard** (`src/components/dashboard/reviewer-dashboard.tsx`, ~830 lines) — for BU/SUBSIDIARY/GROUP reviewers:
+     - COLOR THEME: Indigo/violet (#6366f1, #8b5cf6, #a855f7) — distinctly different from sky-blue/amber/slate
+     - LAYOUT: Top pipeline stepper banner (7 stages: Draft→Submitted→Under Review→BU Approved→Subsidiary Approved→HQ Review→Locked) + 2-column (60/40)
+     - Left: Review Queue table (40px dense rows, Project/Module/Period/Status/Completion/Reviewer/Action) + 3 compact KPI cards with indigo sparklines
+     - Right: Pending Approvals (big gradient number + module breakdown bars) + Exception Summary (2×2 grid: validation/anomalies/corrections/BRSR) + Recent Review Actions (5 activities)
+     - Verified: VLM confirmed indigo/violet theme, pipeline stepper, compact cards, review queue table
+
+  2. **ExecutiveDashboard** (`src/components/dashboard/executive-dashboard.tsx`, ~560 lines) — for EXECUTIVE + SUPER_ADMIN:
+     - COLOR THEME: Amber/gold (#f59e0b, #d4a017, warm gradients) — C-suite briefing feel
+     - LAYOUT: Full-width hero (120px SVG radial gauge with amber→gold gradient) + 2×4 compact KPI grid (118px cards, no sparklines, clean) + bottom split (50/50: ESG Score Breakdown radial bar + Top 3 AI Insights)
+     - Hero: "ESG performance is B with 71.4% BRSR readiness · 25% reporting completion · 0 open exceptions"
+     - Verified: VLM confirmed amber/gold theme, ESG score gauge, compact KPI cards, AI insights
+
+  3. **AuditorDashboard** (`src/components/dashboard/auditor-dashboard.tsx`, ~770 lines) — for AUDITOR:
+     - COLOR THEME: Slate/steel (#475569, #64748b, cool gray gradients) — serious, precise, trustworthy
+     - LAYOUT: Top assurance status bar (4 stat tiles, 80px each) + 2-column equal split (50/50)
+     - Left: Audit Trail Timeline (vertical timeline with color-coded action pills: CREATE=blue, SUBMIT=cyan, VALIDATE=violet, APPROVE=emerald, REJECT=rose, LOCK=slate)
+     - Right: Evidence Status donut (h-32) + Top Exceptions list + Factor Version Inventory (7 seeded factors with version + methodology)
+     - Verified: all 5 sections render (Assurance Console, Audit Trail Timeline, Evidence Status, Top Exceptions, Factor Version Inventory)
+
+- Wired role-based dashboard routing in `src/app/page.tsx` via `getDashboardForRole(roleKey)`:
+  - Site users (PROJECT_USER, HR_USER, EHS_USER, PROCUREMENT_USER, CSR_USER, COMPLIANCE_USER) → SiteUserOverview (sky-blue)
+  - Reviewers (BU_REVIEWER, SUBSIDIARY_REVIEWER, GROUP_REVIEWER) → ReviewerDashboard (indigo/violet)
+  - Executives + Super Admin (EXECUTIVE, SUPER_ADMIN) → ExecutiveDashboard (amber/gold)
+  - Auditors (AUDITOR) → AuditorDashboard (slate/steel)
+  - Managers (ESG_MANAGER, ESG_ANALYST, BRSR_MANAGER) → OverviewDashboard (emerald/teal command center)
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: BU Reviewer sees "Reviewer Console" with Review Pipeline + Review Queue + Pending Approvals + Exception Summary + Recent Review Actions (indigo/violet theme)
+- agent-browser verified: Executive sees "Executive Briefing" with ESG Score gauge + 2×4 compact KPIs + ESG Score Breakdown + Top AI Insights (amber/gold theme)
+- agent-browser verified: Auditor sees "Assurance Console" with Audit Trail Timeline + Evidence Status donut + Top Exceptions + Factor Version Inventory (slate/steel theme)
+- VLM-verified: Reviewer dashboard has indigo/violet theme + pipeline stepper + compact cards + review queue
+- VLM-verified: Executive dashboard has amber/gold theme + ESG score gauge + compact KPI cards + AI insights
+- No console errors on any dashboard
+
+Stage Summary:
+- 3 new unique dashboards built (reviewer-dashboard.tsx, executive-dashboard.tsx, auditor-dashboard.tsx)
+- 5 distinct dashboard designs total — each role group has a UNIQUE dashboard with:
+  - Distinct color theme (sky-blue, indigo/violet, amber/gold, slate/steel, emerald/teal)
+  - Distinct layout (3-column, 2-column pipeline, hero+grid+split, 2-column timeline, command center)
+  - Distinct card sizing (compact KPI cards, dense tables, no oversized cards)
+  - Distinct information focus (operational, review queue, executive briefing, audit trail, data quality)
+- Role-based routing in page.tsx ensures each role sees their unique dashboard
+- All dashboards use real data from APIs, glassmorphism, framer-motion, and compact card sizing

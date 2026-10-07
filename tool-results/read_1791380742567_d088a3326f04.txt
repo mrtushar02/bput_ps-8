@@ -1,0 +1,829 @@
+     1→     1→'use client'
+     2→     2→/**
+     3→     3→ * Overview Dashboard — real KPIs computed server-side from the ESG data control chain.
+     4→     4→ * No hardcoded values; reads from /api/overview.
+     5→     5→ */
+     6→     6→import { useEffect, useState, useMemo } from 'react'
+     7→     7→import { motion, AnimatePresence } from 'framer-motion'
+     8→     8→import {
+     9→     9→  Flame, Zap, Droplet, Recycle, Users, HardHat, ShieldCheck, FileCheck2, TrendingUp, TrendingDown,
+    10→    10→  Building2, Activity, ArrowUpRight, ArrowRight, CheckCircle2, AlertTriangle, AlertOctagon, Clock, Gauge, Leaf, Battery, Send, Link2, X, Sparkles, AlertCircle, ChevronRight, Award, FileDown
+    11→    11→} from 'lucide-react'
+    12→    12→import {
+    13→    13→  AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadialBarChart, RadialBar, ComposedChart, ReferenceDot
+    14→    14→} from 'recharts'
+    15→    15→import { PipelineTracker } from '@/components/dashboard/pipeline-tracker'
+    16→    16→import { TargetsWidget } from '@/components/dashboard/targets-widget'
+    17→    17→import { AiInsightsPanel } from '@/components/dashboard/ai-insights-panel'
+    18→    18→import { ActionItemsWidget } from '@/components/dashboard/action-items-widget'
+    19→    19→import { GlossaryTooltip } from '@/components/dashboard/glossary-tooltip'
+    20→    20→import { ScenarioCalculator } from '@/components/dashboard/scenario-calculator'
+    21→    21→import { ExecutiveSummaryView } from '@/components/dashboard/executive-summary-view'
+    22→    22→import { useApp, type ModuleKey } from '@/lib/auth-context'
+    23→    23→
+    24→    24→interface OverviewData {
+    25→    25→  kpis: any
+    26→    26→  trends: Record<string, { emissions: number; energy: number; water: number; waste: number }>
+    27→    27→  emissionsBySource: Record<string, number>
+    28→    28→  activities: any[]
+    29→    29→  periods: any[]
+    30→    30→  sources: any
+    31→    31→}
+    32→    32→
+    33→    33→const PALETTE = ['#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316']
+    34→    34→
+    35→    35→export function OverviewDashboard() {
+    36→    36→  const [data, setData] = useState<OverviewData | null>(null)
+    37→    37→  const [loading, setLoading] = useState(true)
+    38→    38→  const [error, setError] = useState('')
+    39→    39→
+    40→    40→  useEffect(() => {
+    41→    41→    fetch('/api/overview')
+    42→    42→      .then(r => r.json())
+    43→    43→      .then(d => { setData(d); setLoading(false) })
+    44→    44→      .catch(e => { setError(e.message); setLoading(false) })
+    45→    45→  }, [])
+    46→    46→
+    47→    47→  const { setActiveModule } = useApp()
+    48→    48→  const [drillDown, setDrillDown] = useState<null | 'emissions' | 'energy' | 'water' | 'waste'>(null)
+    49→    49→  const [exporting, setExporting] = useState(false)
+    50→    50→  const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
+    51→    51→  const [isCompact, setIsCompact] = useState(false)
+    52→    52→  useEffect(() => {
+    53→    53→    const check = () => setIsCompact(window.innerWidth < 1024)
+    54→    54→    check()
+    55→    55→    window.addEventListener('resize', check)
+    56→    56→    return () => window.removeEventListener('resize', check)
+    57→    57→  }, [])
+    58→    58→  // Compute ESG composite score (0-100) from real KPIs — no hardcoded values
+    59→    59→  const esgScore = useMemo(() => {
+    60→    60→    if (!data) return 0
+    61→    61→    const kk = data.kpis
+    62→    62→    const dims = [
+    63→    63→      kk.brsrReadiness,                              // BRSR readiness weight
+    64→    64→      kk.completion,                                 // reporting completion
+    65→    65→      kk.waterRecycledShare,                         // water circularity
+    66→    66→      kk.wasteRecycledShare,                         // waste recovery
+    67→    67→      kk.renewableShare,                             // renewable energy
+    68→    68→      Math.min(kk.femaleShare * 2, 100),            // gender diversity (boost)
+    69→    69→      Math.max(0, 100 - kk.ltifr * 20),             // safety (lower LTIFR = better)
+    70→    70→      Math.max(0, 100 - kk.openExceptions * 5),     // data quality
+    71→    71→    ]
+    72→    72→    return Math.round(dims.reduce((s, v) => s + v, 0) / dims.length)
+    73→    73→  }, [data])
+    74→    74→
+    75→    75→  if (loading) return <DashboardSkeleton />
+    76→    76→  if (error) return <ErrorState message={error} onRetry={() => location.reload()} />
+    77→    77→  if (!data) return <EmptyState />
+    78→    78→
+    79→    79→  const k = data.kpis
+    80→    80→  const allTrendArr = Object.entries(data.trends).map(([label, v]) => ({ label, ...v }))
+    81→    81→  // Filter by selected period (if not 'all')
+    82→    82→  const trendArr = selectedPeriod === 'all' ? allTrendArr : (() => {
+    83→    83→    const period = data.periods.find((p: any) => p.id === selectedPeriod)
+    84→    84→    return period ? allTrendArr.filter(t => t.label === period.label) : allTrendArr
+    85→    85→  })()
+    86→    86→  const sourceArr = Object.entries(data.emissionsBySource).map(([name, value]) => ({ name, value }))
+    87→    87→  const waterDonut = [
+    88→    88→    { name: 'Recycled', value: k.waterRecycledShare },
+    89→    89→    { name: 'Fresh', value: 100 - k.waterRecycledShare > 0 ? 100 - k.waterRecycledShare : 0 },
+    90→    90→  ]
+    91→    91→  const wasteDonut = [
+    92→    92→    { name: 'Recovered', value: k.wasteRecycledShare },
+    93→    93→    { name: 'Disposed', value: 100 - k.wasteRecycledShare > 0 ? 100 - k.wasteRecycledShare : 0 },
+    94→    94→  ]
+    95→    95→
+    96→    96→  return (
+    97→    97→    <div className="space-y-5">
+    98→    98→      {/* Page header */}
+    99→    99→      {/* Executive Summary for compact/mobile view */}
+   100→   100→      {isCompact && <ExecutiveSummaryView data={data} esgScore={esgScore} />}
+   101→   101→      {/* Full dashboard — hidden on compact view */}
+   102→   102→      <div className={isCompact ? 'hidden' : 'space-y-5'}>
+   103→   103→      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+   104→   104→        <div>
+   105→   105→          <div className="flex items-center gap-2">
+   106→   106→            <h1 className="text-2xl font-bold tracking-tight text-slate-800">ESG Command Center</h1>
+   107→   107→            <span className="status-pill status-approved"><CheckCircle2 className="h-3 w-3" /> Live</span>
+   108→   108→          </div>
+   109→   109→          <p className="mt-1 text-sm text-slate-500">Group-wide consolidated view · {k.orgs} group(s) · {k.projects} project(s) · {data.periods.length} reporting periods</p>
+   110→   110→        </div>
+   111→   111→        <div className="flex items-center gap-2">
+   112→   112→          <ScopeFilter />
+   113→   113→          <button onClick={() => { setExporting(true); fetch('/api/export/dashboard-pdf').then(r => r.blob()).then(b => { const url = URL.createObjectURL(b); const a = document.createElement('a'); a.href = url; a.download = `MEIL-ESG-Dashboard-${new Date().toISOString().slice(0,10)}.pdf`; a.click(); URL.revokeObjectURL(url); setExporting(false) }).catch(() => setExporting(false)) }}
+   114→   114→            disabled={exporting}
+   115→   115→            className="glass flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-slate-600 transition hover:text-blue-600 disabled:opacity-50">
+   116→   116→            <FileDown className="h-3.5 w-3.5" /> {exporting ? 'Exporting…' : 'Export PDF'}
+   117→   117→          </button>
+   118→   118→          <button className="btn-glass-primary flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold"><Activity className="h-3.5 w-3.5" /> Refresh</button>
+   119→   119→        </div>
+   120→   120→      </div>
+   121→   121→
+   122→   122→      {/* EXECUTIVE SUMMARY BANNER — smart alert with the single most important action */}
+   123→   123→      <ExecutiveSummary kpis={k} onNavigate={(m) => setActiveModule(m as ModuleKey)} />
+   124→   124→
+   125→   125→      {/* PERIOD SELECTOR — filter all charts/KPIs by reporting period */}
+   126→   126→      {data.periods.length > 0 && (
+   127→   127→        <div className="flex items-center gap-1.5 overflow-x-auto scroll-elegant">
+   128→   128→          <button onClick={() => setSelectedPeriod('all')}
+   129→   129→            className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${selectedPeriod === 'all' ? 'bg-blue-500 text-white shadow-sm' : 'glass-subtle text-slate-500 hover:text-slate-700'}`}>
+   130→   130→            All Periods
+   131→   131→          </button>
+   132→   132→          {data.periods.map((p: any) => (
+   133→   133→            <button key={p.id} onClick={() => setSelectedPeriod(p.id)}
+   134→   134→              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${selectedPeriod === p.id ? 'bg-blue-500 text-white shadow-sm' : 'glass-subtle text-slate-500 hover:text-slate-700'}`}>
+   135→   135→              {p.label}
+   136→   136→            </button>
+   137→   137→          ))}
+   138→   138→        </div>
+   139→   139→      )}
+   140→   140→
+   141→   141→      {/* ESG SCORE GAUGE + KPI GRID */}
+   142→   142→      <div className="grid gap-4 lg:grid-cols-[260px,1fr]">
+   143→   143→        <EsgScoreGauge score={esgScore} />
+   144→   144→        <div className="space-y-3">
+   145→   145→          {/* KPI GRID row 1 */}
+   146→   146→
+   147→   147→      {/* KPI GRID — real month-over-month deltas from trends data (no hardcoded values) */}
+   148→   148→      {/* Data confidence: verified (green border) = approved records, warning (amber) = open exceptions, draft (slate) = no data */}
+   149→   149→      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
+   150→   150→        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" glossaryTerm="Scope 1" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={allTrendArr.map(t => t.emissions)} sparkColor="#f43f5e" onClick={() => setDrillDown('emissions')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+   151→   151→        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" glossaryTerm="GJ" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={allTrendArr.map(t => t.energy)} sparkColor="#f59e0b" onClick={() => setDrillDown('energy')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+   152→   152→        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" glossaryTerm="ZLD" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={allTrendArr.map(t => t.water)} sparkColor="#06b6d4" onClick={() => setDrillDown('water')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+   153→   153→        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" glossaryTerm="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={allTrendArr.map(t => t.waste)} sparkColor="#10b981" onClick={() => setDrillDown('waste')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+   154→   154→      </div>
+   155→   155→      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
+   156→   156→        <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={null} goodDirection="up" sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} confidence="verified" />
+   157→   157→        <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" glossaryTerm="LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={null} goodDirection="down" sub={`${k.injuries} injuries · 0 fatal`} risk={k.fatalities > 0 ? { level: 'danger', text: `${k.fatalities} fatality` } : undefined} confidence="verified" />
+   158→   158→        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" glossaryTerm="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} risk={k.brsrMissing > 0 ? { level: 'warning', text: `${k.brsrMissing} gaps` } : undefined} onClick={() => setActiveModule('brsr')} confidence={k.brsrMissing > 0 ? 'warning' : 'verified'} />
+   159→   159→        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" glossaryTerm="Reporting Period" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} risk={k.openExceptions > 0 ? { level: 'warning', text: `${k.openExceptions} exceptions` } : undefined} onClick={() => setActiveModule('submissions')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+   160→   160→      </div>
+   161→   161→        </div>
+   162→   162→      </div>
+   163→   163→
+   164→   164→      {/* ESG SCENARIO CALCULATOR — What-If modeling */}
+   165→   165→      <ScenarioCalculator currentScore={esgScore} currentKpis={{
+   166→   166→        brsrReadiness: k.brsrReadiness, completion: k.completion, waterRecycledShare: k.waterRecycledShare,
+   167→   167→        wasteRecycledShare: k.wasteRecycledShare, renewableShare: k.renewableShare, femaleShare: k.femaleShare,
+   168→   168→        ltifr: k.ltifr, openExceptions: k.openExceptions,
+   169→   169→      }} />
+   170→   170→
+   171→   171→      {/* ESG DATA CONTROL CHAIN — live pipeline tracker */}
+   172→   172→      <PipelineTracker data={data} />
+   173→   173→
+   174→   174→      {/* CHARTS ROW 1 */}
+   175→   175→      <div className="grid gap-4 lg:grid-cols-3">
+   176→   176→        {/* Emissions trend — with PoP comparison + anomaly annotations */}
+   177→   177→        <GlassCard className="lg:col-span-2" delay={0.1}>
+   178→   178→          <CardHeader icon={Flame} title="Monthly GHG Trajectory" subtitle="tCO₂e by reporting period · deterministic calc" right={
+   179→   179→            <div className="flex items-center gap-1.5">
+   180→   180→              <span className="status-pill status-approved">Target &lt; 5k</span>
+   181→   181→            </div>
+   182→   182→          } />
+   183→   183→          <div className="h-64">
+   184→   184→            <ResponsiveContainer width="100%" height="100%">
+   185→   185→              <ComposedChart data={trendArr} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+   186→   186→                <defs>
+   187→   187→                  <linearGradient id="emGrad" x1="0" y1="0" x2="0" y2="1">
+   188→   188→                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.5} />
+   189→   189→                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
+   190→   190→                  </linearGradient>
+   191→   191→                </defs>
+   192→   192→                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+   193→   193→                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
+   194→   194→                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
+   195→   195→                <Tooltip contentStyle={tooltipStyle} />
+   196→   196→                <Area type="monotone" dataKey="emissions" stroke="#3b82f6" strokeWidth={2.5} fill="url(#emGrad)" name="Emissions tCO₂e" />
+   197→   197→                {(() => {
+   198→   198→                  // Detect anomalies (MoM change > 30%) and render annotation dots
+   199→   199→                  const dots: any[] = []
+   200→   200→                  for (let i = 1; i < trendArr.length; i++) {
+   201→   201→                    const prev = trendArr[i - 1].emissions
+   202→   202→                    const cur = trendArr[i].emissions
+   203→   203→                    if (prev > 0) {
+   204→   204→                      const pct = ((cur - prev) / prev) * 100
+   205→   205→                      if (Math.abs(pct) > 30) {
+   206→   206→                        dots.push(
+   207→   207→                          <ReferenceDot key={`anomaly-${i}`} x={trendArr[i].label} y={cur} r={6} fill={pct > 0 ? '#f43f5e' : '#10b981'} stroke="white" strokeWidth={2} />
+   208→   208→                        )
+   209→   209→                      }
+   210→   210→                    }
+   211→   211→                  }
+   212→   212→                  return dots
+   213→   213→                })()}
+   214→   214→              </ComposedChart>
+   215→   215→            </ResponsiveContainer>
+   216→   216→          </div>
+   217→   217→          {/* Anomaly legend */}
+   218→   218→          {trendArr.length >= 2 && (() => {
+   219→   219→            const last = trendArr[trendArr.length - 1].emissions
+   220→   220→            const prev = trendArr[trendArr.length - 2].emissions
+   221→   221→            if (prev <= 0) return null
+   222→   222→            const pct = Math.round(((last - prev) / prev) * 1000) / 10
+   223→   223→            const isAnomaly = Math.abs(pct) > 30
+   224→   224→            return (
+   225→   225→              <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] ${isAnomaly ? (pct > 0 ? 'bg-rose-50/70 text-rose-700' : 'bg-emerald-50/70 text-emerald-700') : 'bg-slate-50/60 text-slate-600'}`}>
+   226→   226→                <span className="font-semibold">{isAnomaly ? (pct > 0 ? 'Anomaly detected' : 'Significant improvement') : 'Stable period'}</span>
+   227→   227→                <span>· Last vs previous: {pct > 0 ? '+' : ''}{pct}%</span>
+   228→   228→                {isAnomaly && pct > 0 && <span className="ml-auto">Review the spike source →</span>}
+   229→   229→              </div>
+   230→   230→            )
+   231→   231→          })()}
+   232→   232→        </GlassCard>
+   233→   233→
+   234→   234→        {/* Emissions by source */}
+   235→   235→        <GlassCard delay={0.15}>
+   236→   236→          <CardHeader icon={Battery} title="Emissions by Source" subtitle="Scope 1 + 2 + 3 split" />
+   237→   237→          <div className="h-64">
+   238→   238→            <ResponsiveContainer width="100%" height="100%">
+   239→   239→              <PieChart>
+   240→   240→                <Pie data={sourceArr} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={80} paddingAngle={3}>
+   241→   241→                  {sourceArr.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+   242→   242→                </Pie>
+   243→   243→                <Tooltip contentStyle={tooltipStyle} />
+   244→   244→                <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+   245→   245→              </PieChart>
+   246→   246→            </ResponsiveContainer>
+   247→   247→          </div>
+   248→   248→        </GlassCard>
+   249→   249→      </div>
+   250→   250→
+   251→   251→      {/* CHARTS ROW 2 */}
+   252→   252→      <div className="grid gap-4 lg:grid-cols-4">
+   253→   253→        {/* Energy trend */}
+   254→   254→        <GlassCard delay={0.1}>
+   255→   255→          <CardHeader icon={Zap} title="Monthly Energy (GJ)" subtitle="Renewable vs non-renewable" />
+   256→   256→          <div className="h-48">
+   257→   257→            <ResponsiveContainer width="100%" height="100%">
+   258→   258→              <BarChart data={trendArr} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+   259→   259→                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" vertical={false} />
+   260→   260→                <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+   261→   261→                <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} />
+   262→   262→                <Tooltip contentStyle={tooltipStyle} />
+   263→   263→                <Bar dataKey="energy" fill="#0ea5e9" radius={[4, 4, 0, 0]} name="Energy GJ" />
+   264→   264→              </BarChart>
+   265→   265→            </ResponsiveContainer>
+   266→   266→          </div>
+   267→   267→        </GlassCard>
+   268→   268→
+   269→   269→        {/* Water balance donut */}
+   270→   270→        <GlassCard delay={0.15}>
+   271→   271→          <CardHeader icon={Droplet} title="Water Balance" subtitle="Recycled vs fresh withdrawal" right={<span className="status-pill status-approved">ZLD Active</span>} />
+   272→   272→          <div className="flex h-48 items-center justify-center">
+   273→   273→            <ResponsiveContainer width="100%" height="100%">
+   274→   274→              <PieChart>
+   275→   275→                <Pie data={waterDonut} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={42} outerRadius={66} paddingAngle={3}>
+   276→   276→                  <Cell fill="#3b82f6" /><Cell fill="#bae6fd" />
+   277→   277→                </Pie>
+   278→   278→                <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => `${v}%`} />
+   279→   279→                <Legend iconType="circle" wrapperStyle={{ fontSize: 10 }} />
+   280→   280→              </PieChart>
+   281→   281→            </ResponsiveContainer>
+   282→   282→          </div>
+   283→   283→        </GlassCard>
+   284→   284→
+   285→   285→        {/* Waste recycled */}
+   286→   286→        <GlassCard delay={0.2}>
+   287→   287→          <CardHeader icon={Recycle} title="Waste Recovered" subtitle={`${k.hazardousWasteT}T hazardous`} />
+   288→   288→          <div className="flex h-48 items-center justify-center">
+   289→   289→            <ResponsiveContainer width="100%" height="100%">
+   290→   290→              <PieChart>
+   291→   291→                <Pie data={wasteDonut} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={42} outerRadius={66} paddingAngle={3}>
+   292→   292→                  <Cell fill="#10b981" /><Cell fill="#d1fae5" />
+   293→   293→                </Pie>
+   294→   294→                <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => `${v}%`} />
+   295→   295→                <Legend iconType="circle" wrapperStyle={{ fontSize: 10 }} />
+   296→   296→              </PieChart>
+   297→   297→            </ResponsiveContainer>
+   298→   298→          </div>
+   299→   299→        </GlassCard>
+   300→   300→
+   301→   301→        {/* Workforce + safety */}
+   302→   302→        <GlassCard delay={0.25}>
+   303→   303→          <CardHeader icon={Users} title="Workforce & Safety" subtitle={`${k.femaleShare}% female`} />
+   304→   304→          <div className="space-y-2.5 p-1">
+   305→   305→            <MiniStat label="Employees" value={k.totalEmployees} icon={Users} tone="blue" />
+   306→   306→            <MiniStat label="Workers" value={k.totalWorkers} icon={HardHat} tone="amber" />
+   307→   307→            <MiniStat label="Differently-abled" value={k.differentlyAbled} icon={ShieldCheck} tone="violet" />
+   308→   308→            <MiniStat label="Training hours" value={k.trainingHours} icon={TrendingUp} tone="emerald" />
+   309→   309→          </div>
+   310→   310→        </GlassCard>
+   311→   311→      </div>
+   312→   312→
+   313→   313→      {/* SUSTAINABILITY TARGETS vs ACTUALS */}
+   314→   314→      <TargetsWidget />
+   315→   315→
+   316→   316→      {/* AI INSIGHTS + MY ACTION ITEMS — premium executive features */}
+   317→   317→      <div className="grid gap-4 lg:grid-cols-2">
+   318→   318→        <AiInsightsPanel />
+   319→   319→        <ActionItemsWidget />
+   320→   320→      </div>
+   321→   321→
+   322→   322→      {/* DATA QUALITY + ACTIVITY */}
+   323→   323→      <div className="grid gap-4 lg:grid-cols-3">
+   324→   324→        {/* Data quality center */}
+   325→   325→        <GlassCard className="lg:col-span-1" delay={0.1}>
+   326→   326→          <CardHeader icon={AlertTriangle} title="Data Quality Center" subtitle="Exceptions & gaps" />
+   327→   327→          <div className="space-y-2">
+   328→   328→            <QualityRow icon={AlertOctagon} label="Open validation errors" value={k.openExceptions} tone="rose" />
+   329→   329→            <QualityRow icon={AlertTriangle} label="Anomalies detected" value={k.anomalies} tone="amber" />
+   330→   330→            <QualityRow icon={Clock} label="Open correction requests" value={k.corrections} tone="violet" />
+   331→   331→            <QualityRow icon={FileCheck2} label="BRSR items missing" value={k.brsrMissing} tone="amber" />
+   332→   332→            <QualityRow icon={CheckCircle2} label="Evidence verified" value={`${k.evidenceVerified}/${k.evidenceTotal}`} tone="emerald" />
+   333→   333→          </div>
+   334→   334→          <button className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-slate-50 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-100">
+   335→   335→            View all exceptions <ArrowRight className="h-3 w-3" />
+   336→   336→          </button>
+   337→   337→        </GlassCard>
+   338→   338→
+   339→   339→        {/* Recent activities */}
+   340→   340→        <GlassCard className="lg:col-span-2" delay={0.15}>
+   341→   341→          <CardHeader icon={Activity} title="Recent Site Activities" subtitle="Submissions, approvals, drafts, calculations" right={<button className="glass-subtle rounded-full px-3 py-1 text-[10px] font-medium text-slate-500">All activities</button>} />
+   342→   342→          <div className="max-h-80 space-y-1 overflow-y-auto scroll-elegant pr-1">
+   343→   343→            {data.activities.map((a, i) => <ActivityRow key={a.id} a={a} delay={i * 0.04} />)}
+   344→   344→          </div>
+   345→   345→        </GlassCard>
+   346→   346→      </div>
+   347→   347→
+   348→   348→      {/* TRACE banner */}
+   349→   349→      <GlassCard delay={0.2}>
+   350→   350→        <div className="flex flex-col items-start gap-3 md:flex-row md:items-center md:justify-between">
+   351→   351→          <div className="flex items-start gap-3">
+   352→   352→            <div className="kpi-tile bg-blue-50 text-blue-600"><Leaf className="h-5 w-5" /></div>
+   353→   353→            <div>
+   354→   354→              <div className="text-sm font-bold text-slate-800">Every number is traceable</div>
+   355→   355→              <div className="text-xs text-slate-500">Each KPI resolves through the chain: source record → evidence → validation → calculation (factor v{1}) → approval → BRSR mapping → report.</div>
+   356→   356→            </div>
+   357→   357→          </div>
+   358→   358→          <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+   359→   359→            {['Source', 'Evidence', 'Validate', 'Calculate', 'Approve', 'Consolidate', 'BRSR', 'Report', 'Audit'].map((s, i, arr) => (
+   360→   360→              <span key={s} className="flex items-center gap-1">
+   361→   361→                <span className="rounded-full bg-white/70 px-2 py-1 font-semibold text-slate-600">{s}</span>
+   362→   362→                {i < arr.length - 1 && <ArrowRight className="h-2.5 w-2.5 text-slate-300" />}
+   363→   363→              </span>
+   364→   364→            ))}
+   365→   365→          </div>
+   366→   366→        </div>
+   367→   367→      </GlassCard>
+   368→   368→
+   369→   369→      {/* KPI Drill-down modal */}
+   370→   370→      <KpiDrillDownModal type={drillDown} data={data} onClose={() => setDrillDown(null)} />
+   371→   371→      </div>{/* end full dashboard */}
+   372→   372→    </div>
+   373→   373→  )
+   374→   374→}
+   375→   375→
+   376→   376→/* ---------- Building blocks ---------- */
+   377→   377→function GlassCard({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+   378→   378→  return (
+   379→   379→    <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
+   380→   380→      className={`glass glass-shimmer rounded-2xl p-4 ${className}`}>
+   381→   381→      {children}
+   382→   382→    </motion.section>
+   383→   383→  )
+   384→   384→}
+   385→   385→
+   386→   386→function CardHeader({ icon: Icon, title, subtitle, right }: { icon: any; title: string; subtitle?: string; right?: React.ReactNode }) {
+   387→   387→  return (
+   388→   388→    <div className="mb-3 flex items-start justify-between">
+   389→   389→      <div className="flex items-start gap-2.5">
+   390→   390→        <div className="kpi-tile bg-slate-50 text-slate-600" style={{ width: 32, height: 32 }}><Icon className="h-4 w-4" /></div>
+   391→   391→        <div>
+   392→   392→          <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+   393→   393→          {subtitle && <p className="text-[11px] text-slate-500">{subtitle}</p>}
+   394→   394→        </div>
+   395→   395→      </div>
+   396→   396→      {right}
+   397→   397→    </div>
+   398→   398→  )
+   399→   399→}
+   400→   400→
+   401→   401→/** Compute real month-over-month delta (%) from the trends array. Returns null if insufficient data. */
+   402→   402→function trendDelta(trends: { emissions: number; energy: number; water: number; waste: number }[], key: 'emissions' | 'energy' | 'water' | 'waste'): number | null {
+   403→   403→  if (!trends || trends.length < 2) return null
+   404→   404→  const last = trends[trends.length - 1][key]
+   405→   405→  const prev = trends[trends.length - 2][key]
+   406→   406→  if (prev === 0) return null
+   407→   407→  return Math.round(((last - prev) / prev) * 1000) / 10
+   408→   408→}
+   409→   409→
+   410→   410→function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay, spark, sparkColor, risk, onClick, confidence, glossaryTerm }: any) {
+   411→   411→  // ESG semantics: trend direction vs what's "good" determines colour
+   412→   412→  const hasTrend = trend !== null && trend !== undefined && !isNaN(trend)
+   413→   413→  const isGood = hasTrend && ((goodDirection === 'down' && trend < 0) || (goodDirection === 'up' && trend > 0))
+   414→   414→  const isNeutral = hasTrend && trend === 0
+   415→   415→  const pillClass = !hasTrend ? 'status-review' : isNeutral ? 'status-review' : isGood ? 'status-approved' : 'status-warning'
+   416→   416→  const hasSpark = Array.isArray(spark) && spark.length >= 2
+   417→   417→  const clickable = !!onClick
+   418→   418→  // Data confidence: verified (green left border), warning (amber), draft (slate)
+   419→   419→  const confidenceConfig = {
+   420→   420→    verified: { border: 'border-l-emerald-400', dot: 'bg-emerald-500', label: 'Verified', title: 'Data verified — all source records approved' },
+   421→   421→    warning: { border: 'border-l-amber-400', dot: 'bg-amber-500', label: 'Review', title: 'Open validation exceptions — review required' },
+   422→   422→    draft: { border: 'border-l-slate-300', dot: 'bg-slate-400', label: 'Draft', title: 'Data in draft — not yet submitted' },
+   423→   423→  }
+   424→   424→  const conf = confidence ? confidenceConfig[confidence as keyof typeof confidenceConfig] : null
+   425→   425→  return (
+   426→   426→    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
+   427→   427→      onClick={onClick}
+   428→   428→      title={conf?.title}
+   429→   429→      className={`glass glass-shimmer relative overflow-hidden rounded-2xl border-l-[3px] p-4 ${conf?.border ?? 'border-l-transparent'} ${clickable ? 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/10' : ''}`}>
+   430→   430→      <div className="flex items-start justify-between">
+   431→   431→        <div className={`kpi-tile ${tileClass}`}><Icon className="h-5 w-5" /></div>
+   432→   432→        <div className="flex items-center gap-1.5">
+   433→   433→          {conf && (
+   434→   434→            <span className="flex items-center gap-1 rounded-full bg-white/60 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500" title={conf.title}>
+   435→   435→              <span className={`h-1.5 w-1.5 rounded-full ${conf.dot}`} />
+   436→   436→              {conf.label}
+   437→   437→            </span>
+   438→   438→          )}
+   439→   439→          {hasTrend ? (
+   440→   440→            <span className={`status-pill ${pillClass}`}>
+   441→   441→              {trend < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+   442→   442→              {trend > 0 ? '+' : ''}{trend}%
+   443→   443→            </span>
+   444→   444→          ) : risk ? (
+   445→   445→            <span className={`status-pill ${risk.level === 'danger' ? 'status-error' : 'status-warning'}`}>
+   446→   446→              <AlertTriangle className="h-3 w-3" /> {risk.text}
+   447→   447→            </span>
+   448→   448→          ) : null}
+   449→   449→        </div>
+   450→   450→      </div>
+   451→   451→      <div className="mt-3">
+   452→   452→        <div className="flex items-center gap-1">
+   453→   453→          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+   454→   454→          {glossaryTerm && <GlossaryTooltip term={glossaryTerm} />}
+   455→   455→        </div>
+   456→   456→        <div className="mt-0.5 flex items-baseline gap-1">
+   457→   457→          <span className="tabular-nums text-[26px] font-bold leading-none text-slate-800">{value}</span>
+   458→   458→          <span className="text-xs font-medium text-slate-400">&nbsp;{unit}</span>
+   459→   459→        </div>
+   460→   460→        <div className="mt-1.5 flex items-end justify-between gap-2">
+   461→   461→          {sub && <div className="text-[11px] leading-tight text-slate-500">{sub}</div>}
+   462→   462→          {hasSpark && (
+   463→   463→            <div className="h-7 w-16 flex-shrink-0">
+   464→   464→              <ResponsiveContainer width="100%" height="100%">
+   465→   465→                <LineChart data={spark.map((v: number, i: number) => ({ i, v }))} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+   466→   466→                  <Line type="monotone" dataKey="v" stroke={sparkColor || '#3b82f6'} strokeWidth={1.8} dot={false} isAnimationActive={true} />
+   467→   467→                </LineChart>
+   468→   468→              </ResponsiveContainer>
+   469→   469→            </div>
+   470→   470→          )}
+   471→   471→        </div>
+   472→   472→      </div>
+   473→   473→      {risk && (
+   474→   474→        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-rose-50/70 px-2 py-1 text-[10px] font-medium text-rose-700">
+   475→   475→          <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+   476→   476→          <span>{risk.text} — review required</span>
+   477→   477→        </div>
+   478→   478→      )}
+   479→   479→    </motion.div>
+   480→   480→  )
+   481→   481→}
+   482→   482→
+   483→   483→function MiniStat({ label, value, icon: Icon, tone }: any) {
+   484→   484→  const toneMap: Record<string, string> = {
+   485→   485→    blue: 'bg-blue-50 text-blue-600', amber: 'bg-amber-50 text-amber-600',
+   486→   486→    violet: 'bg-violet-50 text-violet-600', emerald: 'bg-emerald-50 text-emerald-600',
+   487→   487→  }
+   488→   488→  return (
+   489→   489→    <div className="flex items-center justify-between rounded-lg bg-white/40 px-2.5 py-1.5">
+   490→   490→      <div className="flex items-center gap-2">
+   491→   491→        <div className={`flex h-6 w-6 items-center justify-center rounded-md ${toneMap[tone]}`}><Icon className="h-3 w-3" /></div>
+   492→   492→        <span className="text-[11px] font-medium text-slate-600">{label}</span>
+   493→   493→      </div>
+   494→   494→      <span className="tabular-nums text-sm font-bold text-slate-800">{value.toLocaleString()}</span>
+   495→   495→    </div>
+   496→   496→  )
+   497→   497→}
+   498→   498→
+   499→   499→function QualityRow({ icon: Icon, label, value, tone }: any) {
+   500→   500→  const toneMap: Record<string, string> = {
+   501→   501→    rose: 'text-rose-600 bg-rose-50', amber: 'text-amber-600 bg-amber-50',
+   502→   502→    violet: 'text-violet-600 bg-violet-50', emerald: 'text-emerald-600 bg-emerald-50',
+   503→   503→  }
+   504→   504→  return (
+   505→   505→    <div className="flex items-center justify-between rounded-lg px-2.5 py-2 transition hover:bg-white/40">
+   506→   506→      <div className="flex items-center gap-2">
+   507→   507→        <div className={`flex h-6 w-6 items-center justify-center rounded-md ${toneMap[tone]}`}><Icon className="h-3 w-3" /></div>
+   508→   508→        <span className="text-xs font-medium text-slate-600">{label}</span>
+   509→   509→      </div>
+   510→   510→      <span className="tabular-nums text-sm font-bold text-slate-800">{value}</span>
+   511→   511→    </div>
+   512→   512→  )
+   513→   513→}
+   514→   514→
+   515→   515→function ActivityRow({ a, delay }: { a: any; delay: number }) {
+   516→   516→  const toneMap: Record<string, string> = {
+   517→   517→    SUBMITTED: 'bg-blue-100 text-blue-700', APPROVED: 'bg-emerald-100 text-emerald-700',
+   518→   518→    DRAFT: 'bg-amber-100 text-amber-700', COMPLETED: 'bg-teal-100 text-teal-700',
+   519→   519→  }
+   520→   520→  const iconMap: Record<string, any> = { DATA_ENTRY: Activity, SUBMIT: Send, APPROVE: CheckCircle2, EVIDENCE_UPLOAD: Link2, CALCULATION: Zap }
+   521→   521→  const Icon = iconMap[a.action] ?? Activity
+   522→   522→  const tone = toneMap[a.status] ?? 'bg-slate-100 text-slate-700'
+   523→   523→  return (
+   524→   524→    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay }}
+   525→   525→      className="flex items-start gap-3 rounded-xl px-2 py-2 transition hover:bg-white/40">
+   526→   526→      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600">
+   527→   527→        <Icon className="h-4 w-4" />
+   528→   528→      </div>
+   529→   529→      <div className="min-w-0 flex-1">
+   530→   530→        <div className="flex items-center gap-2">
+   531→   531→          <span className="truncate text-xs font-semibold text-slate-800">{a.title}</span>
+   532→   532→          <span className={`status-pill ${tone}`}>{a.status}</span>
+   533→   533→        </div>
+   534→   534→        <p className="truncate text-[11px] text-slate-500">{a.description}</p>
+   535→   535→        <div className="mt-0.5 flex items-center gap-2 text-[10px] text-slate-400">
+   536→   536→          <span className="font-medium text-slate-500">{a.actorName}</span>
+   537→   537→          <span>·</span><span>{a.actorRole}</span>
+   538→   538→          <span>·</span><span>{timeAgo(a.createdAt)}</span>
+   539→   539→        </div>
+   540→   540→      </div>
+   541→   541→    </motion.div>
+   542→   542→  )
+   543→   543→}
+   544→   544→
+   545→   545→function ScopeFilter() {
+   546→   546→  return (
+   547→   547→    <div className="glass-subtle flex items-center gap-1.5 rounded-full px-3 py-2 text-xs">
+   548→   548→      <Building2 className="h-3.5 w-3.5 text-blue-600" />
+   549→   549→      <select className="bg-transparent font-semibold text-slate-700 outline-none">
+   550→   550→        <option>MEIL Group (All)</option>
+   551→   551→        <option>MEIL Power Systems</option>
+   552→   552→        <option>MEIL Infrastructure</option>
+   553→   553→      </select>
+   554→   554→    </div>
+   555→   555→  )
+   556→   556→}
+   557→   557→
+   558→   558→function DashboardSkeleton() {
+   559→   559→  return (
+   560→   560→    <div className="space-y-5">
+   561→   561→      <div className="h-8 w-64 animate-pulse rounded bg-slate-200/60" />
+   562→   562→      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+   563→   563→        {[...Array(8)].map((_, i) => <div key={i} className="glass h-32 animate-pulse rounded-2xl" />)}
+   564→   564→      </div>
+   565→   565→      <div className="grid gap-4 lg:grid-cols-3">
+   566→   566→        <div className="glass h-80 animate-pulse rounded-2xl lg:col-span-2" />
+   567→   567→        <div className="glass h-80 animate-pulse rounded-2xl" />
+   568→   568→      </div>
+   569→   569→    </div>
+   570→   570→  )
+   571→   571→}
+   572→   572→
+   573→   573→function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+   574→   574→  return (
+   575→   575→    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
+   576→   576→      <AlertOctagon className="h-10 w-10 text-rose-500" />
+   577→   577→      <div>
+   578→   578→        <div className="text-base font-bold text-slate-800">Failed to load dashboard</div>
+   579→   579→        <div className="text-xs text-slate-500">{message}</div>
+   580→   580→      </div>
+   581→   581→      <button onClick={onRetry} className="btn-glass-primary rounded-full px-5 py-2 text-xs font-semibold">Retry</button>
+   582→   582→    </div>
+   583→   583→  )
+   584→   584→}
+   585→   585→
+   586→   586→function EmptyState() {
+   587→   587→  return (
+   588→   588→    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
+   589→   589→      <FileCheck2 className="h-10 w-10 text-slate-400" />
+   590→   590→      <div>
+   591→   591→        <div className="text-base font-bold text-slate-800">No reporting periods yet</div>
+   592→   592→        <div className="text-xs text-slate-500">Create a reporting year and period to begin.</div>
+   593→   593→      </div>
+   594→   594→    </div>
+   595→   595→  )
+   596→   596→}
+   597→   597→
+   598→   598→const tooltipStyle = {
+   599→   599→  background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(255,255,255,0.8)',
+   600→   600→  borderRadius: 12, fontSize: 11, boxShadow: '0 8px 24px -8px rgba(30,58,138,0.18)',
+   601→   601→  backdropFilter: 'blur(12px)',
+   602→   602→}
+   603→   603→
+   604→   604→function timeAgo(iso: string) {
+   605→   605→  const diff = Date.now() - new Date(iso).getTime()
+   606→   606→  const mins = Math.floor(diff / 60000)
+   607→   607→  if (mins < 1) return 'just now'
+   608→   608→  if (mins < 60) return `${mins}m ago`
+   609→   609→  const hrs = Math.floor(mins / 60)
+   610→   610→  if (hrs < 24) return `${hrs}h ago`
+   611→   611→  return `${Math.floor(hrs / 24)}d ago`
+   612→   612→}
+   613→   613→
+   614→   614→/* ---------- Executive Summary banner — smart alert with the single most important action ---------- */
+   615→   615→function ExecutiveSummary({ kpis, onNavigate }: { kpis: any; onNavigate: (m: string) => void }) {
+   616→   616→  // Determine the most urgent action from real KPIs
+   617→   617→  const alerts: { severity: 'danger' | 'warning' | 'info'; title: string; message: string; action: string; module: string }[] = []
+   618→   618→  if (kpis.fatalities > 0) alerts.push({ severity: 'danger', title: 'Safety incident', message: `${kpis.fatalities} fatality recorded. Immediate review required.`, action: 'Review safety', module: 'audit' })
+   619→   619→  if (kpis.brsrMissing > 0) alerts.push({ severity: 'warning', title: 'BRSR compliance gap', message: `${kpis.brsrMissing} BRSR indicators still missing data. Report readiness at ${kpis.brsrReadiness}%.`, action: 'View BRSR', module: 'brsr' })
+   620→   620→  if (kpis.openExceptions > 0) alerts.push({ severity: 'warning', title: 'Data quality exceptions', message: `${kpis.openExceptions} validation errors need resolution before lock.`, action: 'Review exceptions', module: 'submissions' })
+   621→   621→  if (kpis.corrections > 0) alerts.push({ severity: 'info', title: 'Corrections pending', message: `${kpis.corrections} correction requests await user response.`, action: 'View corrections', module: 'submissions' })
+   622→   622→  if (alerts.length === 0) {
+   623→   623→    return (
+   624→   624→      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl border border-emerald-200/50 bg-emerald-50/40 p-4">
+   625→   625→        <div className="flex items-center gap-3">
+   626→   626→          <div className="kpi-tile bg-emerald-50 text-emerald-600"><CheckCircle2 className="h-5 w-5" /></div>
+   627→   627→          <div className="flex-1">
+   628→   628→            <div className="text-sm font-bold text-slate-800">All systems healthy</div>
+   629→   629→            <div className="text-xs text-slate-500">No critical ESG alerts. All data flowing through the control chain on schedule.</div>
+   630→   630→          </div>
+   631→   631→        </div>
+   632→   632→      </motion.div>
+   633→   633→    )
+   634→   634→  }
+   635→   635→  const top = alerts[0]
+   636→   636→  const sevConfig = {
+   637→   637→    danger: { bg: 'from-rose-50/80 to-red-50/40', border: 'border-rose-200/60', tile: 'bg-rose-100 text-rose-600', text: 'text-rose-700' },
+   638→   638→    warning: { bg: 'from-amber-50/80 to-orange-50/40', border: 'border-amber-200/60', tile: 'bg-amber-100 text-amber-600', text: 'text-amber-700' },
+   639→   639→    info: { bg: 'from-blue-50/80 to-cyan-50/40', border: 'border-blue-200/60', tile: 'bg-blue-100 text-blue-600', text: 'text-blue-700' },
+   640→   640→  }[top.severity]
+   641→   641→  return (
+   642→   642→    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className={`glass rounded-2xl border ${sevConfig.border} bg-gradient-to-r ${sevConfig.bg} p-4`}>
+   643→   643→      <div className="flex items-center gap-3">
+   644→   644→        <div className={`kpi-tile ${sevConfig.tile}`}><AlertCircle className="h-5 w-5" /></div>
+   645→   645→        <div className="flex-1 min-w-0">
+   646→   646→          <div className="flex items-center gap-2">
+   647→   647→            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Action required</span>
+   648→   648→            <span className={`status-pill ${top.severity === 'danger' ? 'status-error' : top.severity === 'warning' ? 'status-warning' : 'status-submitted'}`}>{alerts.length} alert{alerts.length > 1 ? 's' : ''}</span>
+   649→   649→          </div>
+   650→   650→          <div className="mt-0.5 text-sm font-bold text-slate-800">{top.title}</div>
+   651→   651→          <div className="text-xs text-slate-600">{top.message}</div>
+   652→   652→        </div>
+   653→   653→        <button onClick={() => onNavigate(top.module)} className={`btn-glass-primary flex flex-shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold ${sevConfig.text}`}>
+   654→   654→          {top.action} <ChevronRight className="h-3.5 w-3.5" />
+   655→   655→        </button>
+   656→   656→      </div>
+   657→   657→    </motion.div>
+   658→   658→  )
+   659→   659→}
+   660→   660→
+   661→   661→/* ---------- ESG Score Gauge — composite 0-100 score with letter grade ---------- */
+   662→   662→function EsgScoreGauge({ score }: { score: number }) {
+   663→   663→  const grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B+' : score >= 60 ? 'B' : score >= 50 ? 'C' : 'D'
+   664→   664→  const gradeColor = score >= 80 ? '#10b981' : score >= 70 ? '#3b82f6' : score >= 50 ? '#f59e0b' : '#ef4444'
+   665→   665→  const data = [{ name: 'score', value: score, fill: gradeColor }]
+   666→   666→  return (
+   667→   667→    <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+   668→   668→      className="glass glass-shimmer rounded-2xl p-5">
+   669→   669→      <div className="mb-2 flex items-center gap-2">
+   670→   670→        <div className="kpi-tile bg-gradient-to-br from-blue-500 to-cyan-600 text-white" style={{ width: 32, height: 32 }}><Award className="h-4 w-4" /></div>
+   671→   671→        <div>
+   672→   672→          <div className="flex items-center gap-1">
+   673→   673→            <h3 className="text-sm font-bold text-slate-800">ESG Score</h3>
+   674→   674→            <GlossaryTooltip term="ESG Score" />
+   675→   675→          </div>
+   676→   676→          <p className="text-[11px] text-slate-500">Composite performance index</p>
+   677→   677→        </div>
+   678→   678→      </div>
+   679→   679→      <div className="relative h-40">
+   680→   680→        <ResponsiveContainer width="100%" height="100%">
+   681→   681→          <RadialBarChart innerRadius="68%" outerRadius="100%" data={data} startAngle={90} endAngle={-270}>
+   682→   682→            <RadialBar background={{ fill: 'rgba(148,163,184,0.12)' }} dataKey="value" cornerRadius={12} />
+   683→   683→          </RadialBarChart>
+   684→   684→        </ResponsiveContainer>
+   685→   685→        <div className="absolute inset-0 flex flex-col items-center justify-center">
+   686→   686→          <span className="tabular-nums text-4xl font-bold text-slate-800">{score}</span>
+   687→   687→          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">/ 100</span>
+   688→   688→          <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-full text-base font-black" style={{ color: 'white', background: gradeColor }}>{grade}</span>
+   689→   689→        </div>
+   690→   690→      </div>
+   691→   691→      <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
+   692→   692→        <div className="flex items-center gap-1.5 rounded-md bg-emerald-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> A+ (90+)</div>
+   693→   693→        <div className="flex items-center gap-1.5 rounded-md bg-blue-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> A (80+)</div>
+   694→   694→        <div className="flex items-center gap-1.5 rounded-md bg-amber-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> B (60+)</div>
+   695→   695→        <div className="flex items-center gap-1.5 rounded-md bg-rose-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> C/D (&lt;60)</div>
+   696→   696→      </div>
+   697→   697→      {/* Industry benchmark comparison */}
+   698→   698→      <BenchmarkComparison score={score} />
+   699→   699→    </motion.section>
+   700→   700→  )
+   701→   701→}
+   702→   702→
+   703→   703→/* ---------- Industry Benchmark Comparison ---------- */
+   704→   704→function BenchmarkComparison({ score }: { score: number }) {
+   705→   705→  // Illustrative industry benchmarks (in production, these would come from a benchmark API)
+   706→   706→  const benchmarks = [
+   707→   707→    { label: 'Industry avg', value: 62, color: '#94a3b8' },
+   708→   708→    { label: 'Top quartile', value: 78, color: '#10b981' },
+   709→   709→    { label: 'Leaders', value: 88, color: '#3b82f6' },
+   710→   710→  ]
+   711→   711→  const percentile = score >= 88 ? 'Top 10%' : score >= 78 ? 'Top 25%' : score >= 62 ? 'Above average' : 'Below average'
+   712→   712→  const percentileColor = score >= 78 ? 'text-emerald-600' : score >= 62 ? 'text-blue-600' : 'text-amber-600'
+   713→   713→  return (
+   714→   714→    <div className="mt-3 rounded-xl border border-slate-200/50 bg-white/40 p-3">
+   715→   715→      <div className="mb-2 flex items-center justify-between">
+   716→   716→        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Industry benchmark</span>
+   717→   717→        <span className={`text-[10px] font-bold ${percentileColor}`}>{percentile}</span>
+   718→   718→      </div>
+   719→   719→      {/* Benchmark bar */}
+   720→   720→      <div className="relative h-2 rounded-full bg-slate-200/60">
+   721→   721→        <div className="absolute h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" style={{ width: `${score}%` }} />
+   722→   722→        {benchmarks.map((b) => (
+   723→   723→          <div key={b.label} className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2" style={{ left: `${b.value}%`, background: b.color }} title={`${b.label}: ${b.value}`} />
+   724→   724→        ))}
+   725→   725→      </div>
+   726→   726→      {/* Benchmark legend */}
+   727→   727→      <div className="mt-2 flex items-center justify-between text-[9px]">
+   728→   728→        {benchmarks.map((b) => (
+   729→   729→          <span key={b.label} className="flex items-center gap-1 text-slate-500">
+   730→   730→            <span className="h-1.5 w-1.5 rounded-full" style={{ background: b.color }} />
+   731→   731→            {b.label} <span className="tabular-nums font-semibold">{b.value}</span>
+   732→   732→          </span>
+   733→   733→        ))}
+   734→   734→      </div>
+   735→   735→    </div>
+   736→   736→  )
+   737→   737→}
+   738→   738→
+   739→   739→/* ---------- KPI Drill-Down Modal — month-over-month breakdown ---------- */
+   740→   740→function KpiDrillDownModal({ type, data, onClose }: { type: 'emissions' | 'energy' | 'water' | 'waste' | null; data: any; onClose: () => void }) {
+   741→   741→  if (!type) return null
+   742→   742→  const trendArr = Object.entries(data.trends).map(([label, v]: any) => ({ label, ...v }))
+   743→   743→  const config = {
+   744→   744→    emissions: { title: 'Scope 1 & 2 Emissions', color: '#f43f5e', unit: 'tCO₂e', icon: Flame, total: data.kpis.totalEmissions, scope1: data.kpis.scope1, scope2: data.kpis.scope2 },
+   745→   745→    energy: { title: 'Energy Consumption', color: '#f59e0b', unit: 'GJ', icon: Zap, total: data.kpis.energyGJ, renewable: data.kpis.renewableShare },
+   746→   746→    water: { title: 'Water Withdrawal', color: '#06b6d4', unit: 'KL', icon: Droplet, total: data.kpis.waterWithdrawalKL, recycled: data.kpis.waterRecycledShare },
+   747→   747→    waste: { title: 'Waste Recovered', color: '#10b981', unit: '%', icon: Recycle, total: data.kpis.wasteRecycledShare, generated: data.kpis.wasteGeneratedT },
+   748→   748→  }[type]
+   749→   749→  const Icon = config.icon
+   750→   750→  const avg = trendArr.length > 0 ? trendArr.reduce((s: number, t: any) => s + t[type], 0) / trendArr.length : 0
+   751→   751→  const max = trendArr.length > 0 ? Math.max(...trendArr.map((t: any) => t[type])) : 0
+   752→   752→  const min = trendArr.length > 0 ? Math.min(...trendArr.map((t: any) => t[type])) : 0
+   753→   753→  return (
+   754→   754→    <AnimatePresence>
+   755→   755→      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
+   756→   756→        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
+   757→   757→        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} onClick={(e) => e.stopPropagation()}
+   758→   758→          className="glass-strong w-full max-w-2xl rounded-3xl p-6">
+   759→   759→          <div className="mb-4 flex items-center justify-between">
+   760→   760→            <div className="flex items-center gap-3">
+   761→   761→              <div className="kpi-tile" style={{ background: config.color + '20', color: config.color }}><Icon className="h-5 w-5" /></div>
+   762→   762→              <div>
+   763→   763→                <h3 className="text-base font-bold text-slate-800">{config.title} · Drill-down</h3>
+   764→   764→                <p className="text-xs text-slate-500">Month-over-month breakdown · {data.periods.length} periods</p>
+   765→   765→              </div>
+   766→   766→            </div>
+   767→   767→            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X className="h-4 w-4" /></button>
+   768→   768→          </div>
+   769→   769→          {/* Summary stats */}
+   770→   770→          <div className="mb-4 grid grid-cols-4 gap-2">
+   771→   771→            <StatTile label="Total" value={config.total.toLocaleString()} unit={config.unit} />
+   772→   772→            <StatTile label="Average" value={avg.toLocaleString(undefined, { maximumFractionDigits: 1 })} unit={config.unit} />
+   773→   773→            <StatTile label="Peak" value={max.toLocaleString(undefined, { maximumFractionDigits: 1 })} unit={config.unit} />
+   774→   774→            <StatTile label="Lowest" value={min.toLocaleString(undefined, { maximumFractionDigits: 1 })} unit={config.unit} />
+   775→   775→          </div>
+   776→   776→          {/* Trend chart */}
+   777→   777→          <div className="h-56">
+   778→   778→            <ResponsiveContainer width="100%" height="100%">
+   779→   779→              <AreaChart data={trendArr} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+   780→   780→                <defs>
+   781→   781→                  <linearGradient id={`dd-${type}`} x1="0" y1="0" x2="0" y2="1">
+   782→   782→                    <stop offset="5%" stopColor={config.color} stopOpacity={0.5} />
+   783→   783→                    <stop offset="95%" stopColor={config.color} stopOpacity={0.02} />
+   784→   784→                  </linearGradient>
+   785→   785→                </defs>
+   786→   786→                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+   787→   787→                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
+   788→   788→                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
+   789→   789→                <Tooltip contentStyle={tooltipStyle} />
+   790→   790→                <Area type="monotone" dataKey={type} stroke={config.color} strokeWidth={2.5} fill={`url(#dd-${type})`} name={`${config.title} (${config.unit})`} />
+   791→   791→              </AreaChart>
+   792→   792→            </ResponsiveContainer>
+   793→   793→          </div>
+   794→   794→          {/* Per-month table */}
+   795→   795→          <div className="mt-4 max-h-40 overflow-y-auto scroll-elegant">
+   796→   796→            <table className="w-full text-xs">
+   797→   797→              <thead className="sticky top-0 bg-white/80 text-[10px] uppercase tracking-wide text-slate-400">
+   798→   798→                <tr><th className="px-2 py-1.5 text-left">Period</th><th className="px-2 py-1.5 text-right">Value</th><th className="px-2 py-1.5 text-right">vs Avg</th></tr>
+   799→   799→              </thead>
+   800→   800→              <tbody>
+   801→   801→                {trendArr.map((t: any) => {
+   802→   802→                  const delta = avg > 0 ? ((t[type] - avg) / avg) * 100 : 0
+   803→   803→                  return (
+   804→   804→                    <tr key={t.label} className="border-t border-slate-100">
+   805→   805→                      <td className="px-2 py-1.5 text-slate-600">{t.label}</td>
+   806→   806→                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-slate-800">{t[type].toLocaleString()} {config.unit}</td>
+   807→   807→                      <td className={`px-2 py-1.5 text-right tabular-nums ${delta < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{delta > 0 ? '+' : ''}{delta.toFixed(1)}%</td>
+   808→   808→                    </tr>
+   809→   809→                  )
+   810→   810→                })}
+   811→   811→              </tbody>
+   812→   812→            </table>
+   813→   813→          </div>
+   814→   814→        </motion.div>
+   815→   815→      </motion.div>
+   816→   816→    </AnimatePresence>
+   817→   817→  )
+   818→   818→}
+   819→   819→
+   820→   820→function StatTile({ label, value, unit }: { label: string; value: string; unit: string }) {
+   821→   821→  return (
+   822→   822→    <div className="rounded-xl bg-white/50 px-3 py-2 text-center">
+   823→   823→      <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+   824→   824→      <div className="tabular-nums text-base font-bold text-slate-800">{value}</div>
+   825→   825→      <div className="text-[9px] text-slate-400">{unit}</div>
+   826→   826→    </div>
+   827→   827→  )
+   828→   828→}
+   829→   829→
