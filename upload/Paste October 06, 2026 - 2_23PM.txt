@@ -1,0 +1,4009 @@
+YOU ARE THE LEAD SOFTWARE ARCHITECT, SENIOR FULL-STACK ENGINEER, UI/UX ENGINEER, DATABASE ARCHITECT, SECURITY ENGINEER, ESG DATA ENGINE ENGINEER, BRSR SYSTEM ENGINEER, QA ENGINEER AND DEVOPS ENGINEER RESPONSIBLE FOR BUILDING THE COMPLETE MEIL ESG / BRSR REPORTING PLATFORM.
+
+THIS IS NOT A UI MOCKUP TASK.
+THIS IS NOT A STATIC DASHBOARD TASK.
+THIS IS NOT A DEMO WITH FAKE VALUES.
+THIS IS NOT A COLLECTION OF FRONTEND SCREENS.
+
+BUILD A COMPLETE, REAL, END-TO-END, DATABASE-BACKED, ROLE-BASED, SECURE, FUNCTIONAL ESG/BRSR REPORTING PLATFORM.
+
+============================================================
+0. PROJECT MISSION
+============================================================
+
+Build a production-oriented enterprise ESG and BRSR reporting platform for MEIL.
+
+The platform must create a controlled chain:
+
+SOURCE DATA
+→ EVIDENCE
+→ VALIDATION
+→ CALCULATION
+→ SUBMISSION
+→ REVIEW
+→ CORRECTION
+→ APPROVAL
+→ CONSOLIDATION
+→ BRSR MAPPING
+→ FINAL REPORT
+→ AUDIT TRACEABILITY
+
+The primary operational source is Project/Site level.
+
+The organization hierarchy is:
+
+GROUP
+  ↓
+SUBSIDIARY
+  ↓
+BUSINESS UNIT
+  ↓
+PROJECT / SITE
+  ↓
+REPORTING PERIOD
+  ↓
+SOURCE ESG RECORD
+  ↓
+EVIDENCE
+  ↓
+VALIDATION RESULT
+  ↓
+CALCULATION RESULT
+  ↓
+SUBMISSION / APPROVAL HISTORY
+
+Higher organizational levels must derive consolidated values from lower-level approved records.
+
+Do NOT allow users to manually re-enter or manipulate consolidated ESG values as the normal process.
+
+The platform must answer this question for every important final metric:
+
+"Where did this number come from?"
+
+The answer must include:
+- reporting year
+- reporting period
+- group
+- subsidiary
+- business unit
+- project
+- source record
+- entered by
+- entered at
+- evidence
+- validation result
+- calculation method
+- emission factor
+- emission factor version
+- approval history
+- BRSR mapping
+- framework version
+- final reporting value
+
+============================================================
+1. ABSOLUTE BUILD RULES
+============================================================
+
+RULE 1:
+Do not create a fake frontend-only application.
+
+RULE 2:
+Do not use hard-coded dashboard metrics.
+
+RULE 3:
+Do not use random values for KPI cards.
+
+RULE 4:
+Do not use fake API responses.
+
+RULE 5:
+Do not keep authoritative ESG data in localStorage.
+
+RULE 6:
+Do not use mock JSON as the production data source.
+
+RULE 7:
+Do not use frontend-only authentication.
+
+RULE 8:
+Do not use frontend-only role protection.
+
+RULE 9:
+Do not hard-code user roles into arbitrary frontend conditions.
+
+RULE 10:
+All authorization must be enforced by the backend.
+
+RULE 11:
+All important business calculations must be performed server-side.
+
+RULE 12:
+All persistent authoritative data must be stored in PostgreSQL via Supabase.
+
+RULE 13:
+Redis is ONLY for cache, queue and background processing.
+Redis is NEVER the permanent source of truth.
+
+RULE 14:
+Evidence files must be stored through controlled storage, not merely filename references.
+
+RULE 15:
+Evidence integrity must use actual file content hashing where hashing is implemented.
+
+RULE 16:
+Locked records cannot be edited through normal update endpoints.
+
+RULE 17:
+Corrections must create controlled revisions/history.
+
+RULE 18:
+Historical records must not silently change because framework rules change.
+
+RULE 19:
+BRSR must be configuration-driven and versioned.
+
+RULE 20:
+Never hard-code one year's BRSR questions into application logic.
+
+RULE 21:
+Never invent real MEIL entities, subsidiaries, projects, financial figures or ESG values.
+
+RULE 22:
+Any sample/demo seed data must be explicitly marked as ILLUSTRATIVE and replaceable.
+
+RULE 23:
+The production application must work with real user-entered data.
+
+RULE 24:
+No module is considered complete until frontend, backend, database, authorization, validation, error handling and testing are connected.
+
+RULE 25:
+Do not redesign the locked dashboard shell unnecessarily.
+
+RULE 26:
+Preserve the MEIL Liquid Glass / premium white-blue visual direction.
+
+RULE 27:
+Do not introduce dark cyberpunk/neon/sci-fi visual design.
+
+RULE 28:
+Do not build disconnected role-specific applications.
+Build ONE application with role-aware views.
+
+============================================================
+2. SOURCE / BUSINESS ARCHITECTURE
+============================================================
+
+The product is:
+
+MEIL ESG / BRSR REPORTING PLATFORM
+
+Core business hierarchy:
+
+GROUP
+→ SUBSIDIARY
+→ BUSINESS UNIT
+→ PROJECT / SITE
+
+Every reporting record must resolve its organizational hierarchy.
+
+Examples:
+
+Group:
+MEIL Group
+
+Subsidiary:
+Configurable subsidiary
+
+Business Unit:
+Configurable BU
+
+Project:
+Configurable project/site
+
+Reporting:
+FY + month/reporting period
+
+The internal organization master must be configurable.
+
+Do not treat public website entity names as a complete or authoritative legal master.
+
+============================================================
+3. THREE BUSINESS PHASES
+============================================================
+
+PHASE 1 — DATA ENTRY / OPERATIONAL USERS
+
+Users:
+1. Project / Site User
+2. HR User
+3. EHS / Safety User
+4. Procurement / Supply Chain User
+5. CSR / Community User
+6. Compliance / Governance User
+
+Responsibilities:
+- enter source data
+- attach evidence
+- save drafts
+- respond to validation problems
+- submit data
+- receive correction requests
+- correct rejected records
+- maintain specialized departmental records
+
+PHASE 2 — REVIEW / CONSOLIDATION USERS
+
+Users:
+7. Business Unit Reviewer
+8. Subsidiary ESG Reviewer
+9. Group / HQ ESG Reviewer
+
+Responsibilities:
+- review
+- validate operational completeness
+- inspect evidence
+- identify exceptions
+- request corrections
+- approve
+- monitor consolidation
+
+PHASE 3 — ANALYSIS / REPORTING / ASSURANCE USERS
+
+Users:
+10. ESG / Sustainability Manager
+11. ESG Analyst
+12. BRSR Manager
+13. Auditor / Assurance User
+14. Management / Executive User
+
+System administration:
+15. Super Admin
+
+Important:
+Validation Engine, Calculation Engine, Consolidation Engine, BRSR Engine and Workflow Engine are SYSTEM ENGINES, not human users.
+
+============================================================
+4. COMPLETE ROLE DEFINITIONS
+============================================================
+
+ROLE 1 — SUPER ADMIN
+Scope:
+Entire system.
+
+Can:
+- manage users
+- manage roles
+- manage organization hierarchy
+- create Group
+- create Subsidiaries
+- create Business Units
+- create Projects
+- manage reporting periods
+- manage units
+- manage conversion rules
+- manage emission factors
+- manage factor versions
+- manage BRSR framework configurations
+- manage question/indicator masters
+- manage system settings
+- configure permissions
+- manage audit configuration
+- manage storage/system settings
+
+Cannot:
+- casually modify source ESG records as a normal admin shortcut
+- bypass workflow
+- erase audit history
+
+Screens:
+- Admin Dashboard
+- User Management
+- Roles & Permissions
+- Group Management
+- Subsidiary Management
+- BU Management
+- Project Management
+- Reporting Periods
+- Unit Master
+- Conversion Master
+- Emission Factor Master
+- BRSR Framework Master
+- Question/Indicator Master
+- Workflow Settings
+- System Settings
+- Audit Configuration
+- System Health
+
+
+ROLE 2 — PROJECT / SITE USER
+Scope:
+Assigned project(s).
+
+Can:
+- enter monthly source ESG data
+- save draft
+- upload evidence
+- update records before submission
+- respond to correction requests
+- submit reporting period
+- view own submission history
+- view project KPIs
+- view validation results
+
+Cannot:
+- approve own submission
+- change organization hierarchy
+- edit another project
+- edit locked periods
+- manually alter consolidated BU/Subsidiary/Group numbers
+
+Screens:
+- Project Dashboard
+- My Project
+- Reporting Periods
+- Data Entry
+- Energy/Fuel
+- Water
+- Waste
+- Workforce
+- Safety
+- Travel
+- Evidence
+- Submission
+- Validation Results
+- Correction Requests
+- Activity History
+
+
+ROLE 3 — HR USER
+Scope:
+Assigned organizational scope.
+
+Can:
+- employee data
+- worker data
+- gender data
+- permanent/non-permanent classification
+- differently abled workforce
+- benefits
+- training
+- wellbeing
+- employee grievance information
+- human-rights-related HR data
+
+Cannot:
+- modify environmental records outside authorized scope
+- edit emissions calculations
+- approve final organizational data
+
+Screens:
+- HR Dashboard
+- Workforce Overview
+- Employee Records
+- Worker Records
+- Gender & Diversity
+- Benefits
+- Training
+- Wellbeing
+- Employee Grievances
+- Human Rights Inputs
+- HR Evidence
+- HR Submissions
+- HR Validation
+
+
+ROLE 4 — EHS / SAFETY USER
+Scope:
+Assigned organizational scope.
+
+Can:
+- safety incidents
+- injuries
+- fatalities
+- occupational health data
+- safety training
+- safety assessments
+- environmental/safety incidents
+- water/waste inputs where assigned
+- corrective action tracking
+
+Screens:
+- EHS Dashboard
+- Safety Overview
+- Incidents
+- Injuries
+- Fatalities
+- Lost Time Injury
+- Training
+- Health & Safety Assessments
+- Corrective Actions
+- Water
+- Waste
+- Environmental Incidents
+- Evidence
+- EHS Submission
+- Validation
+
+
+ROLE 5 — PROCUREMENT / SUPPLY CHAIN USER
+Scope:
+Assigned scope.
+
+Can:
+- suppliers
+- supplier master
+- supplier ESG assessment
+- local sourcing
+- MSME sourcing
+- value-chain information
+- procurement indicators
+- supplier evidence
+- assessments
+
+Screens:
+- Procurement Dashboard
+- Supplier Master
+- Supplier Details
+- Supplier ESG Assessment
+- Local Procurement
+- MSME Procurement
+- Value Chain
+- Supplier Documents
+- Procurement Submission
+- Assessment History
+
+
+ROLE 6 — CSR / COMMUNITY USER
+Scope:
+Assigned scope.
+
+Can:
+- CSR project records
+- beneficiary records
+- social impact
+- stakeholder/community engagement
+- social impact assessment
+- R&R information
+- aspirational district-related inputs where applicable
+- community grievance information
+
+Screens:
+- CSR Dashboard
+- CSR Projects
+- Project Details
+- Beneficiaries
+- Community Engagement
+- SIA
+- R&R
+- Community Grievances
+- Local Development
+- Vulnerable/Marginalized Groups
+- CSR Evidence
+- CSR Submission
+
+
+ROLE 7 — COMPLIANCE / GOVERNANCE USER
+Scope:
+Assigned scope.
+
+Can:
+- policies
+- governance data
+- board/KMP-related records
+- ethics
+- anti-bribery/anti-corruption
+- complaints
+- grievance records
+- public policy/associations
+- governance disclosures
+- compliance information
+
+Screens:
+- Governance Dashboard
+- Policies
+- Policy Details
+- Board / KMP
+- Ethics
+- Anti-Bribery
+- Anti-Corruption
+- Complaints
+- Grievances
+- Public Policy
+- Associations
+- Compliance
+- Governance Evidence
+- Governance Submission
+
+
+ROLE 8 — BUSINESS UNIT REVIEWER
+Scope:
+Own BU and child projects.
+
+Can:
+- view projects
+- review submitted data
+- inspect evidence
+- inspect validation results
+- identify missing data
+- request corrections
+- approve BU submission
+- monitor BU completion
+- view BU KPI rollups
+
+Cannot:
+- approve outside assigned BU
+- edit source data as an unrestricted user
+- alter historical audit trail
+
+Screens:
+- BU Dashboard
+- Project List
+- Project Details
+- Review Queue
+- Submission Review
+- Evidence Review
+- Exceptions
+- Missing Data
+- BU KPI Rollup
+- Approval History
+
+
+ROLE 9 — SUBSIDIARY ESG REVIEWER
+Scope:
+Own subsidiary and all child BUs/projects.
+
+Can:
+- review BU submissions
+- review project submissions
+- inspect evidence
+- inspect consolidated data
+- request corrections
+- approve subsidiary submission
+- monitor subsidiary completeness
+
+Screens:
+- Subsidiary Dashboard
+- Business Units
+- Projects
+- Review Queue
+- Consolidated ESG
+- Evidence
+- Exceptions
+- Missing Data
+- Submission Approval
+- History
+
+
+ROLE 10 — GROUP / HQ ESG REVIEWER
+Scope:
+Entire group.
+
+Can:
+- review subsidiaries
+- review consolidated ESG
+- inspect exceptions
+- review readiness
+- final ESG review
+- initiate/approve correction workflow where permitted
+- final approval
+- lock reporting period
+- view BRSR readiness
+
+Screens:
+- Group Dashboard
+- Organization Tree
+- Subsidiary Overview
+- BU Overview
+- Project Drilldown
+- ESG Consolidation
+- Exceptions
+- Data Completeness
+- BRSR Readiness
+- Final Review
+- Lock Period
+- Group Reports
+- Audit & Traceability
+
+
+ROLE 11 — ESG / SUSTAINABILITY MANAGER
+Scope:
+Configured organizational scope.
+
+Can:
+- monitor ESG data quality
+- review validation
+- review calculations
+- review emission factors
+- review anomalies
+- review ESG KPIs
+- inspect methodology
+- monitor overall ESG health
+- review data completeness
+- support reporting preparation
+
+Screens:
+- ESG Command Center
+- Data Quality
+- Validation Monitoring
+- Calculation Monitoring
+- Emission Factors
+- Anomaly Center
+- ESG KPI Library
+- Methodology
+- Completeness
+- ESG Trends
+- Environmental
+- Social
+- Governance
+- Audit Trace
+
+
+ROLE 12 — ESG ANALYST
+Scope:
+Assigned/reporting-wide read and analytical scope.
+
+Can:
+- analyze trends
+- analyze emissions
+- energy
+- water
+- waste
+- safety
+- workforce
+- data completeness
+- anomalies
+- KPI performance
+- generate analytical reports
+
+Screens:
+- Analytics Home
+- Emission Analytics
+- Energy Analytics
+- Water Analytics
+- Waste Analytics
+- Social Analytics
+- Safety Analytics
+- Workforce Analytics
+- KPI Explorer
+- Trend Comparison
+- Anomaly Analysis
+- Data Completeness
+
+
+ROLE 13 — BRSR MANAGER
+Scope:
+Group/reporting scope.
+
+Can:
+- manage BRSR reporting workflow
+- select framework/reporting year
+- view Sections A/B/C
+- view Principles 1–9
+- inspect indicator mapping
+- identify missing source data
+- identify evidence status
+- inspect readiness
+- review manual corporate disclosures
+- generate BRSR-ready outputs
+- review final report
+
+Screens:
+- BRSR Dashboard
+- Reporting Year Selector
+- BRSR Readiness
+- Section A
+- Section B
+- Section C
+- Principles 1–9
+- Indicator Explorer
+- Source Mapping
+- Missing Data
+- Evidence Status
+- Manual Disclosures
+- Review Status
+- BRSR Preview
+- BRSR Export
+- Report History
+
+
+ROLE 14 — AUDITOR / ASSURANCE USER
+Scope:
+Approved read-only scope.
+
+Can:
+- inspect final ESG data
+- inspect source records
+- inspect evidence
+- inspect calculations
+- inspect factor versions
+- inspect approval history
+- inspect audit events
+- inspect exceptions
+- add comments/exceptions if configured
+
+Cannot:
+- edit source data
+- delete records
+- change calculations
+- alter approvals
+- bypass locks
+
+Screens:
+- Assurance Dashboard
+- Final Data
+- Source Trace
+- Evidence Trail
+- Calculation History
+- Factor History
+- Approval History
+- Audit Trail
+- Exceptions
+- Report Package
+- Assurance Review
+
+
+ROLE 15 — MANAGEMENT / EXECUTIVE USER
+Scope:
+Executive read/reporting access.
+
+Can:
+- view high-level ESG dashboard
+- view total emissions
+- energy
+- water
+- waste
+- workforce
+- safety
+- ESG performance
+- BRSR readiness
+- final reports
+
+Cannot:
+- edit operational source data
+- alter calculations
+- modify approvals
+
+Screens:
+- Executive Dashboard
+- ESG Performance
+- Environmental Overview
+- Social Overview
+- Governance Overview
+- Risk & Exceptions
+- BRSR Readiness
+- Final Reports
+- Management Summary
+
+============================================================
+5. APPLICATION SHELL
+============================================================
+
+Build one enterprise application.
+
+Locked global shell:
+
+TOP HEADER:
+- MEIL branding
+- global search
+- reporting-year/context
+- notifications
+- help
+- user profile
+- role indicator
+
+PRIMARY NAVIGATION:
+- Overview
+- My Project
+- Data Entry
+- Evidence
+- Submissions
+- Reports
+- Analytics
+- Audit & Traceability
+- More
+
+For role-specific users, navigation items must be filtered by backend permissions.
+
+Do not create duplicate unrelated shells for every role.
+
+Use one design system.
+
+============================================================
+6. AUTHENTICATION
+============================================================
+
+Use secure Supabase Auth.
+
+Required:
+- email/password authentication
+- session persistence
+- logout
+- forgot password
+- secure password reset
+- optional MFA/OTP architecture
+- current-user retrieval
+- current-role retrieval
+- current-organization-scope retrieval
+
+Authentication flow:
+
+Login
+→ authentication
+→ session verification
+→ user profile
+→ role resolution
+→ organization scope resolution
+→ permission resolution
+→ dashboard
+
+Never trust:
+- role from localStorage
+- role from URL
+- role from frontend state
+- arbitrary user ID submitted by frontend
+
+Backend must derive current user from authenticated session/token.
+
+============================================================
+7. RBAC + ORGANIZATION SCOPE
+============================================================
+
+Implement:
+
+USER
+ROLE
+PERMISSION
+ORGANIZATION SCOPE
+
+Permission examples:
+
+organization.read
+organization.write
+
+user.read
+user.create
+user.update
+user.disable
+
+project.read
+project.write
+
+esg.energy.write
+esg.water.write
+esg.waste.write
+esg.people.write
+esg.safety.write
+esg.travel.write
+esg.human_rights.write
+esg.suppliers.write
+esg.csr.write
+esg.governance.write
+
+evidence.upload
+evidence.read
+evidence.verify
+
+submission.submit
+submission.review
+submission.reject
+submission.approve
+submission.lock
+
+brsr.read
+brsr.configure
+brsr.generate
+
+report.read
+report.generate
+
+audit.read
+
+Every backend endpoint must verify:
+1. authenticated user
+2. role
+3. permission
+4. organization scope
+5. record ownership/scope
+
+Implement PostgreSQL/Supabase RLS where appropriate.
+
+Frontend permission hiding is UI convenience only.
+Backend authorization is the actual security boundary.
+
+============================================================
+8. DATABASE
+============================================================
+
+PostgreSQL through Supabase is the permanent source of truth.
+
+Design normalized relational schema.
+
+CORE ORGANIZATION TABLES:
+
+groups
+- id
+- name
+- code
+- legal_name
+- status
+- metadata
+- created_at
+- updated_at
+
+subsidiaries
+- id
+- group_id
+- name
+- code
+- legal_name
+- cin where applicable
+- status
+- created_at
+- updated_at
+
+business_units
+- id
+- subsidiary_id
+- name
+- code
+- sector
+- status
+
+projects
+- id
+- business_unit_id
+- project_code
+- project_name
+- location
+- country
+- state
+- status
+- reporting_owner_id
+
+users
+- id
+- auth_user_id
+- name
+- email
+- employee_code
+- status
+- created_at
+
+roles
+permissions
+role_permissions
+user_roles
+user_scopes
+
+REPORTING TABLES:
+
+reporting_years
+reporting_periods
+period_status
+submission_versions
+
+ESG SOURCE TABLES:
+
+energy_records
+fuel_records
+water_records
+waste_records
+people_records
+worker_records
+training_records
+safety_incidents
+safety_assessments
+human_rights_records
+travel_records
+supplier_records
+supplier_assessments
+stakeholder_records
+csr_projects
+csr_beneficiaries
+social_impact_assessments
+community_grievances
+customer_records
+customer_complaints
+privacy_incidents
+governance_records
+policies
+board_kmp_records
+ethics_records
+anti_bribery_records
+public_policy_records
+association_records
+compliance_records
+
+EVIDENCE:
+
+evidence_files
+evidence_links
+evidence_versions
+evidence_verifications
+evidence_hashes
+
+VALIDATION:
+
+validation_rules
+validation_results
+validation_exceptions
+anomaly_events
+
+CALCULATIONS:
+
+unit_master
+conversion_rules
+emission_factors
+emission_factor_versions
+calculation_runs
+calculation_results
+calculation_lineage
+
+WORKFLOW:
+
+submissions
+submission_items
+submission_status_history
+review_actions
+approval_actions
+correction_requests
+revision_history
+locks
+
+BRSR:
+
+brsr_frameworks
+brsr_framework_versions
+brsr_sections
+brsr_principles
+brsr_questions
+brsr_indicators
+brsr_question_versions
+brsr_mappings
+brsr_mapping_sources
+brsr_answers
+brsr_answer_sources
+brsr_applicability_rules
+brsr_manual_disclosures
+
+AUDIT:
+
+audit_logs
+audit_event_types
+audit_metadata
+audit_exceptions
+
+REPORTING:
+
+dashboard_snapshots only if actually required
+report_jobs
+report_files
+report_versions
+
+============================================================
+9. DATA OWNERSHIP MODEL
+============================================================
+
+Project/site is the main operational entry level.
+
+Departmental modules can contribute specialized records within authorized scope.
+
+BU/Subsidiary/Group should normally use derived values.
+
+For every ESG record include:
+
+id
+organization scope
+project_id where relevant
+reporting_period_id
+module
+metric
+source_value
+source_unit
+normalized_value
+normalized_unit
+status
+entered_by
+entered_at
+updated_by
+updated_at
+evidence_requirement
+evidence_status
+validation_status
+calculation_status
+revision_number
+
+============================================================
+10. REPORTING PERIODS
+============================================================
+
+Support:
+- reporting year
+- month
+- quarter
+- annual reporting period
+- period opening
+- period closing
+- submission deadline
+- review deadline
+- approval deadline
+- locked state
+
+States:
+
+OPEN
+DRAFT
+SUBMITTED
+UNDER_REVIEW
+CORRECTION_REQUESTED
+RESUBMITTED
+BU_APPROVED
+SUBSIDIARY_APPROVED
+HQ_REVIEW
+LOCKED
+
+Do not allow invalid state transitions.
+
+============================================================
+11. DATA ENTRY ENGINE
+============================================================
+
+Every form must support:
+
+- reporting period selection
+- project selection where applicable
+- clear units
+- required-field validation
+- inline validation
+- save draft
+- autosave where safe
+- attach evidence
+- calculation preview
+- validation result
+- submission
+- history
+
+Do not make users type derived values manually when the system can calculate them.
+
+============================================================
+12. ENERGY / FUEL MODULE
+============================================================
+
+Support:
+
+Electricity
+Diesel
+Petrol
+Coal
+CNG
+LPG
+Renewable energy
+Non-renewable energy
+Grid electricity
+Purchased electricity
+Renewable/PPA records where applicable
+
+Fields:
+- source
+- quantity
+- unit
+- date/period
+- source category
+- vendor/source
+- meter/invoice reference
+- evidence
+- conversion
+- calculated energy
+- emission calculation where applicable
+
+Features:
+- monthly totals
+- renewable vs non-renewable
+- trend
+- project total
+- BU total
+- subsidiary total
+- group total
+
+============================================================
+13. WATER MODULE
+============================================================
+
+Capture:
+- water source
+- withdrawal
+- consumption
+- discharge
+- treatment
+- destination
+- recycled/reused quantity
+- unit
+- reporting period
+- evidence
+
+Support:
+- water balance
+- source comparison
+- consumption
+- discharge
+- treatment
+- ZLD-related fields where applicable
+- water stress indicator where required by framework
+
+Do not reduce ZLD to a simplistic checkbox.
+
+============================================================
+14. WASTE MODULE
+============================================================
+
+Capture:
+- waste type
+- hazardous/non-hazardous
+- quantity
+- unit
+- generated
+- recovered
+- recycled
+- reused
+- disposed
+- disposal route
+- vendor
+- manifest/reference
+- evidence
+
+Provide:
+- waste dashboard
+- category breakdown
+- recovery rate
+- disposal route
+- monthly trend
+- project → BU → subsidiary → group rollup
+
+============================================================
+15. WORKFORCE / PEOPLE MODULE
+============================================================
+
+Capture:
+- employees
+- workers
+- permanent
+- non-permanent
+- gender
+- differently abled
+- training
+- wellbeing
+- benefits
+- retirement/statutory benefits where applicable
+- turnover
+- grievance
+- equal opportunity
+- parental return/retention
+- performance/career review
+- worker/employee distinctions
+
+Do not merge employee and worker concepts into one uncontrolled category.
+
+============================================================
+16. SAFETY / EHS MODULE
+============================================================
+
+Capture:
+- incidents
+- injuries
+- fatalities
+- lost time incidents
+- recordable injuries
+- high consequence incidents
+- training
+- health assessments
+- working condition assessments
+- corrective actions
+- safety hours where applicable
+- workforce exposure/base denominator where required
+
+Calculations such as LTIFR must be derived correctly from underlying counts and hours.
+
+Never aggregate already-computed LTIFR percentages/ratios incorrectly.
+
+============================================================
+17. HUMAN RIGHTS MODULE
+============================================================
+
+Capture:
+- human rights policy
+- training
+- grievance mechanism
+- minimum wage compliance
+- child labor
+- forced labor
+- discrimination
+- harassment
+- whistleblower/protection
+- contractual human-rights clauses
+- due diligence
+- assessments
+- corrective action
+- value-chain partner assessments
+
+============================================================
+18. TRAVEL / SCOPE 3 SEED MODULE
+============================================================
+
+First-release support:
+
+Flights
+Rail
+Road
+Selected business travel activity
+
+Capture:
+- mode
+- distance/activity
+- passenger count where applicable
+- unit
+- travel date/period
+- origin/destination where appropriate
+- factor
+- factor version
+- calculated emissions
+- evidence
+
+Keep Scope 3 implementation modular.
+
+Do not falsely claim full Scope 3 coverage.
+
+Clearly label supported Scope 3 categories.
+
+============================================================
+19. PROCUREMENT / VALUE CHAIN
+============================================================
+
+Build:
+- supplier master
+- supplier classification
+- MSME indicator
+- local supplier
+- sourcing information
+- supplier ESG assessment
+- supplier policy acceptance
+- value-chain disclosure
+- assessment score
+- evidence
+- corrective actions
+
+Support versioned assessment forms.
+
+============================================================
+20. CSR / COMMUNITY
+============================================================
+
+Build:
+- CSR master
+- project
+- location
+- objective
+- expenditure
+- beneficiary count
+- vulnerable/marginalized group data
+- aspirational district indicator
+- SIA
+- R&R
+- stakeholder engagement
+- community complaints
+- corrective action
+- documents
+
+============================================================
+21. STAKEHOLDER MANAGEMENT
+============================================================
+
+Capture:
+- stakeholder group
+- vulnerable/marginalized status
+- engagement channel
+- engagement frequency
+- purpose
+- concerns
+- action
+- resolution
+- board/management involvement where applicable
+
+============================================================
+22. CUSTOMER / PRIVACY
+============================================================
+
+Capture:
+- customer complaints
+- product/service information
+- environmental/social information
+- responsible use
+- recycling/disposal information
+- data privacy complaints
+- advertising complaints
+- cybersecurity complaints/incidents
+- essential service disruption
+- recalls
+- corrective action
+- data breach
+- PII impact where required
+
+============================================================
+23. GOVERNANCE MODULE
+============================================================
+
+Build:
+- policies
+- principle mapping
+- board approval
+- procedure mapping
+- value-chain extension
+- certifications
+- commitments
+- targets
+- performance
+- director statement
+- highest authority
+- sustainability responsibility
+- policy review
+- independent external assessment
+- non-covered principles/reasons
+- board/KMP
+- ethics
+- anti-corruption
+- public policy
+- trade/industry associations
+- complaints
+
+Policies can map to multiple BRSR principles.
+
+Do not force a one-policy-per-principle architecture.
+
+============================================================
+24. VALIDATION ENGINE
+============================================================
+
+Validation is system-driven.
+
+Every record must be checked for:
+
+- required field
+- reporting period
+- organization scope
+- correct unit
+- valid numeric format
+- negative values where prohibited
+- valid conversion
+- duplicate risk
+- missing evidence
+- inconsistent dates
+- unusual ranges
+- cross-field consistency
+- source/document consistency
+- historical anomalies
+- factor availability
+
+Validation severity:
+
+INFO
+WARNING
+ERROR
+BLOCKING
+
+Example:
+
+Diesel = 5000 liters
+→ valid unit
+→ convert liters to configured energy unit
+→ apply factor/version
+→ calculate CO2e
+→ store result
+
+Validation response must explain:
+- issue
+- field
+- severity
+- reason
+- suggested action
+
+============================================================
+25. ANOMALY DETECTION
+============================================================
+
+Implement deterministic baseline anomaly detection first.
+
+Examples:
+- consumption suddenly 5x previous month
+- workforce suddenly drops 80%
+- impossible negative water consumption
+- duplicate invoice
+- duplicate meter reading
+- emission value outside configured expected range
+
+Do not silently reject every unusual value.
+
+Use:
+WARNING + REVIEW REQUIRED
+
+Allow justified exceptions with comments.
+
+============================================================
+26. CALCULATION ENGINE
+============================================================
+
+Centralized server-side calculation engine.
+
+Must support:
+- unit conversion
+- emission factors
+- factor versions
+- formula versions
+- Scope 1
+- Scope 2
+- selected Scope 3
+- intensity metrics
+- other ESG KPIs
+
+Store:
+
+source_value
+source_unit
+normalized_value
+normalized_unit
+conversion_rule_id
+conversion_version
+factor_id
+factor_version
+formula_id
+formula_version
+calculation_timestamp
+calculated_value
+result_unit
+methodology_note
+
+Calculation results must be deterministic.
+
+Same source input + same factor version = same result.
+
+Never hard-code turnover or other organizational metrics into calculations.
+
+Only calculate intensity when the required denominator exists in the real data model.
+
+============================================================
+27. EMISSION FACTOR MASTER
+============================================================
+
+Build an admin-managed factor repository.
+
+Each factor:
+- id
+- name
+- category
+- source
+- unit
+- geography
+- factor_value
+- CO2/CH4/N2O details where applicable
+- effective_from
+- effective_to
+- version
+- methodology
+- source_document
+- status
+
+Historical calculations must preserve their original factor version.
+
+Never silently recalculate history using a newer factor.
+
+============================================================
+28. CONSOLIDATION ENGINE
+============================================================
+
+The engine must calculate:
+
+Project
+→ BU
+→ Subsidiary
+→ Group
+
+Only include approved/eligible source records according to workflow configuration.
+
+Never:
+- sum duplicated submissions
+- sum already-consolidated numbers as though they were raw source
+- double-count shared records
+
+Store lineage.
+
+Example:
+
+Group Emissions
+→ Subsidiary A
+→ BU A1
+→ Project A1-P1
+→ January fuel record
+→ evidence
+→ calculation
+→ factor version
+
+Allow drill-down from every KPI.
+
+============================================================
+29. WORKFLOW ENGINE
+============================================================
+
+State machine:
+
+DRAFT
+↓
+SUBMITTED
+↓
+PROJECT/SYSTEM VALIDATION
+↓
+UNDER BU REVIEW
+↓
+BU APPROVED
+↓
+UNDER SUBSIDIARY REVIEW
+↓
+SUBSIDIARY APPROVED
+↓
+UNDER HQ REVIEW
+↓
+HQ APPROVED
+↓
+LOCKED
+↓
+BRSR READY
+
+Correction path:
+
+UNDER REVIEW
+→ CORRECTION REQUESTED
+→ USER CORRECTS
+→ NEW REVISION
+→ RESUBMITTED
+→ REVIEW
+
+Do not overwrite previous revision history.
+
+Track:
+- who
+- what
+- when
+- old value
+- new value
+- reason
+- comment
+- evidence
+- status transition
+
+============================================================
+30. EVIDENCE MANAGEMENT
+============================================================
+
+Evidence must be a first-class system.
+
+Support:
+- upload
+- preview
+- download if authorized
+- metadata
+- verification
+- versioning
+- source linking
+- access control
+- audit trail
+
+Examples:
+- invoice
+- electricity bill
+- meter reading
+- fuel register
+- waste manifest
+- safety register
+- policy
+- certificate
+- training record
+- HR record
+- supplier document
+- CSR document
+
+Evidence metadata:
+- document name
+- document type
+- document date
+- reporting period
+- uploader
+- source module
+- source record
+- version
+- status
+- hash
+- verification status
+
+Use secure storage and signed/authorized access.
+
+Important quantitative submissions should support linked evidence where required.
+
+============================================================
+31. EVIDENCE VERIFICATION
+============================================================
+
+Statuses:
+
+NOT_REQUIRED
+REQUIRED
+UPLOADED
+UNDER_REVIEW
+VERIFIED
+REJECTED
+EXPIRED
+
+Reviewer can:
+- approve evidence
+- reject evidence
+- request replacement
+- add comment
+
+Never delete evidence as if it never existed.
+
+============================================================
+32. BRSR ENGINE
+============================================================
+
+DO NOT BUILD A STATIC BRSR FORM.
+
+Build a configuration-driven BRSR engine.
+
+Database/configuration:
+
+framework
+framework_version
+reporting_year
+section
+principle
+question
+indicator
+applicability_rule
+mapping
+answer_type
+source
+calculation
+evidence_requirement
+
+Sections:
+A
+B
+C
+
+Principles:
+P1
+P2
+P3
+P4
+P5
+P6
+P7
+P8
+P9
+
+Support Essential and Leadership disclosures according to the selected framework/version.
+
+Support BRSR Core as configuration.
+
+Never attach future reporting rules directly to old records.
+
+Historical reporting must remain reproducible.
+
+============================================================
+33. BRSR SECTION A
+============================================================
+
+Build configurable support for:
+
+entity identity
+CIN
+entity name
+incorporation
+registered address
+corporate address
+email
+telephone
+website
+financial/reporting year
+stock exchanges
+paid-up capital
+contact person
+reporting boundary
+business activities
+products/services
+NIC codes
+locations
+plants/offices
+national/international markets
+export contribution
+customer types
+employees
+workers
+gender
+differently abled
+women participation
+turnover
+holding/subsidiary/associate/JV
+CSR
+complaints
+material responsible-business issues
+
+All question numbering must be configurable by framework version.
+
+============================================================
+34. BRSR SECTION B
+============================================================
+
+Support:
+- policy coverage
+- board approval
+- links
+- procedures
+- value chain
+- standards/certifications
+- commitments
+- targets
+- performance
+- reasons for deviation
+- director statement
+- highest authority
+- sustainability committee/responsibility
+- policy review
+- independent evaluation
+- reasons for non-coverage
+
+============================================================
+35. BRSR SECTION C / PRINCIPLES
+============================================================
+
+P1:
+Ethics, integrity, anti-corruption, transparency, complaints, corrective actions.
+
+P2:
+Sustainable products/services, R&D/capex, sourcing, recyclability, EPR-related information.
+
+P3:
+Employees, workers, benefits, wellbeing, diversity, training, safety, OHS, incidents, LTIFR, grievance, value-chain workforce controls.
+
+P4:
+Stakeholder identification, engagement, vulnerable/marginalized groups, grievance, board involvement.
+
+P5:
+Human rights, minimum wage, remuneration, grievance, child labor, forced labor, discrimination, due diligence, value-chain controls.
+
+P6:
+Energy, water, emissions, Scope 1, Scope 2, Scope 3 where applicable, waste, air emissions, biodiversity/environmental compliance, EIA, resource efficiency, water stress, environmental incidents.
+
+P7:
+Trade associations, anti-competitive conduct, public policy, advocacy.
+
+P8:
+SIA, R&R, CSR, local sourcing, MSMEs, vulnerable/marginalized groups, community beneficiaries.
+
+P9:
+Customer complaints, product/service information, privacy, cybersecurity, recalls, customer awareness, data breaches and corrective actions.
+
+============================================================
+36. BRSR DATA SOURCE MAPPING
+============================================================
+
+Every BRSR answer must show:
+
+Source:
+- manual disclosure
+OR
+- source record
+OR
+- derived KPI
+OR
+- consolidated KPI
+
+Status:
+MISSING
+DRAFT
+SUBMITTED
+APPROVED
+LOCKED
+EVIDENCE VERIFIED
+
+Example:
+
+BRSR Indicator
+→ source record
+→ calculation
+→ project
+→ month
+→ evidence
+
+Allow one BRSR indicator to use multiple underlying sources.
+
+Allow corporate/manual disclosure where project source data is inappropriate.
+
+============================================================
+37. BRSR READINESS
+============================================================
+
+Create readiness score based on real data.
+
+Do NOT hard-code 94%, 95%, etc.
+
+Readiness dimensions:
+- source completeness
+- approval completeness
+- evidence completeness
+- calculation completeness
+- mapping completeness
+- exception count
+- required manual disclosures
+- unresolved corrections
+- framework applicability
+
+Example:
+
+BRSR readiness:
+92%
+
+must actually mean:
+configured weighted/defined completion calculation from current records.
+
+Click:
+92%
+→ unresolved items
+→ missing indicators
+→ missing evidence
+→ pending approvals
+→ exceptions
+
+============================================================
+38. DASHBOARDS
+============================================================
+
+GLOBAL DASHBOARD:
+
+KPI cards:
+- total emissions
+- energy
+- water
+- waste
+- workforce
+- safety
+- completion
+- BRSR readiness
+
+Do not fake values.
+
+Charts must read from backend.
+
+Charts:
+- emissions trend
+- energy trend
+- water trend
+- waste trend
+- workforce
+- safety
+- completion
+- exceptions
+
+Filters:
+- reporting year
+- period
+- group
+- subsidiary
+- BU
+- project
+- module
+
+============================================================
+39. PROJECT DASHBOARD
+============================================================
+
+Show:
+
+Project identity
+Current reporting period
+Submission status
+Completion
+Pending data
+Pending evidence
+Validation problems
+Current emissions
+Energy
+Water
+Waste
+Safety indicators
+Workforce
+
+Action cards:
+- Continue data entry
+- Upload evidence
+- Fix validation
+- Submit
+- View status
+
+============================================================
+40. REVIEW DASHBOARD
+============================================================
+
+Show:
+- awaiting review
+- pending corrections
+- missing evidence
+- validation errors
+- anomalies
+- overdue submissions
+- approval progress
+
+Table columns:
+Project
+Period
+Module
+Completion
+Validation
+Evidence
+Submitted At
+Reviewer
+Status
+Action
+
+============================================================
+41. ESG ANALYTICS DASHBOARD
+============================================================
+
+Views:
+- emissions analytics
+- energy
+- water
+- waste
+- people
+- safety
+- governance
+- supplier/value chain
+- CSR
+
+Allow:
+- month-over-month
+- year-over-year
+- project comparison
+- BU comparison
+- subsidiary comparison
+- group view
+
+No arbitrary values.
+
+============================================================
+42. EXECUTIVE DASHBOARD
+============================================================
+
+Minimal complexity.
+
+Show:
+- ESG score/readiness
+- emissions
+- energy
+- water
+- waste
+- workforce
+- safety
+- major exceptions
+- reporting completion
+- BRSR readiness
+- key trends
+- latest approved report
+
+Do not expose operational editing tools.
+
+============================================================
+43. MY PROJECT
+============================================================
+
+Design:
+
+Header:
+"My Project"
+
+Actions:
+- Assign Project
+- Request Project
+
+KPI cards:
+- ESG Completion
+- Current Period
+- Emissions
+- Evidence
+- Open Issues
+
+Main project table.
+
+Right details panel:
+Overview
+ESG Progress
+Recent Activity
+Team
+Documents
+
+Bottom:
+progress
+status
+deadlines
+
+All values from real APIs.
+
+============================================================
+44. DATA ENTRY SCREEN
+============================================================
+
+Layout:
+
+Left:
+Data entry form
+
+Right:
+Evidence panel / preview
+
+Bottom:
+Step indicator:
+
+1 Enter Data
+2 Attach Evidence
+3 Validate
+4 Submit
+
+Actions:
+Save Draft
+Validate
+Submit for Review
+
+Right evidence preview should support:
+- PDF preview
+- image preview
+- metadata
+- verification state
+- document history
+
+Do not use tiny unreadable previews.
+
+============================================================
+45. SUBMISSIONS SCREEN
+============================================================
+
+Show:
+- draft
+- submitted
+- under review
+- correction requested
+- approved
+- locked
+
+Filters:
+period
+project
+module
+status
+reviewer
+
+Submission details:
+- source records
+- evidence
+- validation
+- calculations
+- comments
+- history
+- approval steps
+
+============================================================
+46. EVIDENCE SCREEN
+============================================================
+
+Show:
+- all authorized documents
+- document type
+- linked record
+- reporting period
+- project
+- uploaded by
+- status
+- verification
+- version
+- hash
+
+Actions:
+Upload
+Preview
+Verify
+Reject
+Replace
+History
+
+============================================================
+47. AUDIT & TRACEABILITY
+============================================================
+
+This is a major product feature.
+
+Allow drill-down:
+
+Group
+→ Subsidiary
+→ BU
+→ Project
+→ Period
+→ Module
+→ Source Record
+→ Evidence
+→ Validation
+→ Calculation
+→ Submission
+→ Approval
+→ BRSR Indicator
+→ Report
+
+Audit events:
+CREATE
+UPDATE
+SUBMIT
+VALIDATE
+CORRECTION_REQUEST
+RESUBMIT
+REVIEW
+APPROVE
+REJECT
+LOCK
+EVIDENCE_UPLOAD
+EVIDENCE_VERIFY
+CALCULATION
+BRSR_MAPPING
+REPORT_GENERATE
+
+Store:
+- actor
+- timestamp
+- entity
+- record
+- action
+- old state
+- new state
+- reason
+- metadata
+- IP/session metadata where appropriate
+
+Use immutable audit architecture.
+
+Do not provide a normal UI action to delete audit history.
+
+============================================================
+48. REPORTING
+============================================================
+
+Generate real reports.
+
+Supported output:
+- BRSR-ready report
+- ESG summary
+- emissions report
+- energy report
+- water report
+- waste report
+- workforce report
+- safety report
+- evidence package
+- audit package
+- Excel export
+- CSV where applicable
+
+PDF:
+Use ReportLab.
+
+Excel:
+Use openpyxl.
+
+Every generated report must include:
+- reporting period
+- framework/version
+- generation timestamp
+- organization scope
+- data status
+- report version
+
+============================================================
+49. REPORT VERSIONING
+============================================================
+
+Do not overwrite generated historical reports.
+
+Store:
+- report id
+- framework
+- framework version
+- reporting period
+- organization scope
+- generated by
+- generated at
+- file
+- checksum/version where appropriate
+
+============================================================
+50. NOTIFICATIONS
+============================================================
+
+Build notification center.
+
+Examples:
+- submission due
+- correction requested
+- evidence rejected
+- approval pending
+- period deadline
+- anomaly detected
+- BRSR item missing
+- report generated
+
+Notifications must be generated from actual system events.
+
+============================================================
+51. SEARCH
+============================================================
+
+Global search must be backend-powered.
+
+Search:
+- project
+- subsidiary
+- BU
+- user
+- submission
+- evidence
+- BRSR question
+- report
+- supplier
+- CSR project
+
+Respect user scope.
+
+============================================================
+52. FRONTEND ARCHITECTURE
+============================================================
+
+React
+Vite
+TypeScript
+
+Use:
+- React Router
+- TanStack Query
+- React Hook Form
+- Zod
+- Axios or typed REST client
+- Tailwind CSS
+- shadcn/ui
+- Recharts/ECharts
+- Lucide or Phosphor icons
+
+Frontend responsibilities:
+- rendering
+- interaction
+- form management
+- client validation
+- API state
+- optimistic UI only where safe
+- loading states
+- error states
+- accessibility
+
+Frontend must NOT own:
+- authorization truth
+- final calculations
+- consolidation truth
+- final workflow truth
+
+============================================================
+53. BACKEND ARCHITECTURE
+============================================================
+
+Python
+FastAPI
+Pydantic
+SQLAlchemy
+Alembic
+
+Organize backend into domains.
+
+Suggested:
+
+backend/
+  app/
+    api/
+    core/
+    auth/
+    organization/
+    users/
+    reporting/
+    esg/
+      energy/
+      fuel/
+      water/
+      waste/
+      people/
+      safety/
+      human_rights/
+      travel/
+      suppliers/
+      csr/
+      stakeholders/
+      customer/
+      governance/
+    evidence/
+    validation/
+    calculations/
+    consolidation/
+    workflow/
+    brsr/
+    reports/
+    audit/
+    notifications/
+    analytics/
+
+Business rules belong here.
+
+============================================================
+54. API
+============================================================
+
+Implement real REST APIs.
+
+AUTH:
+POST /auth/login
+POST /auth/logout
+GET /auth/me
+POST /auth/refresh where applicable
+
+ORGANIZATION:
+GET /organizations/tree
+GET /groups
+POST /groups
+GET /subsidiaries
+POST /subsidiaries
+GET /business-units
+POST /business-units
+GET /projects
+POST /projects
+GET /projects/{id}
+
+USERS:
+GET /users
+POST /users
+GET /users/{id}
+PATCH /users/{id}
+POST /users/{id}/roles
+POST /users/{id}/scopes
+POST /users/{id}/disable
+
+REPORTING:
+GET /reporting/years
+GET /reporting/periods
+POST /reporting/periods
+PATCH /reporting/periods/{id}
+
+ESG:
+GET/POST/PATCH endpoints for each module.
+
+Examples:
+GET /esg/energy
+POST /esg/energy
+PATCH /esg/energy/{id}
+
+GET /esg/water
+POST /esg/water
+
+GET /esg/waste
+POST /esg/waste
+
+GET /esg/people
+POST /esg/people
+
+GET /esg/safety
+POST /esg/safety
+
+GET /esg/travel
+POST /esg/travel
+
+VALIDATION:
+POST /validation/run
+GET /validation/results
+GET /validation/exceptions
+
+CALCULATION:
+POST /calculations/run
+GET /calculations/{id}
+
+CONSOLIDATION:
+GET /consolidation/project/{id}
+GET /consolidation/bu/{id}
+GET /consolidation/subsidiary/{id}
+GET /consolidation/group/{id}
+
+WORKFLOW:
+POST /submissions
+POST /submissions/{id}/submit
+POST /submissions/{id}/review
+POST /submissions/{id}/reject
+POST /submissions/{id}/approve
+POST /submissions/{id}/lock
+GET /submissions/{id}/history
+
+EVIDENCE:
+POST /evidence/upload
+GET /evidence
+GET /evidence/{id}
+POST /evidence/{id}/verify
+POST /evidence/{id}/reject
+GET /evidence/{id}/history
+
+BRSR:
+GET /brsr/frameworks
+GET /brsr/frameworks/{id}
+GET /brsr/sections
+GET /brsr/questions
+GET /brsr/indicators
+GET /brsr/mappings
+GET /brsr/readiness
+POST /brsr/generate
+
+REPORTS:
+GET /reports
+POST /reports/generate
+GET /reports/{id}
+GET /reports/{id}/download
+
+AUDIT:
+GET /audit/events
+GET /audit/record/{id}
+GET /audit/trace/{id}
+
+============================================================
+55. API RESPONSE STANDARDS
+============================================================
+
+Use typed schemas.
+
+Every response should have predictable shape.
+
+Errors should include:
+- code
+- message
+- field/errors where applicable
+- request id if implemented
+
+Never expose stack traces to users.
+
+============================================================
+56. LOADING / ERROR / EMPTY STATES
+============================================================
+
+Every screen must have:
+
+loading state
+skeleton state
+error state
+empty state
+permission denied state
+network failure state
+retry action
+
+Do not show blank white screens.
+
+Do not silently fall back to fake data.
+
+When backend fails:
+show real failure state and retry.
+
+============================================================
+57. DESIGN SYSTEM
+============================================================
+
+VISUAL DIRECTION:
+
+Premium enterprise
+Light
+Minimal
+Modern
+Professional
+iOS Liquid Glass inspired
+Glassmorphism
+DataStream-style dashboard structure
+
+COLOR ATMOSPHERE:
+
+Primary background:
+mostly white / off-white
+
+Atmosphere:
+very faint muted sky-blue
+
+Illumination:
+occasional soft blue glow
+
+Primary interactive blue:
+clean professional blue
+
+Use restrained color accents only for:
+- status
+- warnings
+- success
+- risk
+- module identity
+
+Do NOT:
+- use neon
+- use cyberpunk
+- use sci-fi grid backgrounds
+- use purple-heavy gradients
+- use dark backgrounds
+- use excessive glass blur
+- make the application look like a gaming dashboard
+
+============================================================
+58. TYPOGRAPHY
+============================================================
+
+Use:
+Inter or Plus Jakarta Sans
+
+Hierarchy:
+
+Large page title
+Medium section title
+Small labels
+Readable body
+Data-heavy numbers with high legibility
+
+Do not use excessively thin text.
+
+Tables must remain readable.
+
+============================================================
+59. GLASS UI
+============================================================
+
+Use:
+- translucent white surfaces
+- frosted blur
+- low-opacity backgrounds
+- thin cool-gray/blue borders
+- soft outer shadows
+- subtle inner highlights
+- 16–28px corner radii
+- layered card depth
+
+Glass must support readability.
+
+Do not blur critical text.
+
+============================================================
+60. LAYOUT
+============================================================
+
+Desktop first.
+
+Responsive:
+- desktop
+- laptop
+- tablet
+- mobile fallback
+
+Desktop:
+- fixed/structured application shell
+- content area
+- consistent spacing
+- max-width content where appropriate
+
+Cards:
+- not oversized
+- useful information density
+
+Tables:
+- horizontal scroll when needed
+- sticky header where useful
+- filters above
+- pagination
+- column visibility where useful
+
+Forms:
+- grouped sections
+- two-column desktop layout where useful
+- one-column mobile
+
+============================================================
+61. MOTION DESIGN
+============================================================
+
+Motion must feel premium and useful.
+
+Use subtle:
+- fade
+- slide
+- scale
+- blur transition
+- spring motion
+- hover depth
+- glass shimmer
+- status transition
+- progress animation
+
+Do not use:
+- excessive bouncing
+- distracting parallax
+- gaming effects
+- constant movement
+
+Motion duration:
+short interaction motion around 150–250ms
+medium transitions around 250–400ms
+major page transitions around 400–600ms
+
+Respect:
+prefers-reduced-motion
+
+============================================================
+62. AUTHENTICATION EXPERIENCE MOTION
+============================================================
+
+Authentication sequence:
+
+WELCOME
+↓
+CHOOSE USER
+↓
+ROLE SELECTION
+↓
+LOGIN
+
+Role cards:
+- premium transparent cards
+- clean background-free professional profile visuals
+- stacked/shuffled initial layout
+- mouse-driven horizontal fan/align interaction
+- subtle depth
+- hover elevation
+- selected card moves to center
+- other cards softly dissolve/fade
+- selected card morphs into a horizontal landscape login panel
+
+Selected login:
+left:
+role/person visual
+
+right:
+login form
+
+Login form:
+email
+password
+remember session where appropriate
+forgot password
+sign in
+
+Add subtle transition between role selection and login.
+
+============================================================
+63. MAIN DASHBOARD MOTION
+============================================================
+
+On initial load:
+- shell fades in
+- cards appear in slight stagger
+- charts draw smoothly
+- KPIs count up only from real values
+- avoid fake loading data
+
+When filters change:
+- update cards smoothly
+- charts crossfade or interpolate
+- preserve context
+
+When status changes:
+- status badge animates subtly
+
+============================================================
+64. DATA ENTRY MOTION
+============================================================
+
+Stepper:
+
+Enter Data
+→ Attach Evidence
+→ Validate
+→ Submit
+
+Transition between steps should feel continuous.
+
+Validation:
+successful field:
+subtle confirmation
+
+error:
+small controlled shake or highlight
+
+Evidence upload:
+progress bar
+preview transition
+
+Submit:
+confirmation animation
+then status transition
+
+============================================================
+65. REVIEW SCREEN MOTION
+============================================================
+
+Review card:
+hover depth
+
+Exceptions:
+subtle status emphasis
+
+Approve:
+confirmation state
+
+Reject:
+correction panel slides into view
+
+Never hide critical workflow information behind animation.
+
+============================================================
+66. MOBILE / TABLET
+============================================================
+
+Responsive adaptation:
+
+Desktop:
+three-column or two-column data layouts where appropriate.
+
+Tablet:
+two-column.
+
+Mobile:
+single-column.
+
+Tables become:
+- horizontal scroll
+OR
+- stacked record cards
+
+Evidence preview must remain usable.
+
+Navigation collapses into accessible mobile navigation.
+
+============================================================
+67. ICON SYSTEM
+============================================================
+
+Use professional vector icon library:
+Lucide or Phosphor.
+
+Do not use emoji as interface icons.
+
+Use consistent icon stroke/weight.
+
+Examples:
+- dashboard
+- hierarchy
+- project
+- energy
+- water
+- waste
+- safety
+- HR
+- procurement
+- CSR
+- governance
+- evidence
+- approval
+- report
+- audit
+- BRSR
+
+============================================================
+68. ACCESSIBILITY
+============================================================
+
+Implement:
+- keyboard navigation
+- focus states
+- labels
+- tooltips where helpful
+- sufficient contrast
+- semantic HTML
+- accessible dialogs
+- accessible tables
+- reduced motion
+- screen-reader-friendly controls
+
+============================================================
+69. ADMIN CONTROL PLANE
+============================================================
+
+Super Admin must be able to configure the platform without changing source code for normal master-data operations.
+
+Manage:
+
+Organizations
+Users
+Roles
+Permissions
+Scopes
+Reporting periods
+Units
+Conversions
+Emission factors
+Factor versions
+BRSR frameworks
+BRSR questions
+BRSR mappings
+Applicability rules
+Workflow configuration
+Notification configuration
+System settings
+
+============================================================
+70. REAL-TIME / NEAR REAL-TIME BEHAVIOR
+============================================================
+
+Use real API-backed state.
+
+Where beneficial, support:
+- submission status updates
+- notification updates
+- job status updates
+- report generation status
+
+Use WebSocket or Supabase realtime only where it materially improves UX.
+
+Do not introduce realtime complexity everywhere unnecessarily.
+
+============================================================
+71. BACKGROUND JOBS
+============================================================
+
+Use Redis + worker for:
+- large report generation
+- heavy calculation batches
+- consolidation jobs
+- document processing
+- asynchronous notifications
+
+Persist job status in PostgreSQL.
+
+Never make Redis the permanent record.
+
+============================================================
+72. SEARCH / FILTER / PAGINATION
+============================================================
+
+Every large dataset must support backend pagination.
+
+Avoid loading thousands of records unnecessarily.
+
+Support:
+- filter
+- search
+- sort
+- pagination
+- date range
+- organizational scope
+- status
+
+============================================================
+73. SECURITY
+============================================================
+
+Implement:
+
+authentication
+authorization
+RBAC
+organization scope
+RLS
+secure file access
+input validation
+rate limiting where appropriate
+secure secrets
+environment variables
+CSRF protection where relevant to architecture
+secure headers
+logging
+audit trail
+
+Never place:
+- API secrets
+- database secrets
+- service role keys
+in frontend code.
+
+============================================================
+74. DATABASE SECURITY
+============================================================
+
+Apply RLS wherever appropriate.
+
+Example:
+Project user can only access assigned project records.
+
+BU reviewer:
+only child projects/BU records.
+
+Subsidiary:
+only own subtree.
+
+Group:
+entire group.
+
+Auditor:
+approved scope.
+
+Management:
+authorized reporting scope.
+
+Never depend only on URL IDs.
+
+Always resolve authorized scope on backend.
+
+============================================================
+75. TESTING
+============================================================
+
+Testing is mandatory.
+
+Frontend:
+Vitest
+React Testing Library
+
+Backend:
+Pytest
+
+Required tests:
+
+AUTH:
+- login
+- logout
+- current user
+- invalid session
+
+RBAC:
+- role access
+- scope access
+- prohibited access
+
+WORKFLOW:
+- draft
+- submit
+- review
+- correction
+- resubmit
+- approve
+- lock
+- invalid transition
+
+VALIDATION:
+- missing field
+- wrong unit
+- duplicate
+- impossible value
+- missing evidence
+
+CALCULATION:
+- conversion
+- emission factor
+- factor version
+- Scope 1
+- Scope 2
+- selected Scope 3
+- intensity
+
+CONSOLIDATION:
+- project
+- BU
+- subsidiary
+- group
+- double-count prevention
+
+EVIDENCE:
+- upload
+- link
+- verify
+- reject
+- versioning
+- access control
+
+BRSR:
+- framework selection
+- mapping
+- answer creation
+- source trace
+- readiness
+- versioning
+
+REPORTS:
+- report generation
+- version
+- content
+- access
+
+AUDIT:
+- create
+- update
+- approval
+- lock
+- traceability
+
+============================================================
+76. END-TO-END TEST SCENARIO
+============================================================
+
+Build one full automated E2E scenario:
+
+1. Super Admin logs in
+2. creates/configures organization tree
+3. creates reporting period
+4. creates Project user
+5. Project user logs in
+6. selects project
+7. selects month
+8. enters electricity
+9. enters diesel
+10. enters water
+11. enters waste
+12. attaches evidence
+13. system validates
+14. system calculates emissions
+15. project submits
+16. BU reviewer logs in
+17. reviews submission
+18. sees evidence
+19. approves OR requests correction
+20. user corrects if required
+21. BU approves
+22. Subsidiary reviewer approves
+23. Group/HQ reviews
+24. group locks period
+25. consolidation updates
+26. BRSR engine reads approved/locked data
+27. BRSR readiness updates
+28. BRSR Manager reviews
+29. report generated
+30. Auditor opens trace
+31. Auditor traces final value back to source/evidence/calculation
+32. Management sees final dashboard
+
+This flow must actually work.
+
+============================================================
+77. NO MOCK-DATA POLICY
+============================================================
+
+The normal application must load from the real database.
+
+Do NOT use:
+- random KPI generators
+- static arrays pretending to be APIs
+- hard-coded dashboard totals
+- fake progress percentages
+- fake user data
+- fake approval statuses
+
+For demonstration:
+seed only explicitly labeled ILLUSTRATIVE data.
+
+Create a clear environment setting:
+
+DEMO_MODE=false
+
+Production-like behavior must use:
+
+DEMO_MODE=false
+
+When demo mode is true:
+- all demo entities visibly marked
+- demo records replaceable
+- no ambiguity with production data
+
+============================================================
+78. ERROR HANDLING
+============================================================
+
+When API fails:
+show actual error state.
+
+Do not:
+fall back to fake records.
+
+Do:
+- log error
+- show user-friendly message
+- offer retry
+- preserve unsaved form data where safe
+
+============================================================
+79. DATA QUALITY CENTER
+============================================================
+
+Build dedicated dashboard for:
+
+- missing data
+- missing evidence
+- validation errors
+- warnings
+- duplicate risk
+- anomaly risk
+- pending approvals
+- overdue submissions
+- BRSR mapping gaps
+
+Click an issue to navigate to exact record.
+
+============================================================
+80. EXCEPTION MANAGEMENT
+============================================================
+
+An exception must have:
+
+id
+type
+severity
+source
+record
+description
+detected_at
+status
+assigned_to
+resolution
+resolved_at
+resolution_comment
+
+Statuses:
+OPEN
+IN_REVIEW
+RESOLVED
+WAIVED
+
+Waiving requires authorized user + reason.
+
+============================================================
+81. AUDIT TRACE UI
+============================================================
+
+Build a visual trace.
+
+Example:
+
+BRSR P6 metric
+↓
+Group consolidated metric
+↓
+Subsidiary
+↓
+BU
+↓
+Project
+↓
+April 2026
+↓
+Diesel record
+↓
+5,000 L
+↓
+Conversion
+↓
+Factor Version
+↓
+CO2e
+↓
+Evidence
+↓
+BU approval
+↓
+Subsidiary approval
+↓
+HQ approval
+
+Every node clickable.
+
+============================================================
+82. REPORT GENERATION WORKFLOW
+============================================================
+
+User selects:
+
+Framework
+Reporting Year
+Organization Scope
+Report Type
+
+System:
+checks completeness
+checks locks
+checks missing indicators
+checks exceptions
+checks required disclosures
+
+Then:
+Generate Report
+
+Use asynchronous job if large.
+
+Display:
+Queued
+Processing
+Completed
+Failed
+
+Do not mark report complete before file generation actually succeeds.
+
+============================================================
+83. BRSR EXPORT
+============================================================
+
+Provide:
+- PDF
+- Excel
+- CSV where useful
+
+PDF must be professionally formatted.
+
+Include:
+- entity
+- period
+- version
+- sections
+- responses
+- quantitative values
+- source status
+- evidence status where suitable
+- report metadata
+
+============================================================
+84. GLOBAL UX DETAILS
+============================================================
+
+Every important page needs:
+
+1. Clear page title
+2. Context/subtitle
+3. Scope/filter
+4. Primary action
+5. KPI summary where useful
+6. Main content
+7. Feedback/status
+8. Secondary actions
+
+Do not overload the interface.
+
+============================================================
+85. DASHBOARD SHELL MUST REMAIN CONSISTENT
+============================================================
+
+Do not create a different dashboard style per role.
+
+Keep:
+- same header
+- same navigation logic
+- same glass panels
+- same typography
+- same spacing
+- same component style
+- same status system
+
+Only content changes based on role.
+
+============================================================
+86. DESIGN DETAIL — CARD SYSTEM
+============================================================
+
+Cards:
+- 18–24px radius
+- thin border
+- very subtle backdrop blur
+- soft shadow
+- readable hierarchy
+- compact action area
+
+Hover:
+- 2–4px visual lift
+- subtle border highlight
+- no exaggerated scaling
+
+============================================================
+87. DESIGN DETAIL — TABLE SYSTEM
+============================================================
+
+Table:
+- clean header
+- comfortable row height
+- status pills
+- icon actions
+- hover row
+- sorting
+- filtering
+- pagination
+
+Important columns remain visible.
+
+============================================================
+88. DESIGN DETAIL — STATUS SYSTEM
+============================================================
+
+Status visual language:
+
+Draft
+Submitted
+Under Review
+Correction Required
+Approved
+Locked
+Verified
+Missing
+Warning
+Error
+
+Every status must have:
+- icon
+- text
+- accessible contrast
+- consistent style
+
+Never communicate status by color alone.
+
+============================================================
+89. DESIGN DETAIL — EMPTY STATES
+============================================================
+
+Example:
+
+"No energy records for April 2026"
+
+Show:
+- explanation
+- Add Data action
+- reporting context
+
+Do not populate empty state with fake data.
+
+============================================================
+90. DESIGN DETAIL — FORM UX
+============================================================
+
+Forms must support:
+
+field grouping
+helper text
+unit labels
+validation
+evidence requirement indicators
+calculation preview
+save draft
+submit
+
+For large forms:
+use sections/tabs/accordions carefully.
+
+Avoid huge walls of fields.
+
+============================================================
+91. SOURCE-OF-TRUTH ARCHITECTURE
+============================================================
+
+React:
+presentation.
+
+FastAPI:
+business logic.
+
+PostgreSQL/Supabase:
+permanent data.
+
+Supabase Auth:
+identity.
+
+Supabase Storage:
+evidence/document storage.
+
+Redis:
+cache/queue/background processing.
+
+Validation Engine:
+validation.
+
+Calculation Engine:
+calculation.
+
+Consolidation Engine:
+aggregation.
+
+Workflow Engine:
+approval lifecycle.
+
+BRSR Engine:
+reporting mapping.
+
+Audit Engine:
+history/traceability.
+
+============================================================
+92. PROJECT FILE STRUCTURE
+============================================================
+
+Use a scalable structure similar to:
+
+MEIL-ESG-PLATFORM/
+
+frontend/
+  src/
+    app/
+    auth/
+    layout/
+    components/
+    pages/
+    modules/
+      dashboard/
+      my-project/
+      data-entry/
+      evidence/
+      submissions/
+      reports/
+      analytics/
+      audit/
+      admin/
+      hr/
+      ehs/
+      procurement/
+      csr/
+      governance/
+      esg/
+      brsr/
+    hooks/
+    services/
+    api/
+    types/
+    schemas/
+    utils/
+
+backend/
+  app/
+    api/
+    auth/
+    core/
+    organization/
+    users/
+    reporting/
+    esg/
+    validation/
+    calculations/
+    consolidation/
+    workflow/
+    evidence/
+    brsr/
+    reports/
+    audit/
+    analytics/
+    notifications/
+
+database/
+  migrations/
+  seeds/
+  functions/
+  policies/
+
+tests/
+  frontend/
+  backend/
+  integration/
+  e2e/
+  role-access/
+  calculations/
+  validation/
+  workflow/
+  brsr/
+
+docs/
+  architecture/
+  api/
+  data-dictionary/
+  brsr/
+  security/
+
+docker/
+.github/
+README.md
+.env.example
+
+============================================================
+93. DEVELOPMENT PHASES
+============================================================
+
+PHASE 0 — READ / FREEZE / PLAN
+
+Before writing business logic:
+- understand requirements
+- inspect existing code
+- identify current implementation
+- map each requirement to frontend/backend/database/API
+- list conflicts
+- do not silently redesign architecture
+
+Deliver:
+requirements matrix
+architecture matrix
+role-permission matrix
+database matrix
+API matrix
+screen matrix
+test matrix
+
+PHASE 1 — FOUNDATION
+
+Implement:
+- React
+- FastAPI
+- PostgreSQL/Supabase
+- Supabase Auth
+- organization hierarchy
+- roles
+- permissions
+- scopes
+- reporting periods
+- global shell
+
+Exit:
+A real user can log in and only see their authorized application.
+
+PHASE 2 — PROJECT DATA COLLECTION
+
+Implement:
+- Project Dashboard
+- reporting period
+- energy
+- fuel
+- water
+- waste
+- evidence
+- save draft
+- validation
+- submit
+
+Exit:
+A Project user can create a real monthly submission.
+
+PHASE 3 — VALIDATION + CALCULATION
+
+Implement:
+- unit registry
+- conversion
+- factor master
+- Scope 1
+- Scope 2
+- selected Scope 3
+- calculation history
+- anomaly detection
+
+Exit:
+Same input + same factor version = deterministic output.
+
+PHASE 4 — REVIEW / APPROVAL / AUDIT
+
+Implement:
+- BU review
+- Subsidiary review
+- HQ review
+- rejection
+- correction
+- approval
+- locking
+- audit history
+
+Exit:
+A record can move from Draft to Locked with complete history.
+
+PHASE 5 — CONSOLIDATION
+
+Implement:
+Project → BU → Subsidiary → Group
+
+Implement:
+- dashboards
+- completeness
+- exceptions
+- drill-down
+
+PHASE 6 — BRSR ENGINE
+
+Implement:
+- framework versions
+- sections A/B/C
+- principles 1–9
+- indicators/questions
+- mappings
+- applicability
+- readiness
+- source trace
+
+PHASE 7 — FUNCTIONAL DEPARTMENTS
+
+Implement:
+- HR
+- EHS
+- Procurement
+- CSR
+- Governance
+- IT/Data Privacy where applicable
+
+PHASE 8 — REPORTING / HARDENING
+
+Implement:
+- dashboards
+- reports
+- exports
+- performance
+- accessibility
+- automated tests
+- security tests
+- E2E demonstration
+- deployment configuration
+
+============================================================
+94. CODING AGENT BEHAVIOR
+============================================================
+
+Before each phase:
+
+1. state what you are implementing
+2. list files/modules affected
+3. state database changes
+4. state APIs
+5. state frontend screens
+6. state acceptance criteria
+7. implement
+8. test
+9. report what passed
+10. continue
+
+Do not pretend something works unless tested.
+
+Do not say "implemented" without verification.
+
+Do not silently create placeholders.
+
+If a feature cannot be completed:
+- explain why
+- identify dependency
+- do not replace it with fake functionality
+
+============================================================
+95. ACCEPTANCE CRITERIA
+============================================================
+
+The project is COMPLETE only when:
+
+AUTH:
+real authentication works
+
+RBAC:
+roles and permissions actually work
+
+SCOPE:
+organization-level scope is enforced
+
+HIERARCHY:
+Group → Subsidiary → BU → Project works
+
+DATABASE:
+PostgreSQL/Supabase is source of truth
+
+DATA:
+real source records can be entered
+
+EVIDENCE:
+real documents can be uploaded and linked
+
+VALIDATION:
+real validation happens
+
+CALCULATION:
+real deterministic calculation happens
+
+FACTORS:
+factor version is preserved
+
+WORKFLOW:
+draft → submission → review → correction → approval → lock works
+
+CONSOLIDATION:
+Project → BU → Subsidiary → Group works
+
+BRSR:
+configured framework maps real data
+
+REPORT:
+real report is generated
+
+AUDIT:
+every important action is traceable
+
+ANALYTICS:
+charts use backend data
+
+ERRORS:
+backend errors are not masked by mock data
+
+SECURITY:
+unauthorized users cannot access other scopes
+
+TESTING:
+automated tests pass
+
+RESPONSIVE:
+application works on desktop/tablet/mobile
+
+ACCESSIBILITY:
+basic accessibility implemented
+
+PERFORMANCE:
+pagination/caching/jobs used appropriately
+
+============================================================
+96. MOST IMPORTANT PRODUCT PRINCIPLE
+============================================================
+
+The dashboard is NOT the product.
+
+The ESG DATA CONTROL CHAIN is the product.
+
+The product is:
+
+COLLECT
+→ EVIDENCE
+→ VALIDATE
+→ CALCULATE
+→ REVIEW
+→ APPROVE
+→ CONSOLIDATE
+→ MAP TO BRSR
+→ REPORT
+→ AUDIT
+
+The dashboard is only a visualization of this chain.
+
+============================================================
+97. FINAL NORTH STAR
+============================================================
+
+For every important BRSR number, the platform must be able to answer:
+
+WHAT IS THE NUMBER?
+
+WHERE DID IT COME FROM?
+
+WHO ENTERED IT?
+
+WHEN WAS IT ENTERED?
+
+WHICH PROJECT?
+
+WHICH BUSINESS UNIT?
+
+WHICH SUBSIDIARY?
+
+WHICH GROUP?
+
+WHICH REPORTING PERIOD?
+
+WHAT EVIDENCE SUPPORTS IT?
+
+WHAT VALIDATION PASSED?
+
+WHAT CALCULATION WAS USED?
+
+WHICH EMISSION FACTOR?
+
+WHICH FACTOR VERSION?
+
+WHO REVIEWED IT?
+
+WHO APPROVED IT?
+
+WHEN WAS IT LOCKED?
+
+WHICH BRSR INDICATOR USES IT?
+
+WHICH FRAMEWORK VERSION?
+
+WHICH REPORT CONTAINS IT?
+
+============================================================
+98. FINAL INSTRUCTION
+============================================================
+
+BUILD THE COMPLETE APPLICATION.
+
+Do not stop at UI.
+
+Do not stop at API.
+
+Do not stop at database.
+
+Do not stop at authentication.
+
+Do not stop at dashboards.
+
+Connect EVERYTHING.
+
+Every screen:
+→ real API
+
+Every API:
+→ real service
+
+Every service:
+→ real database/business logic
+
+Every important metric:
+→ real calculation/consolidation
+
+Every important number:
+→ source trace
+
+Every source:
+→ evidence where required
+
+Every approval:
+→ audit history
+
+Every BRSR result:
+→ configured mapping
+
+Every report:
+→ real generated output
+
+Every user:
+→ real RBAC + organizational scope
+
+Every workflow:
+→ server-enforced state machine
+
+Every correction:
+→ versioned history
+
+Every locked period:
+→ protected data
+
+Every implementation:
+→ tested
+
+Build this as a serious enterprise ESG/BRSR system, not as a visual prototype.
+
+DO NOT USE MOCK BUSINESS DATA IN NORMAL OPERATION.
+
+DO NOT USE HARDCODED KPI VALUES.
+
+DO NOT USE FAKE APPROVALS.
+
+DO NOT USE FAKE BRSR READINESS.
+
+DO NOT USE FAKE REPORT CONTENT.
+
+DO NOT HIDE BACKEND FAILURES BEHIND FALLBACK DATA.
+
+DO NOT BYPASS RBAC.
+
+DO NOT BYPASS AUDIT.
+
+DO NOT CHANGE THE CORE ORGANIZATIONAL ARCHITECTURE.
+
+DO NOT CHANGE THE LOCKED PREMIUM LIGHT LIQUID GLASS DESIGN LANGUAGE.
+
+MAKE THE ENTIRE SYSTEM ACTUALLY WORK END TO END.

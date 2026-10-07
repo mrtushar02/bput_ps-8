@@ -1,0 +1,2002 @@
+     1→YOU ARE THE LEAD SOFTWARE ARCHITECT, SENIOR FULL-STACK ENGINEER, UI/UX ENGINEER, DATABASE ARCHITECT, SECURITY ENGINEER, ESG DATA ENGINE ENGINEER, BRSR SYSTEM ENGINEER, QA ENGINEER AND DEVOPS ENGINEER RESPONSIBLE FOR BUILDING THE COMPLETE MEIL ESG / BRSR REPORTING PLATFORM.
+     2→
+     3→THIS IS NOT A UI MOCKUP TASK.
+     4→THIS IS NOT A STATIC DASHBOARD TASK.
+     5→THIS IS NOT A DEMO WITH FAKE VALUES.
+     6→THIS IS NOT A COLLECTION OF FRONTEND SCREENS.
+     7→
+     8→BUILD A COMPLETE, REAL, END-TO-END, DATABASE-BACKED, ROLE-BASED, SECURE, FUNCTIONAL ESG/BRSR REPORTING PLATFORM.
+     9→
+    10→============================================================
+    11→0. PROJECT MISSION
+    12→============================================================
+    13→
+    14→Build a production-oriented enterprise ESG and BRSR reporting platform for MEIL.
+    15→
+    16→The platform must create a controlled chain:
+    17→
+    18→SOURCE DATA
+    19→→ EVIDENCE
+    20→→ VALIDATION
+    21→→ CALCULATION
+    22→→ SUBMISSION
+    23→→ REVIEW
+    24→→ CORRECTION
+    25→→ APPROVAL
+    26→→ CONSOLIDATION
+    27→→ BRSR MAPPING
+    28→→ FINAL REPORT
+    29→→ AUDIT TRACEABILITY
+    30→
+    31→The primary operational source is Project/Site level.
+    32→
+    33→The organization hierarchy is:
+    34→
+    35→GROUP
+    36→  ↓
+    37→SUBSIDIARY
+    38→  ↓
+    39→BUSINESS UNIT
+    40→  ↓
+    41→PROJECT / SITE
+    42→  ↓
+    43→REPORTING PERIOD
+    44→  ↓
+    45→SOURCE ESG RECORD
+    46→  ↓
+    47→EVIDENCE
+    48→  ↓
+    49→VALIDATION RESULT
+    50→  ↓
+    51→CALCULATION RESULT
+    52→  ↓
+    53→SUBMISSION / APPROVAL HISTORY
+    54→
+    55→Higher organizational levels must derive consolidated values from lower-level approved records.
+    56→
+    57→Do NOT allow users to manually re-enter or manipulate consolidated ESG values as the normal process.
+    58→
+    59→The platform must answer this question for every important final metric:
+    60→
+    61→"Where did this number come from?"
+    62→
+    63→The answer must include:
+    64→- reporting year
+    65→- reporting period
+    66→- group
+    67→- subsidiary
+    68→- business unit
+    69→- project
+    70→- source record
+    71→- entered by
+    72→- entered at
+    73→- evidence
+    74→- validation result
+    75→- calculation method
+    76→- emission factor
+    77→- emission factor version
+    78→- approval history
+    79→- BRSR mapping
+    80→- framework version
+    81→- final reporting value
+    82→
+    83→============================================================
+    84→1. ABSOLUTE BUILD RULES
+    85→============================================================
+    86→
+    87→RULE 1:
+    88→Do not create a fake frontend-only application.
+    89→
+    90→RULE 2:
+    91→Do not use hard-coded dashboard metrics.
+    92→
+    93→RULE 3:
+    94→Do not use random values for KPI cards.
+    95→
+    96→RULE 4:
+    97→Do not use fake API responses.
+    98→
+    99→RULE 5:
+   100→Do not keep authoritative ESG data in localStorage.
+   101→
+   102→RULE 6:
+   103→Do not use mock JSON as the production data source.
+   104→
+   105→RULE 7:
+   106→Do not use frontend-only authentication.
+   107→
+   108→RULE 8:
+   109→Do not use frontend-only role protection.
+   110→
+   111→RULE 9:
+   112→Do not hard-code user roles into arbitrary frontend conditions.
+   113→
+   114→RULE 10:
+   115→All authorization must be enforced by the backend.
+   116→
+   117→RULE 11:
+   118→All important business calculations must be performed server-side.
+   119→
+   120→RULE 12:
+   121→All persistent authoritative data must be stored in PostgreSQL via Supabase.
+   122→
+   123→RULE 13:
+   124→Redis is ONLY for cache, queue and background processing.
+   125→Redis is NEVER the permanent source of truth.
+   126→
+   127→RULE 14:
+   128→Evidence files must be stored through controlled storage, not merely filename references.
+   129→
+   130→RULE 15:
+   131→Evidence integrity must use actual file content hashing where hashing is implemented.
+   132→
+   133→RULE 16:
+   134→Locked records cannot be edited through normal update endpoints.
+   135→
+   136→RULE 17:
+   137→Corrections must create controlled revisions/history.
+   138→
+   139→RULE 18:
+   140→Historical records must not silently change because framework rules change.
+   141→
+   142→RULE 19:
+   143→BRSR must be configuration-driven and versioned.
+   144→
+   145→RULE 20:
+   146→Never hard-code one year's BRSR questions into application logic.
+   147→
+   148→RULE 21:
+   149→Never invent real MEIL entities, subsidiaries, projects, financial figures or ESG values.
+   150→
+   151→RULE 22:
+   152→Any sample/demo seed data must be explicitly marked as ILLUSTRATIVE and replaceable.
+   153→
+   154→RULE 23:
+   155→The production application must work with real user-entered data.
+   156→
+   157→RULE 24:
+   158→No module is considered complete until frontend, backend, database, authorization, validation, error handling and testing are connected.
+   159→
+   160→RULE 25:
+   161→Do not redesign the locked dashboard shell unnecessarily.
+   162→
+   163→RULE 26:
+   164→Preserve the MEIL Liquid Glass / premium white-blue visual direction.
+   165→
+   166→RULE 27:
+   167→Do not introduce dark cyberpunk/neon/sci-fi visual design.
+   168→
+   169→RULE 28:
+   170→Do not build disconnected role-specific applications.
+   171→Build ONE application with role-aware views.
+   172→
+   173→============================================================
+   174→2. SOURCE / BUSINESS ARCHITECTURE
+   175→============================================================
+   176→
+   177→The product is:
+   178→
+   179→MEIL ESG / BRSR REPORTING PLATFORM
+   180→
+   181→Core business hierarchy:
+   182→
+   183→GROUP
+   184→→ SUBSIDIARY
+   185→→ BUSINESS UNIT
+   186→→ PROJECT / SITE
+   187→
+   188→Every reporting record must resolve its organizational hierarchy.
+   189→
+   190→Examples:
+   191→
+   192→Group:
+   193→MEIL Group
+   194→
+   195→Subsidiary:
+   196→Configurable subsidiary
+   197→
+   198→Business Unit:
+   199→Configurable BU
+   200→
+   201→Project:
+   202→Configurable project/site
+   203→
+   204→Reporting:
+   205→FY + month/reporting period
+   206→
+   207→The internal organization master must be configurable.
+   208→
+   209→Do not treat public website entity names as a complete or authoritative legal master.
+   210→
+   211→============================================================
+   212→3. THREE BUSINESS PHASES
+   213→============================================================
+   214→
+   215→PHASE 1 — DATA ENTRY / OPERATIONAL USERS
+   216→
+   217→Users:
+   218→1. Project / Site User
+   219→2. HR User
+   220→3. EHS / Safety User
+   221→4. Procurement / Supply Chain User
+   222→5. CSR / Community User
+   223→6. Compliance / Governance User
+   224→
+   225→Responsibilities:
+   226→- enter source data
+   227→- attach evidence
+   228→- save drafts
+   229→- respond to validation problems
+   230→- submit data
+   231→- receive correction requests
+   232→- correct rejected records
+   233→- maintain specialized departmental records
+   234→
+   235→PHASE 2 — REVIEW / CONSOLIDATION USERS
+   236→
+   237→Users:
+   238→7. Business Unit Reviewer
+   239→8. Subsidiary ESG Reviewer
+   240→9. Group / HQ ESG Reviewer
+   241→
+   242→Responsibilities:
+   243→- review
+   244→- validate operational completeness
+   245→- inspect evidence
+   246→- identify exceptions
+   247→- request corrections
+   248→- approve
+   249→- monitor consolidation
+   250→
+   251→PHASE 3 — ANALYSIS / REPORTING / ASSURANCE USERS
+   252→
+   253→Users:
+   254→10. ESG / Sustainability Manager
+   255→11. ESG Analyst
+   256→12. BRSR Manager
+   257→13. Auditor / Assurance User
+   258→14. Management / Executive User
+   259→
+   260→System administration:
+   261→15. Super Admin
+   262→
+   263→Important:
+   264→Validation Engine, Calculation Engine, Consolidation Engine, BRSR Engine and Workflow Engine are SYSTEM ENGINES, not human users.
+   265→
+   266→============================================================
+   267→4. COMPLETE ROLE DEFINITIONS
+   268→============================================================
+   269→
+   270→ROLE 1 — SUPER ADMIN
+   271→Scope:
+   272→Entire system.
+   273→
+   274→Can:
+   275→- manage users
+   276→- manage roles
+   277→- manage organization hierarchy
+   278→- create Group
+   279→- create Subsidiaries
+   280→- create Business Units
+   281→- create Projects
+   282→- manage reporting periods
+   283→- manage units
+   284→- manage conversion rules
+   285→- manage emission factors
+   286→- manage factor versions
+   287→- manage BRSR framework configurations
+   288→- manage question/indicator masters
+   289→- manage system settings
+   290→- configure permissions
+   291→- manage audit configuration
+   292→- manage storage/system settings
+   293→
+   294→Cannot:
+   295→- casually modify source ESG records as a normal admin shortcut
+   296→- bypass workflow
+   297→- erase audit history
+   298→
+   299→Screens:
+   300→- Admin Dashboard
+   301→- User Management
+   302→- Roles & Permissions
+   303→- Group Management
+   304→- Subsidiary Management
+   305→- BU Management
+   306→- Project Management
+   307→- Reporting Periods
+   308→- Unit Master
+   309→- Conversion Master
+   310→- Emission Factor Master
+   311→- BRSR Framework Master
+   312→- Question/Indicator Master
+   313→- Workflow Settings
+   314→- System Settings
+   315→- Audit Configuration
+   316→- System Health
+   317→
+   318→
+   319→ROLE 2 — PROJECT / SITE USER
+   320→Scope:
+   321→Assigned project(s).
+   322→
+   323→Can:
+   324→- enter monthly source ESG data
+   325→- save draft
+   326→- upload evidence
+   327→- update records before submission
+   328→- respond to correction requests
+   329→- submit reporting period
+   330→- view own submission history
+   331→- view project KPIs
+   332→- view validation results
+   333→
+   334→Cannot:
+   335→- approve own submission
+   336→- change organization hierarchy
+   337→- edit another project
+   338→- edit locked periods
+   339→- manually alter consolidated BU/Subsidiary/Group numbers
+   340→
+   341→Screens:
+   342→- Project Dashboard
+   343→- My Project
+   344→- Reporting Periods
+   345→- Data Entry
+   346→- Energy/Fuel
+   347→- Water
+   348→- Waste
+   349→- Workforce
+   350→- Safety
+   351→- Travel
+   352→- Evidence
+   353→- Submission
+   354→- Validation Results
+   355→- Correction Requests
+   356→- Activity History
+   357→
+   358→
+   359→ROLE 3 — HR USER
+   360→Scope:
+   361→Assigned organizational scope.
+   362→
+   363→Can:
+   364→- employee data
+   365→- worker data
+   366→- gender data
+   367→- permanent/non-permanent classification
+   368→- differently abled workforce
+   369→- benefits
+   370→- training
+   371→- wellbeing
+   372→- employee grievance information
+   373→- human-rights-related HR data
+   374→
+   375→Cannot:
+   376→- modify environmental records outside authorized scope
+   377→- edit emissions calculations
+   378→- approve final organizational data
+   379→
+   380→Screens:
+   381→- HR Dashboard
+   382→- Workforce Overview
+   383→- Employee Records
+   384→- Worker Records
+   385→- Gender & Diversity
+   386→- Benefits
+   387→- Training
+   388→- Wellbeing
+   389→- Employee Grievances
+   390→- Human Rights Inputs
+   391→- HR Evidence
+   392→- HR Submissions
+   393→- HR Validation
+   394→
+   395→
+   396→ROLE 4 — EHS / SAFETY USER
+   397→Scope:
+   398→Assigned organizational scope.
+   399→
+   400→Can:
+   401→- safety incidents
+   402→- injuries
+   403→- fatalities
+   404→- occupational health data
+   405→- safety training
+   406→- safety assessments
+   407→- environmental/safety incidents
+   408→- water/waste inputs where assigned
+   409→- corrective action tracking
+   410→
+   411→Screens:
+   412→- EHS Dashboard
+   413→- Safety Overview
+   414→- Incidents
+   415→- Injuries
+   416→- Fatalities
+   417→- Lost Time Injury
+   418→- Training
+   419→- Health & Safety Assessments
+   420→- Corrective Actions
+   421→- Water
+   422→- Waste
+   423→- Environmental Incidents
+   424→- Evidence
+   425→- EHS Submission
+   426→- Validation
+   427→
+   428→
+   429→ROLE 5 — PROCUREMENT / SUPPLY CHAIN USER
+   430→Scope:
+   431→Assigned scope.
+   432→
+   433→Can:
+   434→- suppliers
+   435→- supplier master
+   436→- supplier ESG assessment
+   437→- local sourcing
+   438→- MSME sourcing
+   439→- value-chain information
+   440→- procurement indicators
+   441→- supplier evidence
+   442→- assessments
+   443→
+   444→Screens:
+   445→- Procurement Dashboard
+   446→- Supplier Master
+   447→- Supplier Details
+   448→- Supplier ESG Assessment
+   449→- Local Procurement
+   450→- MSME Procurement
+   451→- Value Chain
+   452→- Supplier Documents
+   453→- Procurement Submission
+   454→- Assessment History
+   455→
+   456→
+   457→ROLE 6 — CSR / COMMUNITY USER
+   458→Scope:
+   459→Assigned scope.
+   460→
+   461→Can:
+   462→- CSR project records
+   463→- beneficiary records
+   464→- social impact
+   465→- stakeholder/community engagement
+   466→- social impact assessment
+   467→- R&R information
+   468→- aspirational district-related inputs where applicable
+   469→- community grievance information
+   470→
+   471→Screens:
+   472→- CSR Dashboard
+   473→- CSR Projects
+   474→- Project Details
+   475→- Beneficiaries
+   476→- Community Engagement
+   477→- SIA
+   478→- R&R
+   479→- Community Grievances
+   480→- Local Development
+   481→- Vulnerable/Marginalized Groups
+   482→- CSR Evidence
+   483→- CSR Submission
+   484→
+   485→
+   486→ROLE 7 — COMPLIANCE / GOVERNANCE USER
+   487→Scope:
+   488→Assigned scope.
+   489→
+   490→Can:
+   491→- policies
+   492→- governance data
+   493→- board/KMP-related records
+   494→- ethics
+   495→- anti-bribery/anti-corruption
+   496→- complaints
+   497→- grievance records
+   498→- public policy/associations
+   499→- governance disclosures
+   500→- compliance information
+   501→
+   502→Screens:
+   503→- Governance Dashboard
+   504→- Policies
+   505→- Policy Details
+   506→- Board / KMP
+   507→- Ethics
+   508→- Anti-Bribery
+   509→- Anti-Corruption
+   510→- Complaints
+   511→- Grievances
+   512→- Public Policy
+   513→- Associations
+   514→- Compliance
+   515→- Governance Evidence
+   516→- Governance Submission
+   517→
+   518→
+   519→ROLE 8 — BUSINESS UNIT REVIEWER
+   520→Scope:
+   521→Own BU and child projects.
+   522→
+   523→Can:
+   524→- view projects
+   525→- review submitted data
+   526→- inspect evidence
+   527→- inspect validation results
+   528→- identify missing data
+   529→- request corrections
+   530→- approve BU submission
+   531→- monitor BU completion
+   532→- view BU KPI rollups
+   533→
+   534→Cannot:
+   535→- approve outside assigned BU
+   536→- edit source data as an unrestricted user
+   537→- alter historical audit trail
+   538→
+   539→Screens:
+   540→- BU Dashboard
+   541→- Project List
+   542→- Project Details
+   543→- Review Queue
+   544→- Submission Review
+   545→- Evidence Review
+   546→- Exceptions
+   547→- Missing Data
+   548→- BU KPI Rollup
+   549→- Approval History
+   550→
+   551→
+   552→ROLE 9 — SUBSIDIARY ESG REVIEWER
+   553→Scope:
+   554→Own subsidiary and all child BUs/projects.
+   555→
+   556→Can:
+   557→- review BU submissions
+   558→- review project submissions
+   559→- inspect evidence
+   560→- inspect consolidated data
+   561→- request corrections
+   562→- approve subsidiary submission
+   563→- monitor subsidiary completeness
+   564→
+   565→Screens:
+   566→- Subsidiary Dashboard
+   567→- Business Units
+   568→- Projects
+   569→- Review Queue
+   570→- Consolidated ESG
+   571→- Evidence
+   572→- Exceptions
+   573→- Missing Data
+   574→- Submission Approval
+   575→- History
+   576→
+   577→
+   578→ROLE 10 — GROUP / HQ ESG REVIEWER
+   579→Scope:
+   580→Entire group.
+   581→
+   582→Can:
+   583→- review subsidiaries
+   584→- review consolidated ESG
+   585→- inspect exceptions
+   586→- review readiness
+   587→- final ESG review
+   588→- initiate/approve correction workflow where permitted
+   589→- final approval
+   590→- lock reporting period
+   591→- view BRSR readiness
+   592→
+   593→Screens:
+   594→- Group Dashboard
+   595→- Organization Tree
+   596→- Subsidiary Overview
+   597→- BU Overview
+   598→- Project Drilldown
+   599→- ESG Consolidation
+   600→- Exceptions
+   601→- Data Completeness
+   602→- BRSR Readiness
+   603→- Final Review
+   604→- Lock Period
+   605→- Group Reports
+   606→- Audit & Traceability
+   607→
+   608→
+   609→ROLE 11 — ESG / SUSTAINABILITY MANAGER
+   610→Scope:
+   611→Configured organizational scope.
+   612→
+   613→Can:
+   614→- monitor ESG data quality
+   615→- review validation
+   616→- review calculations
+   617→- review emission factors
+   618→- review anomalies
+   619→- review ESG KPIs
+   620→- inspect methodology
+   621→- monitor overall ESG health
+   622→- review data completeness
+   623→- support reporting preparation
+   624→
+   625→Screens:
+   626→- ESG Command Center
+   627→- Data Quality
+   628→- Validation Monitoring
+   629→- Calculation Monitoring
+   630→- Emission Factors
+   631→- Anomaly Center
+   632→- ESG KPI Library
+   633→- Methodology
+   634→- Completeness
+   635→- ESG Trends
+   636→- Environmental
+   637→- Social
+   638→- Governance
+   639→- Audit Trace
+   640→
+   641→
+   642→ROLE 12 — ESG ANALYST
+   643→Scope:
+   644→Assigned/reporting-wide read and analytical scope.
+   645→
+   646→Can:
+   647→- analyze trends
+   648→- analyze emissions
+   649→- energy
+   650→- water
+   651→- waste
+   652→- safety
+   653→- workforce
+   654→- data completeness
+   655→- anomalies
+   656→- KPI performance
+   657→- generate analytical reports
+   658→
+   659→Screens:
+   660→- Analytics Home
+   661→- Emission Analytics
+   662→- Energy Analytics
+   663→- Water Analytics
+   664→- Waste Analytics
+   665→- Social Analytics
+   666→- Safety Analytics
+   667→- Workforce Analytics
+   668→- KPI Explorer
+   669→- Trend Comparison
+   670→- Anomaly Analysis
+   671→- Data Completeness
+   672→
+   673→
+   674→ROLE 13 — BRSR MANAGER
+   675→Scope:
+   676→Group/reporting scope.
+   677→
+   678→Can:
+   679→- manage BRSR reporting workflow
+   680→- select framework/reporting year
+   681→- view Sections A/B/C
+   682→- view Principles 1–9
+   683→- inspect indicator mapping
+   684→- identify missing source data
+   685→- identify evidence status
+   686→- inspect readiness
+   687→- review manual corporate disclosures
+   688→- generate BRSR-ready outputs
+   689→- review final report
+   690→
+   691→Screens:
+   692→- BRSR Dashboard
+   693→- Reporting Year Selector
+   694→- BRSR Readiness
+   695→- Section A
+   696→- Section B
+   697→- Section C
+   698→- Principles 1–9
+   699→- Indicator Explorer
+   700→- Source Mapping
+   701→- Missing Data
+   702→- Evidence Status
+   703→- Manual Disclosures
+   704→- Review Status
+   705→- BRSR Preview
+   706→- BRSR Export
+   707→- Report History
+   708→
+   709→
+   710→ROLE 14 — AUDITOR / ASSURANCE USER
+   711→Scope:
+   712→Approved read-only scope.
+   713→
+   714→Can:
+   715→- inspect final ESG data
+   716→- inspect source records
+   717→- inspect evidence
+   718→- inspect calculations
+   719→- inspect factor versions
+   720→- inspect approval history
+   721→- inspect audit events
+   722→- inspect exceptions
+   723→- add comments/exceptions if configured
+   724→
+   725→Cannot:
+   726→- edit source data
+   727→- delete records
+   728→- change calculations
+   729→- alter approvals
+   730→- bypass locks
+   731→
+   732→Screens:
+   733→- Assurance Dashboard
+   734→- Final Data
+   735→- Source Trace
+   736→- Evidence Trail
+   737→- Calculation History
+   738→- Factor History
+   739→- Approval History
+   740→- Audit Trail
+   741→- Exceptions
+   742→- Report Package
+   743→- Assurance Review
+   744→
+   745→
+   746→ROLE 15 — MANAGEMENT / EXECUTIVE USER
+   747→Scope:
+   748→Executive read/reporting access.
+   749→
+   750→Can:
+   751→- view high-level ESG dashboard
+   752→- view total emissions
+   753→- energy
+   754→- water
+   755→- waste
+   756→- workforce
+   757→- safety
+   758→- ESG performance
+   759→- BRSR readiness
+   760→- final reports
+   761→
+   762→Cannot:
+   763→- edit operational source data
+   764→- alter calculations
+   765→- modify approvals
+   766→
+   767→Screens:
+   768→- Executive Dashboard
+   769→- ESG Performance
+   770→- Environmental Overview
+   771→- Social Overview
+   772→- Governance Overview
+   773→- Risk & Exceptions
+   774→- BRSR Readiness
+   775→- Final Reports
+   776→- Management Summary
+   777→
+   778→============================================================
+   779→5. APPLICATION SHELL
+   780→============================================================
+   781→
+   782→Build one enterprise application.
+   783→
+   784→Locked global shell:
+   785→
+   786→TOP HEADER:
+   787→- MEIL branding
+   788→- global search
+   789→- reporting-year/context
+   790→- notifications
+   791→- help
+   792→- user profile
+   793→- role indicator
+   794→
+   795→PRIMARY NAVIGATION:
+   796→- Overview
+   797→- My Project
+   798→- Data Entry
+   799→- Evidence
+   800→- Submissions
+   801→- Reports
+   802→- Analytics
+   803→- Audit & Traceability
+   804→- More
+   805→
+   806→For role-specific users, navigation items must be filtered by backend permissions.
+   807→
+   808→Do not create duplicate unrelated shells for every role.
+   809→
+   810→Use one design system.
+   811→
+   812→============================================================
+   813→6. AUTHENTICATION
+   814→============================================================
+   815→
+   816→Use secure Supabase Auth.
+   817→
+   818→Required:
+   819→- email/password authentication
+   820→- session persistence
+   821→- logout
+   822→- forgot password
+   823→- secure password reset
+   824→- optional MFA/OTP architecture
+   825→- current-user retrieval
+   826→- current-role retrieval
+   827→- current-organization-scope retrieval
+   828→
+   829→Authentication flow:
+   830→
+   831→Login
+   832→→ authentication
+   833→→ session verification
+   834→→ user profile
+   835→→ role resolution
+   836→→ organization scope resolution
+   837→→ permission resolution
+   838→→ dashboard
+   839→
+   840→Never trust:
+   841→- role from localStorage
+   842→- role from URL
+   843→- role from frontend state
+   844→- arbitrary user ID submitted by frontend
+   845→
+   846→Backend must derive current user from authenticated session/token.
+   847→
+   848→============================================================
+   849→7. RBAC + ORGANIZATION SCOPE
+   850→============================================================
+   851→
+   852→Implement:
+   853→
+   854→USER
+   855→ROLE
+   856→PERMISSION
+   857→ORGANIZATION SCOPE
+   858→
+   859→Permission examples:
+   860→
+   861→organization.read
+   862→organization.write
+   863→
+   864→user.read
+   865→user.create
+   866→user.update
+   867→user.disable
+   868→
+   869→project.read
+   870→project.write
+   871→
+   872→esg.energy.write
+   873→esg.water.write
+   874→esg.waste.write
+   875→esg.people.write
+   876→esg.safety.write
+   877→esg.travel.write
+   878→esg.human_rights.write
+   879→esg.suppliers.write
+   880→esg.csr.write
+   881→esg.governance.write
+   882→
+   883→evidence.upload
+   884→evidence.read
+   885→evidence.verify
+   886→
+   887→submission.submit
+   888→submission.review
+   889→submission.reject
+   890→submission.approve
+   891→submission.lock
+   892→
+   893→brsr.read
+   894→brsr.configure
+   895→brsr.generate
+   896→
+   897→report.read
+   898→report.generate
+   899→
+   900→audit.read
+   901→
+   902→Every backend endpoint must verify:
+   903→1. authenticated user
+   904→2. role
+   905→3. permission
+   906→4. organization scope
+   907→5. record ownership/scope
+   908→
+   909→Implement PostgreSQL/Supabase RLS where appropriate.
+   910→
+   911→Frontend permission hiding is UI convenience only.
+   912→Backend authorization is the actual security boundary.
+   913→
+   914→============================================================
+   915→8. DATABASE
+   916→============================================================
+   917→
+   918→PostgreSQL through Supabase is the permanent source of truth.
+   919→
+   920→Design normalized relational schema.
+   921→
+   922→CORE ORGANIZATION TABLES:
+   923→
+   924→groups
+   925→- id
+   926→- name
+   927→- code
+   928→- legal_name
+   929→- status
+   930→- metadata
+   931→- created_at
+   932→- updated_at
+   933→
+   934→subsidiaries
+   935→- id
+   936→- group_id
+   937→- name
+   938→- code
+   939→- legal_name
+   940→- cin where applicable
+   941→- status
+   942→- created_at
+   943→- updated_at
+   944→
+   945→business_units
+   946→- id
+   947→- subsidiary_id
+   948→- name
+   949→- code
+   950→- sector
+   951→- status
+   952→
+   953→projects
+   954→- id
+   955→- business_unit_id
+   956→- project_code
+   957→- project_name
+   958→- location
+   959→- country
+   960→- state
+   961→- status
+   962→- reporting_owner_id
+   963→
+   964→users
+   965→- id
+   966→- auth_user_id
+   967→- name
+   968→- email
+   969→- employee_code
+   970→- status
+   971→- created_at
+   972→
+   973→roles
+   974→permissions
+   975→role_permissions
+   976→user_roles
+   977→user_scopes
+   978→
+   979→REPORTING TABLES:
+   980→
+   981→reporting_years
+   982→reporting_periods
+   983→period_status
+   984→submission_versions
+   985→
+   986→ESG SOURCE TABLES:
+   987→
+   988→energy_records
+   989→fuel_records
+   990→water_records
+   991→waste_records
+   992→people_records
+   993→worker_records
+   994→training_records
+   995→safety_incidents
+   996→safety_assessments
+   997→human_rights_records
+   998→travel_records
+   999→supplier_records
+  1000→supplier_assessments
+  1001→stakeholder_records
+  1002→csr_projects
+  1003→csr_beneficiaries
+  1004→social_impact_assessments
+  1005→community_grievances
+  1006→customer_records
+  1007→customer_complaints
+  1008→privacy_incidents
+  1009→governance_records
+  1010→policies
+  1011→board_kmp_records
+  1012→ethics_records
+  1013→anti_bribery_records
+  1014→public_policy_records
+  1015→association_records
+  1016→compliance_records
+  1017→
+  1018→EVIDENCE:
+  1019→
+  1020→evidence_files
+  1021→evidence_links
+  1022→evidence_versions
+  1023→evidence_verifications
+  1024→evidence_hashes
+  1025→
+  1026→VALIDATION:
+  1027→
+  1028→validation_rules
+  1029→validation_results
+  1030→validation_exceptions
+  1031→anomaly_events
+  1032→
+  1033→CALCULATIONS:
+  1034→
+  1035→unit_master
+  1036→conversion_rules
+  1037→emission_factors
+  1038→emission_factor_versions
+  1039→calculation_runs
+  1040→calculation_results
+  1041→calculation_lineage
+  1042→
+  1043→WORKFLOW:
+  1044→
+  1045→submissions
+  1046→submission_items
+  1047→submission_status_history
+  1048→review_actions
+  1049→approval_actions
+  1050→correction_requests
+  1051→revision_history
+  1052→locks
+  1053→
+  1054→BRSR:
+  1055→
+  1056→brsr_frameworks
+  1057→brsr_framework_versions
+  1058→brsr_sections
+  1059→brsr_principles
+  1060→brsr_questions
+  1061→brsr_indicators
+  1062→brsr_question_versions
+  1063→brsr_mappings
+  1064→brsr_mapping_sources
+  1065→brsr_answers
+  1066→brsr_answer_sources
+  1067→brsr_applicability_rules
+  1068→brsr_manual_disclosures
+  1069→
+  1070→AUDIT:
+  1071→
+  1072→audit_logs
+  1073→audit_event_types
+  1074→audit_metadata
+  1075→audit_exceptions
+  1076→
+  1077→REPORTING:
+  1078→
+  1079→dashboard_snapshots only if actually required
+  1080→report_jobs
+  1081→report_files
+  1082→report_versions
+  1083→
+  1084→============================================================
+  1085→9. DATA OWNERSHIP MODEL
+  1086→============================================================
+  1087→
+  1088→Project/site is the main operational entry level.
+  1089→
+  1090→Departmental modules can contribute specialized records within authorized scope.
+  1091→
+  1092→BU/Subsidiary/Group should normally use derived values.
+  1093→
+  1094→For every ESG record include:
+  1095→
+  1096→id
+  1097→organization scope
+  1098→project_id where relevant
+  1099→reporting_period_id
+  1100→module
+  1101→metric
+  1102→source_value
+  1103→source_unit
+  1104→normalized_value
+  1105→normalized_unit
+  1106→status
+  1107→entered_by
+  1108→entered_at
+  1109→updated_by
+  1110→updated_at
+  1111→evidence_requirement
+  1112→evidence_status
+  1113→validation_status
+  1114→calculation_status
+  1115→revision_number
+  1116→
+  1117→============================================================
+  1118→10. REPORTING PERIODS
+  1119→============================================================
+  1120→
+  1121→Support:
+  1122→- reporting year
+  1123→- month
+  1124→- quarter
+  1125→- annual reporting period
+  1126→- period opening
+  1127→- period closing
+  1128→- submission deadline
+  1129→- review deadline
+  1130→- approval deadline
+  1131→- locked state
+  1132→
+  1133→States:
+  1134→
+  1135→OPEN
+  1136→DRAFT
+  1137→SUBMITTED
+  1138→UNDER_REVIEW
+  1139→CORRECTION_REQUESTED
+  1140→RESUBMITTED
+  1141→BU_APPROVED
+  1142→SUBSIDIARY_APPROVED
+  1143→HQ_REVIEW
+  1144→LOCKED
+  1145→
+  1146→Do not allow invalid state transitions.
+  1147→
+  1148→============================================================
+  1149→11. DATA ENTRY ENGINE
+  1150→============================================================
+  1151→
+  1152→Every form must support:
+  1153→
+  1154→- reporting period selection
+  1155→- project selection where applicable
+  1156→- clear units
+  1157→- required-field validation
+  1158→- inline validation
+  1159→- save draft
+  1160→- autosave where safe
+  1161→- attach evidence
+  1162→- calculation preview
+  1163→- validation result
+  1164→- submission
+  1165→- history
+  1166→
+  1167→Do not make users type derived values manually when the system can calculate them.
+  1168→
+  1169→============================================================
+  1170→12. ENERGY / FUEL MODULE
+  1171→============================================================
+  1172→
+  1173→Support:
+  1174→
+  1175→Electricity
+  1176→Diesel
+  1177→Petrol
+  1178→Coal
+  1179→CNG
+  1180→LPG
+  1181→Renewable energy
+  1182→Non-renewable energy
+  1183→Grid electricity
+  1184→Purchased electricity
+  1185→Renewable/PPA records where applicable
+  1186→
+  1187→Fields:
+  1188→- source
+  1189→- quantity
+  1190→- unit
+  1191→- date/period
+  1192→- source category
+  1193→- vendor/source
+  1194→- meter/invoice reference
+  1195→- evidence
+  1196→- conversion
+  1197→- calculated energy
+  1198→- emission calculation where applicable
+  1199→
+  1200→Features:
+  1201→- monthly totals
+  1202→- renewable vs non-renewable
+  1203→- trend
+  1204→- project total
+  1205→- BU total
+  1206→- subsidiary total
+  1207→- group total
+  1208→
+  1209→============================================================
+  1210→13. WATER MODULE
+  1211→============================================================
+  1212→
+  1213→Capture:
+  1214→- water source
+  1215→- withdrawal
+  1216→- consumption
+  1217→- discharge
+  1218→- treatment
+  1219→- destination
+  1220→- recycled/reused quantity
+  1221→- unit
+  1222→- reporting period
+  1223→- evidence
+  1224→
+  1225→Support:
+  1226→- water balance
+  1227→- source comparison
+  1228→- consumption
+  1229→- discharge
+  1230→- treatment
+  1231→- ZLD-related fields where applicable
+  1232→- water stress indicator where required by framework
+  1233→
+  1234→Do not reduce ZLD to a simplistic checkbox.
+  1235→
+  1236→============================================================
+  1237→14. WASTE MODULE
+  1238→============================================================
+  1239→
+  1240→Capture:
+  1241→- waste type
+  1242→- hazardous/non-hazardous
+  1243→- quantity
+  1244→- unit
+  1245→- generated
+  1246→- recovered
+  1247→- recycled
+  1248→- reused
+  1249→- disposed
+  1250→- disposal route
+  1251→- vendor
+  1252→- manifest/reference
+  1253→- evidence
+  1254→
+  1255→Provide:
+  1256→- waste dashboard
+  1257→- category breakdown
+  1258→- recovery rate
+  1259→- disposal route
+  1260→- monthly trend
+  1261→- project → BU → subsidiary → group rollup
+  1262→
+  1263→============================================================
+  1264→15. WORKFORCE / PEOPLE MODULE
+  1265→============================================================
+  1266→
+  1267→Capture:
+  1268→- employees
+  1269→- workers
+  1270→- permanent
+  1271→- non-permanent
+  1272→- gender
+  1273→- differently abled
+  1274→- training
+  1275→- wellbeing
+  1276→- benefits
+  1277→- retirement/statutory benefits where applicable
+  1278→- turnover
+  1279→- grievance
+  1280→- equal opportunity
+  1281→- parental return/retention
+  1282→- performance/career review
+  1283→- worker/employee distinctions
+  1284→
+  1285→Do not merge employee and worker concepts into one uncontrolled category.
+  1286→
+  1287→============================================================
+  1288→16. SAFETY / EHS MODULE
+  1289→============================================================
+  1290→
+  1291→Capture:
+  1292→- incidents
+  1293→- injuries
+  1294→- fatalities
+  1295→- lost time incidents
+  1296→- recordable injuries
+  1297→- high consequence incidents
+  1298→- training
+  1299→- health assessments
+  1300→- working condition assessments
+  1301→- corrective actions
+  1302→- safety hours where applicable
+  1303→- workforce exposure/base denominator where required
+  1304→
+  1305→Calculations such as LTIFR must be derived correctly from underlying counts and hours.
+  1306→
+  1307→Never aggregate already-computed LTIFR percentages/ratios incorrectly.
+  1308→
+  1309→============================================================
+  1310→17. HUMAN RIGHTS MODULE
+  1311→============================================================
+  1312→
+  1313→Capture:
+  1314→- human rights policy
+  1315→- training
+  1316→- grievance mechanism
+  1317→- minimum wage compliance
+  1318→- child labor
+  1319→- forced labor
+  1320→- discrimination
+  1321→- harassment
+  1322→- whistleblower/protection
+  1323→- contractual human-rights clauses
+  1324→- due diligence
+  1325→- assessments
+  1326→- corrective action
+  1327→- value-chain partner assessments
+  1328→
+  1329→============================================================
+  1330→18. TRAVEL / SCOPE 3 SEED MODULE
+  1331→============================================================
+  1332→
+  1333→First-release support:
+  1334→
+  1335→Flights
+  1336→Rail
+  1337→Road
+  1338→Selected business travel activity
+  1339→
+  1340→Capture:
+  1341→- mode
+  1342→- distance/activity
+  1343→- passenger count where applicable
+  1344→- unit
+  1345→- travel date/period
+  1346→- origin/destination where appropriate
+  1347→- factor
+  1348→- factor version
+  1349→- calculated emissions
+  1350→- evidence
+  1351→
+  1352→Keep Scope 3 implementation modular.
+  1353→
+  1354→Do not falsely claim full Scope 3 coverage.
+  1355→
+  1356→Clearly label supported Scope 3 categories.
+  1357→
+  1358→============================================================
+  1359→19. PROCUREMENT / VALUE CHAIN
+  1360→============================================================
+  1361→
+  1362→Build:
+  1363→- supplier master
+  1364→- supplier classification
+  1365→- MSME indicator
+  1366→- local supplier
+  1367→- sourcing information
+  1368→- supplier ESG assessment
+  1369→- supplier policy acceptance
+  1370→- value-chain disclosure
+  1371→- assessment score
+  1372→- evidence
+  1373→- corrective actions
+  1374→
+  1375→Support versioned assessment forms.
+  1376→
+  1377→============================================================
+  1378→20. CSR / COMMUNITY
+  1379→============================================================
+  1380→
+  1381→Build:
+  1382→- CSR master
+  1383→- project
+  1384→- location
+  1385→- objective
+  1386→- expenditure
+  1387→- beneficiary count
+  1388→- vulnerable/marginalized group data
+  1389→- aspirational district indicator
+  1390→- SIA
+  1391→- R&R
+  1392→- stakeholder engagement
+  1393→- community complaints
+  1394→- corrective action
+  1395→- documents
+  1396→
+  1397→============================================================
+  1398→21. STAKEHOLDER MANAGEMENT
+  1399→============================================================
+  1400→
+  1401→Capture:
+  1402→- stakeholder group
+  1403→- vulnerable/marginalized status
+  1404→- engagement channel
+  1405→- engagement frequency
+  1406→- purpose
+  1407→- concerns
+  1408→- action
+  1409→- resolution
+  1410→- board/management involvement where applicable
+  1411→
+  1412→============================================================
+  1413→22. CUSTOMER / PRIVACY
+  1414→============================================================
+  1415→
+  1416→Capture:
+  1417→- customer complaints
+  1418→- product/service information
+  1419→- environmental/social information
+  1420→- responsible use
+  1421→- recycling/disposal information
+  1422→- data privacy complaints
+  1423→- advertising complaints
+  1424→- cybersecurity complaints/incidents
+  1425→- essential service disruption
+  1426→- recalls
+  1427→- corrective action
+  1428→- data breach
+  1429→- PII impact where required
+  1430→
+  1431→============================================================
+  1432→23. GOVERNANCE MODULE
+  1433→============================================================
+  1434→
+  1435→Build:
+  1436→- policies
+  1437→- principle mapping
+  1438→- board approval
+  1439→- procedure mapping
+  1440→- value-chain extension
+  1441→- certifications
+  1442→- commitments
+  1443→- targets
+  1444→- performance
+  1445→- director statement
+  1446→- highest authority
+  1447→- sustainability responsibility
+  1448→- policy review
+  1449→- independent external assessment
+  1450→- non-covered principles/reasons
+  1451→- board/KMP
+  1452→- ethics
+  1453→- anti-corruption
+  1454→- public policy
+  1455→- trade/industry associations
+  1456→- complaints
+  1457→
+  1458→Policies can map to multiple BRSR principles.
+  1459→
+  1460→Do not force a one-policy-per-principle architecture.
+  1461→
+  1462→============================================================
+  1463→24. VALIDATION ENGINE
+  1464→============================================================
+  1465→
+  1466→Validation is system-driven.
+  1467→
+  1468→Every record must be checked for:
+  1469→
+  1470→- required field
+  1471→- reporting period
+  1472→- organization scope
+  1473→- correct unit
+  1474→- valid numeric format
+  1475→- negative values where prohibited
+  1476→- valid conversion
+  1477→- duplicate risk
+  1478→- missing evidence
+  1479→- inconsistent dates
+  1480→- unusual ranges
+  1481→- cross-field consistency
+  1482→- source/document consistency
+  1483→- historical anomalies
+  1484→- factor availability
+  1485→
+  1486→Validation severity:
+  1487→
+  1488→INFO
+  1489→WARNING
+  1490→ERROR
+  1491→BLOCKING
+  1492→
+  1493→Example:
+  1494→
+  1495→Diesel = 5000 liters
+  1496→→ valid unit
+  1497→→ convert liters to configured energy unit
+  1498→→ apply factor/version
+  1499→→ calculate CO2e
+  1500→→ store result
+  1501→
+  1502→Validation response must explain:
+  1503→- issue
+  1504→- field
+  1505→- severity
+  1506→- reason
+  1507→- suggested action
+  1508→
+  1509→============================================================
+  1510→25. ANOMALY DETECTION
+  1511→============================================================
+  1512→
+  1513→Implement deterministic baseline anomaly detection first.
+  1514→
+  1515→Examples:
+  1516→- consumption suddenly 5x previous month
+  1517→- workforce suddenly drops 80%
+  1518→- impossible negative water consumption
+  1519→- duplicate invoice
+  1520→- duplicate meter reading
+  1521→- emission value outside configured expected range
+  1522→
+  1523→Do not silently reject every unusual value.
+  1524→
+  1525→Use:
+  1526→WARNING + REVIEW REQUIRED
+  1527→
+  1528→Allow justified exceptions with comments.
+  1529→
+  1530→============================================================
+  1531→26. CALCULATION ENGINE
+  1532→============================================================
+  1533→
+  1534→Centralized server-side calculation engine.
+  1535→
+  1536→Must support:
+  1537→- unit conversion
+  1538→- emission factors
+  1539→- factor versions
+  1540→- formula versions
+  1541→- Scope 1
+  1542→- Scope 2
+  1543→- selected Scope 3
+  1544→- intensity metrics
+  1545→- other ESG KPIs
+  1546→
+  1547→Store:
+  1548→
+  1549→source_value
+  1550→source_unit
+  1551→normalized_value
+  1552→normalized_unit
+  1553→conversion_rule_id
+  1554→conversion_version
+  1555→factor_id
+  1556→factor_version
+  1557→formula_id
+  1558→formula_version
+  1559→calculation_timestamp
+  1560→calculated_value
+  1561→result_unit
+  1562→methodology_note
+  1563→
+  1564→Calculation results must be deterministic.
+  1565→
+  1566→Same source input + same factor version = same result.
+  1567→
+  1568→Never hard-code turnover or other organizational metrics into calculations.
+  1569→
+  1570→Only calculate intensity when the required denominator exists in the real data model.
+  1571→
+  1572→============================================================
+  1573→27. EMISSION FACTOR MASTER
+  1574→============================================================
+  1575→
+  1576→Build an admin-managed factor repository.
+  1577→
+  1578→Each factor:
+  1579→- id
+  1580→- name
+  1581→- category
+  1582→- source
+  1583→- unit
+  1584→- geography
+  1585→- factor_value
+  1586→- CO2/CH4/N2O details where applicable
+  1587→- effective_from
+  1588→- effective_to
+  1589→- version
+  1590→- methodology
+  1591→- source_document
+  1592→- status
+  1593→
+  1594→Historical calculations must preserve their original factor version.
+  1595→
+  1596→Never silently recalculate history using a newer factor.
+  1597→
+  1598→============================================================
+  1599→28. CONSOLIDATION ENGINE
+  1600→============================================================
+  1601→
+  1602→The engine must calculate:
+  1603→
+  1604→Project
+  1605→→ BU
+  1606→→ Subsidiary
+  1607→→ Group
+  1608→
+  1609→Only include approved/eligible source records according to workflow configuration.
+  1610→
+  1611→Never:
+  1612→- sum duplicated submissions
+  1613→- sum already-consolidated numbers as though they were raw source
+  1614→- double-count shared records
+  1615→
+  1616→Store lineage.
+  1617→
+  1618→Example:
+  1619→
+  1620→Group Emissions
+  1621→→ Subsidiary A
+  1622→→ BU A1
+  1623→→ Project A1-P1
+  1624→→ January fuel record
+  1625→→ evidence
+  1626→→ calculation
+  1627→→ factor version
+  1628→
+  1629→Allow drill-down from every KPI.
+  1630→
+  1631→============================================================
+  1632→29. WORKFLOW ENGINE
+  1633→============================================================
+  1634→
+  1635→State machine:
+  1636→
+  1637→DRAFT
+  1638→↓
+  1639→SUBMITTED
+  1640→↓
+  1641→PROJECT/SYSTEM VALIDATION
+  1642→↓
+  1643→UNDER BU REVIEW
+  1644→↓
+  1645→BU APPROVED
+  1646→↓
+  1647→UNDER SUBSIDIARY REVIEW
+  1648→↓
+  1649→SUBSIDIARY APPROVED
+  1650→↓
+  1651→UNDER HQ REVIEW
+  1652→↓
+  1653→HQ APPROVED
+  1654→↓
+  1655→LOCKED
+  1656→↓
+  1657→BRSR READY
+  1658→
+  1659→Correction path:
+  1660→
+  1661→UNDER REVIEW
+  1662→→ CORRECTION REQUESTED
+  1663→→ USER CORRECTS
+  1664→→ NEW REVISION
+  1665→→ RESUBMITTED
+  1666→→ REVIEW
+  1667→
+  1668→Do not overwrite previous revision history.
+  1669→
+  1670→Track:
+  1671→- who
+  1672→- what
+  1673→- when
+  1674→- old value
+  1675→- new value
+  1676→- reason
+  1677→- comment
+  1678→- evidence
+  1679→- status transition
+  1680→
+  1681→============================================================
+  1682→30. EVIDENCE MANAGEMENT
+  1683→============================================================
+  1684→
+  1685→Evidence must be a first-class system.
+  1686→
+  1687→Support:
+  1688→- upload
+  1689→- preview
+  1690→- download if authorized
+  1691→- metadata
+  1692→- verification
+  1693→- versioning
+  1694→- source linking
+  1695→- access control
+  1696→- audit trail
+  1697→
+  1698→Examples:
+  1699→- invoice
+  1700→- electricity bill
+  1701→- meter reading
+  1702→- fuel register
+  1703→- waste manifest
+  1704→- safety register
+  1705→- policy
+  1706→- certificate
+  1707→- training record
+  1708→- HR record
+  1709→- supplier document
+  1710→- CSR document
+  1711→
+  1712→Evidence metadata:
+  1713→- document name
+  1714→- document type
+  1715→- document date
+  1716→- reporting period
+  1717→- uploader
+  1718→- source module
+  1719→- source record
+  1720→- version
+  1721→- status
+  1722→- hash
+  1723→- verification status
+  1724→
+  1725→Use secure storage and signed/authorized access.
+  1726→
+  1727→Important quantitative submissions should support linked evidence where required.
+  1728→
+  1729→============================================================
+  1730→31. EVIDENCE VERIFICATION
+  1731→============================================================
+  1732→
+  1733→Statuses:
+  1734→
+  1735→NOT_REQUIRED
+  1736→REQUIRED
+  1737→UPLOADED
+  1738→UNDER_REVIEW
+  1739→VERIFIED
+  1740→REJECTED
+  1741→EXPIRED
+  1742→
+  1743→Reviewer can:
+  1744→- approve evidence
+  1745→- reject evidence
+  1746→- request replacement
+  1747→- add comment
+  1748→
+  1749→Never delete evidence as if it never existed.
+  1750→
+  1751→============================================================
+  1752→32. BRSR ENGINE
+  1753→============================================================
+  1754→
+  1755→DO NOT BUILD A STATIC BRSR FORM.
+  1756→
+  1757→Build a configuration-driven BRSR engine.
+  1758→
+  1759→Database/configuration:
+  1760→
+  1761→framework
+  1762→framework_version
+  1763→reporting_year
+  1764→section
+  1765→principle
+  1766→question
+  1767→indicator
+  1768→applicability_rule
+  1769→mapping
+  1770→answer_type
+  1771→source
+  1772→calculation
+  1773→evidence_requirement
+  1774→
+  1775→Sections:
+  1776→A
+  1777→B
+  1778→C
+  1779→
+  1780→Principles:
+  1781→P1
+  1782→P2
+  1783→P3
+  1784→P4
+  1785→P5
+  1786→P6
+  1787→P7
+  1788→P8
+  1789→P9
+  1790→
+  1791→Support Essential and Leadership disclosures according to the selected framework/version.
+  1792→
+  1793→Support BRSR Core as configuration.
+  1794→
+  1795→Never attach future reporting rules directly to old records.
+  1796→
+  1797→Historical reporting must remain reproducible.
+  1798→
+  1799→============================================================
+  1800→33. BRSR SECTION A
+  1801→============================================================
+  1802→
+  1803→Build configurable support for:
+  1804→
+  1805→entity identity
+  1806→CIN
+  1807→entity name
+  1808→incorporation
+  1809→registered address
+  1810→corporate address
+  1811→email
+  1812→telephone
+  1813→website
+  1814→financial/reporting year
+  1815→stock exchanges
+  1816→paid-up capital
+  1817→contact person
+  1818→reporting boundary
+  1819→business activities
+  1820→products/services
+  1821→NIC codes
+  1822→locations
+  1823→plants/offices
+  1824→national/international markets
+  1825→export contribution
+  1826→customer types
+  1827→employees
+  1828→workers
+  1829→gender
+  1830→differently abled
+  1831→women participation
+  1832→turnover
+  1833→holding/subsidiary/associate/JV
+  1834→CSR
+  1835→complaints
+  1836→material responsible-business issues
+  1837→
+  1838→All question numbering must be configurable by framework version.
+  1839→
+  1840→============================================================
+  1841→34. BRSR SECTION B
+  1842→============================================================
+  1843→
+  1844→Support:
+  1845→- policy coverage
+  1846→- board approval
+  1847→- links
+  1848→- procedures
+  1849→- value chain
+  1850→- standards/certifications
+  1851→- commitments
+  1852→- targets
+  1853→- performance
+  1854→- reasons for deviation
+  1855→- director statement
+  1856→- highest authority
+  1857→- sustainability committee/responsibility
+  1858→- policy review
+  1859→- independent evaluation
+  1860→- reasons for non-coverage
+  1861→
+  1862→============================================================
+  1863→35. BRSR SECTION C / PRINCIPLES
+  1864→============================================================
+  1865→
+  1866→P1:
+  1867→Ethics, integrity, anti-corruption, transparency, complaints, corrective actions.
+  1868→
+  1869→P2:
+  1870→Sustainable products/services, R&D/capex, sourcing, recyclability, EPR-related information.
+  1871→
+  1872→P3:
+  1873→Employees, workers, benefits, wellbeing, diversity, training, safety, OHS, incidents, LTIFR, grievance, value-chain workforce controls.
+  1874→
+  1875→P4:
+  1876→Stakeholder identification, engagement, vulnerable/marginalized groups, grievance, board involvement.
+  1877→
+  1878→P5:
+  1879→Human rights, minimum wage, remuneration, grievance, child labor, forced labor, discrimination, due diligence, value-chain controls.
+  1880→
+  1881→P6:
+  1882→Energy, water, emissions, Scope 1, Scope 2, Scope 3 where applicable, waste, air emissions, biodiversity/environmental compliance, EIA, resource efficiency, water stress, environmental incidents.
+  1883→
+  1884→P7:
+  1885→Trade associations, anti-competitive conduct, public policy, advocacy.
+  1886→
+  1887→P8:
+  1888→SIA, R&R, CSR, local sourcing, MSMEs, vulnerable/marginalized groups, community beneficiaries.
+  1889→
+  1890→P9:
+  1891→Customer complaints, product/service information, privacy, cybersecurity, recalls, customer awareness, data breaches and corrective actions.
+  1892→
+  1893→============================================================
+  1894→36. BRSR DATA SOURCE MAPPING
+  1895→============================================================
+  1896→
+  1897→Every BRSR answer must show:
+  1898→
+  1899→Source:
+  1900→- manual disclosure
+  1901→OR
+  1902→- source record
+  1903→OR
+  1904→- derived KPI
+  1905→OR
+  1906→- consolidated KPI
+  1907→
+  1908→Status:
+  1909→MISSING
+  1910→DRAFT
+  1911→SUBMITTED
+  1912→APPROVED
+  1913→LOCKED
+  1914→EVIDENCE VERIFIED
+  1915→
+  1916→Example:
+  1917→
+  1918→BRSR Indicator
+  1919→→ source record
+  1920→→ calculation
+  1921→→ project
+  1922→→ month
+  1923→→ evidence
+  1924→
+  1925→Allow one BRSR indicator to use multiple underlying sources.
+  1926→
+  1927→Allow corporate/manual disclosure where project source data is inappropriate.
+  1928→
+  1929→============================================================
+  1930→37. BRSR READINESS
+  1931→============================================================
+  1932→
+  1933→Create readiness score based on real data.
+  1934→
+  1935→Do NOT hard-code 94%, 95%, etc.
+  1936→
+  1937→Readiness dimensions:
+  1938→- source completeness
+  1939→- approval completeness
+  1940→- evidence completeness
+  1941→- calculation completeness
+  1942→- mapping completeness
+  1943→- exception count
+  1944→- required manual disclosures
+  1945→- unresolved corrections
+  1946→- framework applicability
+  1947→
+  1948→Example:
+  1949→
+  1950→BRSR readiness:
+  1951→92%
+  1952→
+  1953→must actually mean:
+  1954→configured weighted/defined completion calculation from current records.
+  1955→
+  1956→Click:
+  1957→92%
+  1958→→ unresolved items
+  1959→→ missing indicators
+  1960→→ missing evidence
+  1961→→ pending approvals
+  1962→→ exceptions
+  1963→
+  1964→============================================================
+  1965→38. DASHBOARDS
+  1966→============================================================
+  1967→
+  1968→GLOBAL DASHBOARD:
+  1969→
+  1970→KPI cards:
+  1971→- total emissions
+  1972→- energy
+  1973→- water
+  1974→- waste
+  1975→- workforce
+  1976→- safety
+  1977→- completion
+  1978→- BRSR readiness
+  1979→
+  1980→Do not fake values.
+  1981→
+  1982→Charts must read from backend.
+  1983→
+  1984→Charts:
+  1985→- emissions trend
+  1986→- energy trend
+  1987→- water trend
+  1988→- waste trend
+  1989→- workforce
+  1990→- safety
+  1991→- completion
+  1992→- exceptions
+  1993→
+  1994→Filters:
+  1995→- reporting year
+  1996→- period
+  1997→- group
+  1998→- subsidiary
+  1999→- BU
+  2000→- project
+
+[showing lines 1-2000 of 4009; use offset=2001 with limit to continue reading]
