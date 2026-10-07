@@ -150,7 +150,7 @@ const STATUS_CHIPS = [
   { key: 'SUBMITTED', label: 'Submitted', filter: 'SUBMITTED' },
   { key: 'UNDER_REVIEW', label: 'Under Review', filter: 'UNDER_REVIEW' },
   { key: 'CORRECTION_REQUIRED', label: 'Correction', filter: 'CORRECTION_REQUESTED' },
-  { key: 'APPROVED', label: 'Approved', filter: 'BU_APPROVED' },
+  { key: 'APPROVED', label: 'Approved', filter: 'APPROVED' },
   { key: 'LOCKED', label: 'Locked', filter: 'LOCKED' },
 ] as const
 
@@ -167,6 +167,7 @@ const PIPELINE_LABEL: Record<string, string> = {
   BU_APPROVED: 'BU Approved',
   SUBSIDIARY_APPROVED: 'Subsidiary',
   HQ_REVIEW: 'HQ Review',
+  APPROVED: 'Approved',
   LOCKED: 'Locked',
   CORRECTION_REQUESTED: 'Correction',
   RESUBMITTED: 'Resubmitted',
@@ -363,7 +364,7 @@ export function SubmissionsModule() {
       else if (it.status === 'SUBMITTED' || it.status === 'RESUBMITTED') m.SUBMITTED++
       else if (it.status === 'UNDER_REVIEW') m.UNDER_REVIEW++
       else if (it.status === 'CORRECTION_REQUESTED') m.CORRECTION_REQUIRED++
-      else if (it.status === 'BU_APPROVED' || it.status === 'SUBSIDIARY_APPROVED' || it.status === 'HQ_REVIEW') m.APPROVED++
+      else if (it.status === 'APPROVED' || it.status === 'BU_APPROVED' || it.status === 'SUBSIDIARY_APPROVED' || it.status === 'HQ_REVIEW') m.APPROVED++
       else if (it.status === 'LOCKED') m.LOCKED++
     }
     return m
@@ -936,14 +937,18 @@ function SubmissionsTable({
                 </TableCell>
                 <TableCell className="py-3 text-xs text-slate-600">{fmtDate(s.submittedAt)}</TableCell>
                 <TableCell className="py-3 text-xs text-slate-600">
-                  {s.currentReviewer ? (
-                    <div>
-                      <div className="font-medium text-slate-700">{s.currentReviewer.name}</div>
-                      <div className="text-[10px] text-slate-400">{s.currentReviewer.email}</div>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400">—</span>
-                  )}
+                  {(() => {
+                    // history is newest-first; currentReviewer may be null for approved/locked
+                    const lastAction = s.history && s.history.length > 0 ? s.history[0] : null
+                    const reviewer = s.currentReviewer
+                      ?? (lastAction ? { name: lastAction.actorName, email: lastAction.actorRole } : null)
+                    return reviewer ? (
+                      <div>
+                        <div className="font-medium text-slate-700">{reviewer.name}</div>
+                        <div className="text-[10px] text-slate-400">{reviewer.email}</div>
+                      </div>
+                    ) : <span className="text-slate-400">—</span>
+                  })()}
                 </TableCell>
                 <TableCell className="py-3">
                   <span className={`status-pill ${statusPillClass(s.status)}`}>

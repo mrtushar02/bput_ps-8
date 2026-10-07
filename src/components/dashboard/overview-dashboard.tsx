@@ -12,6 +12,8 @@ import {
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts'
+import { PipelineTracker } from '@/components/dashboard/pipeline-tracker'
+import { TargetsWidget } from '@/components/dashboard/targets-widget'
 
 interface OverviewData {
   kpis: any
@@ -69,19 +71,22 @@ export function OverviewDashboard() {
         </div>
       </div>
 
-      {/* KPI GRID */}
+      {/* KPI GRID — real month-over-month deltas from trends data (no hardcoded values) */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
-        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={-4.2} trendUp={false} sub={`S1: ${k.scope1} · S2: ${k.scope2}`} />
-        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={1.2} trendUp sub={`Renewable ${k.renewableShare}%`} />
-        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={0.8} trendUp sub={`Recycled ${k.waterRecycledShare}%`} />
-        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={2.1} trendUp={false} sub={`${k.wasteGeneratedT}T generated`} />
+        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} />
+        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} />
+        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} />
+        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} />
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
-        <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={0.5} trendUp sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} />
-        <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={-8.0} trendUp={false} sub={`${k.injuries} injuries · 0 fatal`} />
-        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={3.4} trendUp sub={`${k.brsrMissing} items missing`} />
-        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" value={k.completion.toString()} unit="%" trend={5.2} trendUp sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} />
+        <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={null} goodDirection="up" sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} />
+        <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={null} goodDirection="down" sub={`${k.injuries} injuries · 0 fatal`} />
+        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} />
+        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} />
       </div>
+
+      {/* ESG DATA CONTROL CHAIN — live pipeline tracker */}
+      <PipelineTracker data={data} />
 
       {/* CHARTS ROW 1 */}
       <div className="grid gap-4 lg:grid-cols-3">
@@ -186,6 +191,9 @@ export function OverviewDashboard() {
         </GlassCard>
       </div>
 
+      {/* SUSTAINABILITY TARGETS vs ACTUALS */}
+      <TargetsWidget />
+
       {/* DATA QUALITY + ACTIVITY */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Data quality center */}
@@ -261,22 +269,42 @@ function CardHeader({ icon: Icon, title, subtitle, right }: { icon: any; title: 
   )
 }
 
-function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, trendUp, sub, delay }: any) {
+/** Compute real month-over-month delta (%) from the trends array. Returns null if insufficient data. */
+function trendDelta(trends: { emissions: number; energy: number; water: number; waste: number }[], key: 'emissions' | 'energy' | 'water' | 'waste'): number | null {
+  if (!trends || trends.length < 2) return null
+  const last = trends[trends.length - 1][key]
+  const prev = trends[trends.length - 2][key]
+  if (prev === 0) return null
+  return Math.round(((last - prev) / prev) * 1000) / 10
+}
+
+function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay }: any) {
+  // ESG semantics: trend direction vs what's "good" determines colour
+  // goodDirection='down' → decreasing is good (emissions, energy, water, LTIFR)
+  // goodDirection='up' → increasing is good (readiness, completion, workforce, recovery%)
+  const hasTrend = trend !== null && trend !== undefined && !isNaN(trend)
+  const isGood = hasTrend && ((goodDirection === 'down' && trend < 0) || (goodDirection === 'up' && trend > 0))
+  const isNeutral = hasTrend && trend === 0
+  const pillClass = !hasTrend ? 'status-review' : isNeutral ? 'status-review' : isGood ? 'status-approved' : 'status-warning'
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
       className="glass glass-shimmer rounded-2xl p-4">
       <div className="flex items-start justify-between">
         <div className={`kpi-tile ${tileClass}`}><Icon className="h-5 w-5" /></div>
-        <span className={`status-pill ${trendUp === false ? 'status-approved' : 'status-submitted'}`}>
-          {trendUp === false ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-          {Math.abs(trend)}%
-        </span>
+        {hasTrend ? (
+          <span className={`status-pill ${pillClass}`}>
+            {trend < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+            {trend > 0 ? '+' : ''}{trend}%
+          </span>
+        ) : (
+          <span className="status-pill status-review"><Activity className="h-3 w-3" /> current</span>
+        )}
       </div>
       <div className="mt-3">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
         <div className="mt-0.5 flex items-baseline gap-1">
           <span className="tabular-nums text-2xl font-bold text-slate-800">{value}</span>
-          <span className="text-xs font-medium text-slate-400">{unit}</span>
+          <span className="text-xs font-medium text-slate-400">&nbsp;{unit}</span>
         </div>
         {sub && <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div>}
       </div>

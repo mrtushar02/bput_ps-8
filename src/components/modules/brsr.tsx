@@ -463,12 +463,12 @@ function ReadinessHero({ readiness }: { readiness: ReadinessResponse }) {
   const offset = circ - (overall / 100) * circ
 
   const dimensions = [
-    { label: 'Source completeness', value: readiness.totals.answers > 0 ? Math.round((readiness.totals.answers / readiness.totals.questions) * 1000) / 10 : 0, icon: Database, tone: 'blue' },
+    { label: 'Source completeness', value: readiness.totals.totalWeight > 0 ? Math.round((readiness.totals.readyWeight / readiness.totals.totalWeight) * 1000) / 10 : 0, icon: Database, tone: 'blue' },
+    { label: 'Answer coverage', value: readiness.totals.questions > 0 ? Math.round((readiness.totals.answers / readiness.totals.questions) * 1000) / 10 : 0, icon: ListChecks, tone: 'cyan' },
+    { label: 'Missing items', value: readiness.missingItems.length, icon: AlertTriangle, tone: 'rose' },
     { label: 'Pending evidence', value: readiness.pendingEvidence, icon: Link2, tone: 'amber' },
     { label: 'Pending approvals', value: readiness.pendingApprovals, icon: Clock, tone: 'violet' },
-    { label: 'Missing items', value: readiness.missingItems.length, icon: AlertTriangle, tone: 'rose' },
-    { label: 'Total questions', value: readiness.totals.questions, icon: ListChecks, tone: 'slate' },
-    { label: 'Ready weight', value: readiness.totals.readyWeight, icon: CheckCircle2, tone: 'emerald' },
+    { label: 'Ready / Total', value: `${readiness.totals.readyWeight} / ${readiness.totals.totalWeight}`, icon: CheckCircle2, tone: 'emerald' },
   ]
 
   return (
@@ -577,7 +577,7 @@ function ReadinessHero({ readiness }: { readiness: ReadinessResponse }) {
   )
 }
 
-function DimensionTile({ label, value, icon: Icon, tone }: { label: string; value: number; icon: any; tone: string }) {
+function DimensionTile({ label, value, icon: Icon, tone }: { label: string; value: number | string; icon: any; tone: string }) {
   const toneMap: Record<string, string> = {
     blue: 'bg-blue-50 text-blue-600',
     amber: 'bg-amber-50 text-amber-600',

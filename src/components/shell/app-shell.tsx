@@ -9,6 +9,7 @@ import {
   LayoutDashboard, Building2, FileText, Link2, Send, FileBarChart, TrendingUp, History, FileCheck2, Bell, Search, HelpCircle, ChevronDown, LogOut, Settings, ShieldCheck, Flame, Zap, Droplet, Recycle, Users, HardHat, Plane, Calendar, Database, GitBranch, Activity, X, Check
 } from 'lucide-react'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
+import { CommandPalette } from '@/components/shell/command-palette'
 
 const NAV: { key: ModuleKey; label: string; icon: any; badge?: { count: number; tone: string } }[] = [
   { key: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -207,6 +208,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+
+      {/* Global Cmd+K command palette — always available while logged in */}
+      <CommandPalette />
     </div>
   )
 }

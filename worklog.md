@@ -401,3 +401,95 @@ Stage Summary:
 - Premium light liquid-glass design language preserved throughout (NO neon/dark/cyberpunk).
 - Demo login: any seeded user email + password `esg12345` (e.g. rohit@meil-esg.in, admin@meil-esg.in).
 - Cron job scheduled to run every 15 minutes for autonomous QA + feature advancement.
+
+---
+Task ID: 5
+Agent: Command Palette Builder
+Task: Build a premium Cmd+K / Ctrl+K Command Palette for global search + module navigation + quick actions.
+
+Work Log:
+- Read worklog.md (Tasks 1, 6, 7, 7-UI, 8, 8-UI, 9) to absorb the glassmorphism design system (premium light white-blue glass, primary oklch(0.55 0.18 245), status pills, glass-shimmer, KPI tiles, framer-motion staggered entrance), the auth context shape (`useApp()` → `{ user, activeModule, setActiveModule, dataEntrySubModule, setDataEntrySubModule }` with `ModuleKey` union of 10 modules), the single-route SPA navigation contract (no URL changes — everything funnels through `setActiveModule()`), and the established ESLint pattern (the `react-hooks/set-state-in-effect` rule observed in earlier Task 5 work requires that no `setState` calls happen synchronously inside effect bodies).
+- Inspected `src/components/shell/app-shell.tsx` (placement target — AppShell is rendered only when `user` is non-null per `src/app/page.tsx`), `src/lib/auth-context.tsx` (useApp shape + `ModuleKey` union), `src/app/globals.css` (`.glass-strong`, `.glass-subtle`, `.glass-shimmer`, `.status-pill` + variants, `.btn-glass-primary`, `.kpi-tile`, `.scroll-elegant`, `.tabular-nums`, `.animate-scale-in`, `.animate-fade-up`, `.stagger-*`), and `src/app/api/organization/tree/route.ts` (response shape: `{ groups: [{ subsidiaries: [{ businessUnits: [{ projects: [{ id, projectCode, projectName, location, status }] }] }] }] }`).
+
+Built `src/components/shell/command-palette.tsx` (~380 lines, exports `CommandPalette`):
+- `'use client'`, strict TypeScript, framer-motion + lucide-react only.
+- Trigger: global `window.addEventListener('keydown', onKey)` that handles `(e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')` → `preventDefault()` + toggle `open`. Inside the open state it also handles `Escape` (close + clear query + reset selection), `ArrowDown`/`ArrowUp` (move selection with wrap-around modulo `items.length`, `preventDefault` so the cursor doesn't move inside the search input), and `Enter` (activate `items[safeIndex]` + close).
+- Overlay: full-screen `position: fixed; inset: 0; z-index: 80; background: rgba(15,23,42,0.3); backdrop-filter: blur(6px)`. Clicking the backdrop (mousedown where `e.target === e.currentTarget`) closes the palette. Centered panel: `glass-strong glass-shimmer w-full max-w-2xl rounded-3xl overflow-hidden` positioned `pt-[12vh]`. framer-motion: backdrop fades; panel `initial={opacity:0, scale:0.96, y:-8}` → `animate={opacity:1, scale:1, y:0}` with `ease=[0.22,1,0.36,1]` and `duration:0.22`; exit reverses.
+- Body scroll lock + input focus effect: when `open` becomes true, `document.body.style.overflow = 'hidden'` is set and a `setTimeout(() => inputRef.current?.focus(), 30)` schedules focus; cleanup restores the previous `overflow`. Effect deps are `[open]` only — no `setState` calls in the effect body (focus + DOM mutation only), so the lint rule stays satisfied.
+- Search input row: `border-b border-slate-200/60 p-4`. Left = 9×9 rounded-xl gradient tile (`from-blue-500 to-cyan-500` + `Search` icon — the gradient accent called out in the spec). Input = `flex-1 bg-transparent text-base text-slate-800 outline-none`, `placeholder="Search modules, projects, actions, or jump to…"`, `aria-label="Command palette search"`, `autoComplete="off"`, `spellCheck={false}`. Clear button (X) only renders when `query` is non-empty; clicking resets `query` + `selectedIndex` and refocuses. Right-side `kbd` "esc" badge is always present as a hint.
+- Results list: `max-h-96 overflow-y-auto scroll-elegant p-2`. Three groups in fixed order: Navigation, Quick Actions, Recent Projects. Group headers are sticky `top-0` `bg-white/75 backdrop-blur-sm` uppercase `text-[10px] font-bold tracking-wider text-slate-400`.
+- Navigation group: 10 modules (Overview / My Project / Data Entry / Evidence / Submissions / Reports / Analytics / Audit & Trace / BRSR / Admin) — each row has a `LucideIcon` (LayoutDashboard, Building2, FileText, Link2, Send, FileBarChart, TrendingUp, History, FileCheck2, Settings), a label, a description, and a `G <letter>` keyboard shortcut hint badge (G O / G P / G D / G E / G S / G R / G A / G T / G B / G M). Clicking → `go(m.key)` = `setActiveModule(m.key)` + close.
+- Quick Actions group: 5 actions ("Enter new Energy data", "Enter new Water data", "Generate BRSR Report", "View Audit Trail", "Check Data Quality") — each with an icon (Zap, Droplet, FileCheck, History, FileBarChart). Energy/Water actions also call `setDataEntrySubModule('energy'|'water')` so the Data Entry screen opens on the right sub-form. The other three actions just `setActiveModule` to `brsr` / `audit` / `overview` respectively.
+- Recent Projects group: fetched live from `GET /api/organization/tree` on mount (cancellation-safe). Flattens the group→subsidiary→BU→project tree and slices to the first 5 projects. Each row shows `projectName` + `projectCode · location`. Clicking → `go('my-project')` + close.
+- Filtering: `useMemo` rebuilds the flat item list whenever `query`, `projects`, or `go` changes. Case-insensitive substring match on label + description (+ `location` for projects). Empty state: centered card with a `Search` icon tile + "No results found" + "Try a different keyword or module name."
+- Keyboard navigation correctness: `safeIndex = items.length === 0 ? 0 : ((selectedIndex % items.length) + items.length) % items.length` ensures the active index never goes out-of-bounds when the result set shrinks (e.g., after typing a filter). This avoids needing a `setState`-in-effect clamp (which would trip the `react-hooks/set-state-in-effect` rule). The selected row also auto-scrolls into view via `el.scrollIntoView({ block: 'nearest' })` whenever `safeIndex` changes.
+- Selected row styling: `bg-blue-50 ring-2 ring-blue-200 shadow-[0_0_0_4px_rgba(59,130,246,0.08)]` — the subtle blue glow called out in the spec. The row's icon tile flips to `bg-gradient-to-br from-blue-500 to-cyan-500 text-white` when selected. An `ArrowRight` lucide icon shows on the trailing edge of the selected row. `onMouseMove` on each row sets `selectedIndex` so hover + keyboard stay in sync.
+- Staggered entrance: the results container is a `motion.div` with `variants={{ hidden:{}, show:{ transition:{ staggerChildren: 0.025 }}}}` and `initial="hidden" animate="show"`. Each item is a `motion.button` with `variants={{ hidden:{opacity:0, y:6}, show:{opacity:1, y:0} }}` — they fade-up in sequence when the palette opens. Filtering does NOT re-trigger the entrance for items that stayed mounted (their React `key` is stable).
+- Footer hint bar: `border-t border-slate-200/60 bg-white/60 px-4 py-2.5 text-[11px] text-slate-500`. Three kbd groups: `↓ ↑ navigate`, `↵ select` (CornerDownLeft icon), `esc close` — each kbd is a small bordered pill. Right side (hidden on mobile): `Recycle` icon + `MEIL · Command Palette` mono caption.
+
+Wiring:
+- Imported `CommandPalette` at the top of `src/components/shell/app-shell.tsx`.
+- Rendered `<CommandPalette />` as the last child inside the shell's root `<div className="relative flex min-h-screen flex-col">`, immediately before its closing `</div>`. Because `AppShell` is only mounted when `user` is non-null (per `src/app/page.tsx`), the palette is automatically only available when authenticated — no extra guard needed.
+
+Lint + TypeScript:
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -10` → clean (`$ eslint .` exits 0 with zero output).
+- `cd /home/z/my-project && bunx tsc --noEmit 2>&1 | grep -E "command-palette|app-shell" | head -10` → empty (zero TS errors in my two files). The only remaining TS errors in the project are pre-existing in other agents' files (`examples/`, `skills/`, `src/components/modules/brsr.tsx` from Task 8-UI).
+
+agent-browser verification:
+- `agent-browser open http://localhost:3000` — already authenticated as Arjun Mehta (Super Admin).
+- `agent-browser press "Control+k"` → palette opens; `agent-browser snapshot -i` confirms the `textbox "Command palette search"` plus all 10 Navigation items (each with its `G <letter>` shortcut), all 5 Quick Actions, and 4 Recent Projects fetched live from `/api/organization/tree` (Gayatri Solar Plant · MEIL-SOL-GJT · Gayatri, Telangana; Nizamabad Solar Farm · MEIL-SOL-NZR · Nizamabad, Telangana; Hyderabad 33kV Substation · MEIL-TD-HYD · Hyderabad, Telangana; Kaleshwaram Lift Irrigation · MEIL-WTR-KPR · Jayashankar, Telangana).
+- Filter test: typed `water` → list collapses to just "Enter new Water data"; the "Clear search" (X) button appears.
+- Empty-state test: filled `zzznomatch` → `agent-browser read` returned "No results found" (correct empty-state rendering).
+- Esc test: pressed `Escape` → palette closed; subsequent snapshot no longer contains the `Command palette search` textbox.
+- Keyboard-nav test: reopened with `Control+k`, pressed `ArrowDown` 6 times (Overview → … → Analytics), then `Enter`. Page heading switched from "ESG Command Center" to "ESG Analytics" — selection + activation working end-to-end.
+- Quick Action test: reopened, filled `water`, pressed `Enter`. Page heading switched to "Data Entry" + sub-heading "Water Entry Form" — `setActiveModule('data-entry')` + `setDataEntrySubModule('water')` both fired.
+- Click test: reopened, clicked the `Nizamabad Solar Farm` row via `@e1157`. Page heading switched to "My Project" — palette closed + navigation fired.
+- Visual verification: screenshot saved to `/tmp/cmdk-palette.png`, sent to z-ai vision. VLM confirmed: "centered command palette overlay with a glassmorphism effect (white background, subtle shadow, rounded corners) floating over a blurred dashboard background", "search input with a blue search icon", "grouped results under a NAVIGATION header with items including icon, title, description, and keyboard shortcut hints (G O, G P, G D)", "selected row highlighted with a light blue background and a blue left-border accent", "footer hint bar with kbd-style badges for arrow keys, enter, esc, and the label 'Command Palette'", "clean, modern, and functional, utilizing a blue accent color".
+- Dev server log: zero new errors/warnings/exceptions introduced. Only new log line is the expected `GET /api/organization/tree 200` (palette pre-fetch on first open).
+
+Stage Summary:
+- 1 new client component delivered (`src/components/shell/command-palette.tsx`, ~380 lines) + a 2-line edit to `src/components/shell/app-shell.tsx` (import + render before closing root `</div>`).
+- Premium glass-strong + glass-shimmer palette with a gradient search-icon tile, sticky group headers, blue glow on the selected row, staggered framer-motion entrance, and a kbd-style footer hint bar — fully consistent with the established MEIL ESG design system.
+- Three groups, fully data-driven: 10 navigation modules (static catalog) + 5 quick actions (static catalog) + up to 5 recent projects (live from `/api/organization/tree`).
+- Full keyboard support: Cmd/Ctrl+K toggle, ↑↓ wrap-around navigation, Enter to activate, Esc to close, hover syncs to keyboard selection, selected row auto-scrolls into view.
+- Filtering: case-insensitive substring match on label/description/location with a clean empty state.
+- Single-route SPA navigation preserved: every action funnels through `setActiveModule()` (+ `setDataEntrySubModule()` for the energy/water quick actions); no URL changes.
+- Zero lint errors in my files. Zero TS errors in my files. Verified end-to-end in browser via agent-browser (open / filter / empty / Esc / arrow-nav / quick-action / click) plus VLM visual confirmation of the glassmorphism aesthetic.
+- Work record written to `/agent-ctx/5-command-palette-builder.md`.
+
+---
+Task ID: 10 (QA + Features)
+Agent: Lead Architect (main) — autonomous webDevReview round 1
+Task: QA testing via agent-browser, fix bugs, add new features + styling improvements
+
+Work Log:
+- Reviewed worklog to understand prior work (full ESG/BRSR platform built + verified)
+- Performed comprehensive QA testing via agent-browser: logged in as Super Admin, tested all 9 modules, used VLM to visually inspect screenshots
+- Identified and fixed 4 bugs:
+  1. **Submissions "Approved" chip count = 0** (should be 1): the seeded submission has status='APPROVED' but the chip counting logic only checked BU_APPROVED/SUBSIDIARY_APPROVED/HQ_REVIEW. Fixed by adding 'APPROVED' to the count + filter logic.
+  2. **Submissions Reviewer column empty for approved submission**: currentReviewerId was null. Fixed by deriving the last reviewer from history[0] (history is newest-first) when currentReviewer is null. Now shows "Nisha Pillai (Subsidiary ESG Reviewer)".
+  3. **BRSR "Source completeness" showed 100%** contradicting overall 71.4% readiness: the formula was answers/questions (21/21=100%) which counts all answer rows including MISSING ones. Fixed to use readyWeight/totalWeight (15/21=71.4%) which matches overall. Added "Answer coverage" as a separate dimension (100%) + "Ready / Total" (15/21).
+  4. **Trend badges showed hardcoded values + wrong ESG semantics**: emissions increase was shown as green (should be amber — increasing emissions is bad). Replaced all hardcoded trends (-4.2, +1.2, etc.) with REAL month-over-month deltas computed from the trends data (April→May→June). Added `goodDirection` prop ('down' for emissions/energy/water/LTIFR, 'up' for readiness/completion/workforce). Now: emissions -5.8% → green+down (decrease is good); energy -24.7% → green+down; water -100% → green+down. Non-timeseries metrics show "current" badge.
+
+- Added 3 NEW FEATURES:
+  5. **Command Palette (Cmd+K)** — premium enterprise feature. Global overlay triggered by Cmd+K/Ctrl+K. Search input + 3 result groups (Navigation with all 10 modules + shortcut hints G O/G P/etc, Quick Actions for common tasks, Recent Projects from /api/organization/tree). Full keyboard navigation (↑↓ to move, Enter to select, Esc to close). Glass-strong panel with shimmer, gradient search icon, staggered entrance, blue glow on selected row. Verified: opens with Cmd+K, typing filters, keyboard nav works, navigates to correct modules.
+  6. **ESG Data Control Chain (Pipeline Tracker)** — visual horizontal pipeline showing the 8-stage chain (Collect→Validate→Calculate→Approve→Consolidate→BRSR Map→Report→Audit) with LIVE counts at each stage from real DB data. Each stage has a gradient icon tile, label, count, and description. Connected by arrows. Status summary bar at bottom showing records collected, calculations, approved, exceptions, BRSR readiness. This directly visualizes the master spec's core product principle: "The ESG DATA CONTROL CHAIN is the product."
+  7. **Sustainability Targets Widget** — new /api/targets endpoint computes real targets as X% reduction/improvement from the previous reporting period's baseline (5% emissions reduction, 3% energy, 4% water, 20% LTIFR reduction, 15% BRSR improvement, etc.). The widget shows 8 target cards with: actual vs target values, progress bars (green if on track, amber if close, rose if off), on-track checkmarks, gap indicators. Verified: 4/8 targets on track, emissions 320.77 vs target 323.33 = on track.
+
+- Fixed a TypeScript error in brsr.tsx: DimensionTile value prop widened to `number | string` to accept the "Ready / Total" dimension (value = "15 / 21").
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- VLM-verified all 4 bug fixes: Submissions Approved=1, Reviewer="Nisha Pillai", BRSR Source completeness=71.4%, trend badges show real deltas with ESG-aware colors
+- VLM-verified all 3 new features: Pipeline tracker renders with 8 stages + live counts, Sustainability Targets shows 8 cards with progress bars, Command Palette opens with Cmd+K + keyboard nav works
+
+Stage Summary:
+- 4 bugs fixed (Submissions count, reviewer display, BRSR readiness dimensions, trend badge semantics)
+- 3 new features added (Command Palette, ESG Pipeline Tracker, Sustainability Targets widget)
+- 1 new API endpoint (/api/targets)
+- 3 new component files (command-palette.tsx, pipeline-tracker.tsx, targets-widget.tsx)
+- All values computed from real DB data — no hardcoded KPIs
+- Premium glassmorphism design language preserved throughout
+- Ready for next round: could add role-specific dashboard variants, data export to CSV/Excel, real-time notifications via WebSocket, mobile-responsive refinements, or BRSR framework comparison views
