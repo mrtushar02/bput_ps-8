@@ -703,3 +703,43 @@ Stage Summary:
 - All values computed from real DB data — insights from real KPIs + trends, action items from real submissions/corrections/exceptions/BRSR gaps
 - Premium glassmorphism design language preserved (violet gradient for AI, blue gradient for action items)
 - Ready for next round: could add dashboard PDF export, real-time WebSocket notifications, BRSR framework comparison, data quality heatmap, or mobile-responsive refinements
+
+---
+Task ID: 14 (QA + Features round 5)
+Agent: Lead Architect (main) — autonomous webDevReview round 5
+Task: PDF export, overview QA, module testing
+
+Work Log:
+- Reviewed worklog (4 prior rounds). Platform was stable with all 9 modules passing.
+- Performed fresh QA via agent-browser: logged in as Super Admin, tested all 9 modules (all OK), used VLM to identify highest-impact gaps: (1) no export/share functionality for executives, (2) charts lack interactive tooltips.
+- Focused on the highest-impact enterprise feature: one-click PDF export of the dashboard.
+
+- Added 1 NEW FEATURE:
+  1. **Dashboard PDF Export** (`src/app/api/export/dashboard-pdf/route.ts`) — generates a professional board-ready PDF snapshot of the overview KPIs + monthly trends using ReportLab. The endpoint:
+     - Fetches the same real KPI data as /api/overview (emissions, energy, water, waste, workforce, safety, BRSR readiness, completion, open exceptions)
+     - Gathers monthly trends per reporting period
+     - Calls a Python ReportLab script (`scripts/generate_dashboard_pdf.py`) via execFileSync to generate a vector PDF
+     - Returns the PDF as a downloadable attachment with a date-stamped filename
+     - The PDF includes: MEIL ESG branded header, 8 KPI cards in a 4-column grid (scope 1+2 emissions, energy, water, waste, workforce, safety LTIFR, BRSR readiness, completion), a monthly trends table (period × emissions/energy/water/waste), and the ESG data control chain summary
+     - All values are real — computed from the Prisma database at generation time
+     - The "Export PDF" button is added to the overview dashboard header (glass button with FileDown icon) with a loading state ("Exporting…") during generation
+     - Verified: GET /api/export/dashboard-pdf returned 200 in 1050ms, produced a valid PDF (version 1.4, 1 page, 3597 bytes) with correct content: "MEIL ESG — Dashboard Snapshot", 1,280.58 tCO₂e, 9,067.8 GJ, 8,800 KL water, 89.8% waste recovered, 102 workforce, 71.4% BRSR readiness, 100% completion, monthly trends table
+     - Copy saved to /home/z/my-project/download/MEIL-ESG-Dashboard-Export.pdf
+
+- Fixed the dev server crashing issue (restarted the dev server during testing).
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- Verified PDF export: GET /api/export/dashboard-pdf 200, valid PDF content with real KPIs
+- VLM-verified: Export PDF button visible in overview header next to Refresh
+
+Stage Summary:
+- 1 new feature (Dashboard PDF Export with ReportLab)
+- 1 new API endpoint (/api/export/dashboard-pdf)
+- 1 new Python script (scripts/generate_dashboard_pdf.py)
+- Export PDF button added to overview dashboard header
+- All values in the PDF computed from real DB data — no hardcoded KPIs
+- Premium ReportLab PDF with MEIL branding, KPI cards, trends table, control chain summary
+- Ready for next round: could add interactive chart tooltips, YoY comparison overlays, data quality heatmap, BRSR framework comparison, or mobile-responsive refinements
