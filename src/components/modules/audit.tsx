@@ -3,21 +3,26 @@
  * Audit & Traceability Module — every number traceable to source.
  *
  * Endpoints used:
- *   GET /api/audit?action=&entityType=&entityId=   — audit log (100 most recent)
+ *   GET /api/audit?action=&entityType=&entityId=   — audit log (up to 100 most recent)
  *   GET /api/audit/trace/[id]?type=                — vertical traceability tree:
  *        SOURCE → EVIDENCE → VALIDATION → CALCULATION → SUBMISSION
  *        → APPROVAL_HISTORY → CORRECTIONS → BRSR_MAPPING
  *
  * Click any audit log row to trace its entity; or enter an entity id + type
  * manually in the search bar above the tree panel.
+ *
+ * Client-side pagination + filtering is layered on top of the API response
+ * (page size 10/20/50, case-insensitive substring match on action/entityType/
+ * entityId, optional date-range filter on createdAt).
  */
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import {
   History, Search, AlertOctagon, RefreshCw, Loader2, GitBranch, ShieldCheck,
   Database, Link2, Calculator, Send, FileCheck2, AlertTriangle, ArrowDown,
-  ChevronRight, Building2, User, Clock, Filter, FileText, ArrowRight, Leaf
+  ChevronRight, ChevronLeft, Building2, User, Clock, Filter, FileText,
+  ArrowRight, Leaf, X, Calendar
 } from 'lucide-react'
 import { useApp } from '@/lib/auth-context'
 
@@ -65,6 +70,25 @@ interface TraceResponse {
   summary: Record<string, number>
 }
 
+/** Live input values for the filter form (typed but not yet committed). */
+interface FilterInput {
+  action: string
+  entityType: string
+  entityId: string
+  dateFrom: string
+  dateTo: string
+}
+
+const EMPTY_FILTERS: FilterInput = {
+  action: '',
+  entityType: '',
+  entityId: '',
+  dateFrom: '',
+  dateTo: '',
+}
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const
+
 // ============================================================
 // Module
 // ============================================================
@@ -73,7 +97,16 @@ export function AuditModule() {
   const [logs, setLogs] = useState<AuditLogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filters, setFilters] = useState({ action: '', entityType: '', entityId: '' })
+  const [totalFromApi, setTotalFromApi] = useState(0)
+
+  // Filter input (live form state) vs. appliedFilters (actually used for filtering)
+  const [filterInput, setFilterInput] = useState<FilterInput>(EMPTY_FILTERS)
+  const [appliedFilters, setAppliedFilters] = useState<FilterInput>(EMPTY_FILTERS)
+
+  // Pagination
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<number>(10)
+
   const [trace, setTrace] = useState<TraceResponse | null>(null)
   const [traceLoading, setTraceLoading] = useState(false)
   const [traceError, setTraceError] = useState('')
@@ -84,21 +117,112 @@ export function AuditModule() {
     setLoading(true)
     setError('')
     try {
+      // Fetch all 100 most recent entries; filtering happens client-side.
       const params = new URLSearchParams()
-      if (filters.action) params.set('action', filters.action)
-      if (filters.entityType) params.set('entityType', filters.entityType)
-      if (filters.entityId) params.set('entityId', filters.entityId)
       params.set('take', '100')
       const data = await fetch(`/api/audit?${params.toString()}`).then(r => r.json())
-      setLogs((data as AuditResponse).items ?? [])
+      const resp = data as AuditResponse
+      setLogs(resp.items ?? [])
+      setTotalFromApi(resp.total ?? resp.items?.length ?? 0)
     } catch (e: any) {
       setError(e?.message ?? 'Failed to load audit log')
     } finally {
       setLoading(false)
     }
-  }, [filters])
+  }, [])
 
   useEffect(() => { load() }, [load])
+
+  // ----------------------------------------------------------------
+  // Client-side filtering — case-insensitive substring + date range.
+  // ----------------------------------------------------------------
+  const filteredItems = useMemo(() => {
+    const f = appliedFilters
+    if (!f.action && !f.entityType && !f.entityId && !f.dateFrom && !f.dateTo) {
+      return logs
+    }
+    const actionL = f.action.trim().toLowerCase()
+    const etL = f.entityType.trim().toLowerCase()
+    const idL = f.entityId.trim().toLowerCase()
+    const fromTs = f.dateFrom ? new Date(`${f.dateFrom}T00:00:00`).getTime() : null
+    const toTs = f.dateTo ? new Date(`${f.dateTo}T23:59:59.999`).getTime() : null
+    return logs.filter(l => {
+      if (actionL && !l.action.toLowerCase().includes(actionL)) return false
+      if (etL && !l.entityType.toLowerCase().includes(etL)) return false
+      if (idL && !l.entityId.toLowerCase().includes(idL)) return false
+      if (fromTs !== null || toTs !== null) {
+        const ts = new Date(l.createdAt).getTime()
+        if (fromTs !== null && ts < fromTs) return false
+        if (toTs !== null && ts > toTs) return false
+      }
+      return true
+    })
+  }, [logs, appliedFilters])
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0
+    if (appliedFilters.action.trim()) n++
+    if (appliedFilters.entityType.trim()) n++
+    if (appliedFilters.entityId.trim()) n++
+    if (appliedFilters.dateFrom) n++
+    if (appliedFilters.dateTo) n++
+    return n
+  }, [appliedFilters])
+
+  // ----------------------------------------------------------------
+  // Pagination maths — clamp page, compute window, slice items.
+  // ----------------------------------------------------------------
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const startIdx = (safePage - 1) * pageSize
+  const endIdx = Math.min(startIdx + pageSize, filteredItems.length)
+  const pagedItems = useMemo(
+    () => filteredItems.slice(startIdx, endIdx),
+    [filteredItems, startIdx, endIdx]
+  )
+
+  // Clamp page if filtered list shrinks below current page.
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  const pageWindow = useMemo<(number | 'ellipsis')[]>(() => {
+    const tp = totalPages
+    if (tp <= 7) return Array.from({ length: tp }, (_, i) => i + 1)
+    const out: (number | 'ellipsis')[] = [1]
+    const left = Math.max(2, safePage - 1)
+    const right = Math.min(tp - 1, safePage + 1)
+    if (left > 2) out.push('ellipsis')
+    for (let i = left; i <= right; i++) out.push(i)
+    if (right < tp - 1) out.push('ellipsis')
+    out.push(tp)
+    return out
+  }, [safePage, totalPages])
+
+  const applyFilters = useCallback(() => {
+    setAppliedFilters(filterInput)
+    setPage(1)
+    if (
+      filterInput.action || filterInput.entityType ||
+      filterInput.entityId || filterInput.dateFrom || filterInput.dateTo
+    ) {
+      toast.success('Filters applied')
+    }
+  }, [filterInput])
+
+  const clearFilters = useCallback(() => {
+    setFilterInput(EMPTY_FILTERS)
+    setAppliedFilters(EMPTY_FILTERS)
+    setPage(1)
+    toast.info('Filters cleared')
+  }, [])
+
+  const onPageSizeChange = (val: number) => {
+    setPageSize(val)
+    // Try to keep the same first item visible.
+    const firstIdx = (safePage - 1) * pageSize
+    setPage(Math.floor(firstIdx / val) + 1)
+  }
 
   const loadTrace = useCallback(async (entityId: string, type?: string) => {
     if (!entityId) return
@@ -164,31 +288,87 @@ export function AuditModule() {
             <div className="flex items-center gap-2">
               <History className="h-4 w-4 text-blue-600" />
               <h3 className="text-sm font-bold text-slate-800">Audit Log</h3>
-              <span className="status-pill status-submitted">{logs.length} of 100</span>
+              <span className="status-pill status-submitted">{logs.length} of {Math.max(totalFromApi, logs.length, 100)}</span>
+              {activeFilterCount > 0 && (
+                <span className="status-pill status-review">
+                  <Filter className="h-3 w-3" /> {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+                </span>
+              )}
             </div>
             <span className="text-[10px] text-slate-400">Sorted by timestamp desc</span>
           </div>
 
-          {/* Filters */}
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            <input
-              value={filters.action}
-              onChange={(e) => setFilters({ ...filters, action: e.target.value })}
-              placeholder="Action (e.g. SUBMIT)"
-              className="rounded-lg border border-white/60 bg-white/70 px-2 py-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-300"
-            />
-            <input
-              value={filters.entityType}
-              onChange={(e) => setFilters({ ...filters, entityType: e.target.value })}
-              placeholder="Entity Type"
-              className="rounded-lg border border-white/60 bg-white/70 px-2 py-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-300"
-            />
-            <input
-              value={filters.entityId}
-              onChange={(e) => setFilters({ ...filters, entityId: e.target.value })}
-              placeholder="Entity ID"
-              className="rounded-lg border border-white/60 bg-white/70 px-2 py-1.5 text-[11px] text-slate-700 outline-none focus:border-blue-300"
-            />
+          {/* FILTERS BAR — glass-subtle panel with Apply / Clear + date range */}
+          <div className="glass-subtle mb-3 rounded-xl p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                <Filter className="h-3 w-3 text-blue-600" />
+                <span>Filters</span>
+                {activeFilterCount > 0 && (
+                  <span className="status-pill status-submitted py-0 text-[10px]">{activeFilterCount} active</span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={applyFilters}
+                  className="btn-glass-primary rounded-full px-3 py-1 text-[11px] font-semibold transition"
+                >
+                  Apply
+                </button>
+                <button
+                  onClick={clearFilters}
+                  disabled={activeFilterCount === 0 && !filterInput.action && !filterInput.entityType && !filterInput.entityId && !filterInput.dateFrom && !filterInput.dateTo}
+                  className="glass-subtle flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <X className="h-3 w-3" /> Clear
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+              <input
+                value={filterInput.action}
+                onChange={(e) => setFilterInput({ ...filterInput, action: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyFilters() }}
+                placeholder="Action (e.g. SUBMIT)"
+                className="rounded-lg border border-white/60 bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white"
+              />
+              <input
+                value={filterInput.entityType}
+                onChange={(e) => setFilterInput({ ...filterInput, entityType: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyFilters() }}
+                placeholder="Entity Type (e.g. EnergyRecord)"
+                className="rounded-lg border border-white/60 bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white"
+              />
+              <input
+                value={filterInput.entityId}
+                onChange={(e) => setFilterInput({ ...filterInput, entityId: e.target.value })}
+                onKeyDown={(e) => { if (e.key === 'Enter') applyFilters() }}
+                placeholder="Entity ID (or fragment)"
+                className="rounded-lg border border-white/60 bg-white/70 px-2.5 py-1.5 text-[11px] text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white"
+              />
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <label className="flex items-center gap-2 rounded-lg border border-white/60 bg-white/70 px-2.5 py-1.5">
+                <Calendar className="h-3 w-3 flex-shrink-0 text-slate-400" />
+                <span className="text-[10px] font-semibold uppercase text-slate-500">From</span>
+                <input
+                  type="date"
+                  value={filterInput.dateFrom}
+                  onChange={(e) => setFilterInput({ ...filterInput, dateFrom: e.target.value })}
+                  className="ml-auto bg-transparent text-[11px] text-slate-700 outline-none"
+                />
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-white/60 bg-white/70 px-2.5 py-1.5">
+                <Calendar className="h-3 w-3 flex-shrink-0 text-slate-400" />
+                <span className="text-[10px] font-semibold uppercase text-slate-500">To</span>
+                <input
+                  type="date"
+                  value={filterInput.dateTo}
+                  onChange={(e) => setFilterInput({ ...filterInput, dateTo: e.target.value })}
+                  className="ml-auto bg-transparent text-[11px] text-slate-700 outline-none"
+                />
+              </label>
+            </div>
           </div>
 
           {loading ? (
@@ -200,17 +380,90 @@ export function AuditModule() {
               <div className="text-[11px] text-slate-500">{error}</div>
               <button onClick={load} className="btn-glass-primary rounded-full px-3 py-1.5 text-[11px] font-semibold">Retry</button>
             </div>
-          ) : logs.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
               <History className="h-8 w-8 text-slate-300" />
-              <div className="text-xs font-semibold text-slate-500">No audit log entries match these filters</div>
+              <div className="text-xs font-semibold text-slate-500">
+                {activeFilterCount > 0 ? 'No entries match the active filters' : 'No audit log entries'}
+              </div>
+              {activeFilterCount > 0 && (
+                <button onClick={clearFilters} className="btn-glass-primary rounded-full px-3 py-1.5 text-[11px] font-semibold">Clear filters</button>
+              )}
             </div>
           ) : (
-            <div className="max-h-[640px] space-y-1 overflow-y-auto scroll-elegant pr-1">
-              {logs.map((l, i) => (
-                <LogRow key={l.id} log={l} delay={Math.min(i * 0.015, 0.6)} onClick={() => loadTrace(l.entityId, mapEntityType(l.entityType))} />
-              ))}
-            </div>
+            <>
+              <div className="max-h-[560px] space-y-1 overflow-y-auto scroll-elegant pr-1">
+                {pagedItems.map((l, i) => (
+                  <LogRow key={l.id} log={l} delay={Math.min(i * 0.02, 0.4)} onClick={() => loadTrace(l.entityId, mapEntityType(l.entityType))} />
+                ))}
+              </div>
+
+              {/* PAGINATION BAR */}
+              <div className="glass-subtle mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                  <span>
+                    Showing <span className="font-semibold tabular-nums text-slate-800">{startIdx + 1}–{endIdx}</span>
+                    {' '}of{' '}
+                    <span className="font-semibold tabular-nums text-slate-800">{filteredItems.length}</span>
+                    {filteredItems.length !== logs.length && (
+                      <span className="text-slate-400"> (filtered from {logs.length})</span>
+                    )}
+                  </span>
+                  <span className="hidden text-slate-300 sm:inline">·</span>
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-slate-500">Items per page</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => onPageSizeChange(Number(e.target.value))}
+                      className="rounded-md border border-white/60 bg-white/80 px-1.5 py-0.5 text-[11px] font-semibold text-slate-700 outline-none focus:border-blue-300"
+                    >
+                      {PAGE_SIZE_OPTIONS.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                    className="glass-subtle flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="h-3 w-3" /> Prev
+                  </button>
+                  <div className="flex items-center gap-0.5">
+                    {pageWindow.map((p, idx) =>
+                      p === 'ellipsis' ? (
+                        <span key={`e-${idx}`} className="px-1 text-[11px] text-slate-400">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setPage(p)}
+                          className={
+                            p === safePage
+                              ? 'btn-glass-primary min-w-[24px] rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums'
+                              : 'glass-subtle min-w-[24px] rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 tabular-nums transition hover:bg-white'
+                          }
+                          aria-current={p === safePage ? 'page' : undefined}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                    className="glass-subtle flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                    aria-label="Next page"
+                  >
+                    Next <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 

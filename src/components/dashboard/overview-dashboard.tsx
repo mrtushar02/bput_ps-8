@@ -3,17 +3,18 @@
  * Overview Dashboard — real KPIs computed server-side from the ESG data control chain.
  * No hardcoded values; reads from /api/overview.
  */
-import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { useEffect, useState, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Flame, Zap, Droplet, Recycle, Users, HardHat, ShieldCheck, FileCheck2, TrendingUp, TrendingDown,
-  Building2, Activity, ArrowUpRight, ArrowRight, CheckCircle2, AlertTriangle, AlertOctagon, Clock, Gauge, Leaf, Battery, Send, Link2
+  Building2, Activity, ArrowUpRight, ArrowRight, CheckCircle2, AlertTriangle, AlertOctagon, Clock, Gauge, Leaf, Battery, Send, Link2, X, Sparkles, AlertCircle, ChevronRight, Award
 } from 'lucide-react'
 import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadialBarChart, RadialBar
 } from 'recharts'
 import { PipelineTracker } from '@/components/dashboard/pipeline-tracker'
 import { TargetsWidget } from '@/components/dashboard/targets-widget'
+import { useApp, type ModuleKey } from '@/lib/auth-context'
 
 interface OverviewData {
   kpis: any
@@ -37,6 +38,25 @@ export function OverviewDashboard() {
       .then(d => { setData(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
+
+  const { setActiveModule } = useApp()
+  const [drillDown, setDrillDown] = useState<null | 'emissions' | 'energy' | 'water' | 'waste'>(null)
+  // Compute ESG composite score (0-100) from real KPIs — no hardcoded values
+  const esgScore = useMemo(() => {
+    if (!data) return 0
+    const kk = data.kpis
+    const dims = [
+      kk.brsrReadiness,                              // BRSR readiness weight
+      kk.completion,                                 // reporting completion
+      kk.waterRecycledShare,                         // water circularity
+      kk.wasteRecycledShare,                         // waste recovery
+      kk.renewableShare,                             // renewable energy
+      Math.min(kk.femaleShare * 2, 100),            // gender diversity (boost)
+      Math.max(0, 100 - kk.ltifr * 20),             // safety (lower LTIFR = better)
+      Math.max(0, 100 - kk.openExceptions * 5),     // data quality
+    ]
+    return Math.round(dims.reduce((s, v) => s + v, 0) / dims.length)
+  }, [data])
 
   if (loading) return <DashboardSkeleton />
   if (error) return <ErrorState message={error} onRetry={() => location.reload()} />
@@ -71,18 +91,29 @@ export function OverviewDashboard() {
         </div>
       </div>
 
+      {/* EXECUTIVE SUMMARY BANNER — smart alert with the single most important action */}
+      <ExecutiveSummary kpis={k} onNavigate={(m) => setActiveModule(m as ModuleKey)} />
+
+      {/* ESG SCORE GAUGE + KPI GRID */}
+      <div className="grid gap-4 lg:grid-cols-[260px,1fr]">
+        <EsgScoreGauge score={esgScore} />
+        <div className="space-y-3">
+          {/* KPI GRID row 1 */}
+
       {/* KPI GRID — real month-over-month deltas from trends data (no hardcoded values) */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
-        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={trendArr.map(t => t.emissions)} sparkColor="#f43f5e" />
-        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={trendArr.map(t => t.energy)} sparkColor="#f59e0b" />
-        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={trendArr.map(t => t.water)} sparkColor="#06b6d4" />
-        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={trendArr.map(t => t.waste)} sparkColor="#10b981" />
+        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={trendArr.map(t => t.emissions)} sparkColor="#f43f5e" onClick={() => setDrillDown('emissions')} />
+        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={trendArr.map(t => t.energy)} sparkColor="#f59e0b" onClick={() => setDrillDown('energy')} />
+        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={trendArr.map(t => t.water)} sparkColor="#06b6d4" onClick={() => setDrillDown('water')} />
+        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={trendArr.map(t => t.waste)} sparkColor="#10b981" onClick={() => setDrillDown('waste')} />
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
         <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={null} goodDirection="up" sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} />
         <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={null} goodDirection="down" sub={`${k.injuries} injuries · 0 fatal`} risk={k.fatalities > 0 ? { level: 'danger', text: `${k.fatalities} fatality` } : undefined} />
-        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} risk={k.brsrMissing > 0 ? { level: 'warning', text: `${k.brsrMissing} gaps` } : undefined} />
-        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} risk={k.openExceptions > 0 ? { level: 'warning', text: `${k.openExceptions} exceptions` } : undefined} />
+        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} risk={k.brsrMissing > 0 ? { level: 'warning', text: `${k.brsrMissing} gaps` } : undefined} onClick={() => setActiveModule('brsr')} />
+        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} risk={k.openExceptions > 0 ? { level: 'warning', text: `${k.openExceptions} exceptions` } : undefined} onClick={() => setActiveModule('submissions')} />
+      </div>
+        </div>
       </div>
 
       {/* ESG DATA CONTROL CHAIN — live pipeline tracker */}
@@ -240,6 +271,9 @@ export function OverviewDashboard() {
           </div>
         </div>
       </GlassCard>
+
+      {/* KPI Drill-down modal */}
+      <KpiDrillDownModal type={drillDown} data={data} onClose={() => setDrillDown(null)} />
     </div>
   )
 }
@@ -278,16 +312,18 @@ function trendDelta(trends: { emissions: number; energy: number; water: number; 
   return Math.round(((last - prev) / prev) * 1000) / 10
 }
 
-function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay, spark, sparkColor, risk }: any) {
+function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay, spark, sparkColor, risk, onClick }: any) {
   // ESG semantics: trend direction vs what's "good" determines colour
   const hasTrend = trend !== null && trend !== undefined && !isNaN(trend)
   const isGood = hasTrend && ((goodDirection === 'down' && trend < 0) || (goodDirection === 'up' && trend > 0))
   const isNeutral = hasTrend && trend === 0
   const pillClass = !hasTrend ? 'status-review' : isNeutral ? 'status-review' : isGood ? 'status-approved' : 'status-warning'
   const hasSpark = Array.isArray(spark) && spark.length >= 2
+  const clickable = !!onClick
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
-      className="glass glass-shimmer relative overflow-hidden rounded-2xl p-4">
+      onClick={onClick}
+      className={`glass glass-shimmer relative overflow-hidden rounded-2xl p-4 ${clickable ? 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/10' : ''}`}>
       <div className="flex items-start justify-between">
         <div className={`kpi-tile ${tileClass}`}><Icon className="h-5 w-5" /></div>
         {hasTrend ? (
@@ -461,4 +497,179 @@ function timeAgo(iso: string) {
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h ago`
   return `${Math.floor(hrs / 24)}d ago`
+}
+
+/* ---------- Executive Summary banner — smart alert with the single most important action ---------- */
+function ExecutiveSummary({ kpis, onNavigate }: { kpis: any; onNavigate: (m: string) => void }) {
+  // Determine the most urgent action from real KPIs
+  const alerts: { severity: 'danger' | 'warning' | 'info'; title: string; message: string; action: string; module: string }[] = []
+  if (kpis.fatalities > 0) alerts.push({ severity: 'danger', title: 'Safety incident', message: `${kpis.fatalities} fatality recorded. Immediate review required.`, action: 'Review safety', module: 'audit' })
+  if (kpis.brsrMissing > 0) alerts.push({ severity: 'warning', title: 'BRSR compliance gap', message: `${kpis.brsrMissing} BRSR indicators still missing data. Report readiness at ${kpis.brsrReadiness}%.`, action: 'View BRSR', module: 'brsr' })
+  if (kpis.openExceptions > 0) alerts.push({ severity: 'warning', title: 'Data quality exceptions', message: `${kpis.openExceptions} validation errors need resolution before lock.`, action: 'Review exceptions', module: 'submissions' })
+  if (kpis.corrections > 0) alerts.push({ severity: 'info', title: 'Corrections pending', message: `${kpis.corrections} correction requests await user response.`, action: 'View corrections', module: 'submissions' })
+  if (alerts.length === 0) {
+    return (
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl border border-emerald-200/50 bg-emerald-50/40 p-4">
+        <div className="flex items-center gap-3">
+          <div className="kpi-tile bg-emerald-50 text-emerald-600"><CheckCircle2 className="h-5 w-5" /></div>
+          <div className="flex-1">
+            <div className="text-sm font-bold text-slate-800">All systems healthy</div>
+            <div className="text-xs text-slate-500">No critical ESG alerts. All data flowing through the control chain on schedule.</div>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+  const top = alerts[0]
+  const sevConfig = {
+    danger: { bg: 'from-rose-50/80 to-red-50/40', border: 'border-rose-200/60', tile: 'bg-rose-100 text-rose-600', text: 'text-rose-700' },
+    warning: { bg: 'from-amber-50/80 to-orange-50/40', border: 'border-amber-200/60', tile: 'bg-amber-100 text-amber-600', text: 'text-amber-700' },
+    info: { bg: 'from-blue-50/80 to-cyan-50/40', border: 'border-blue-200/60', tile: 'bg-blue-100 text-blue-600', text: 'text-blue-700' },
+  }[top.severity]
+  return (
+    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className={`glass rounded-2xl border ${sevConfig.border} bg-gradient-to-r ${sevConfig.bg} p-4`}>
+      <div className="flex items-center gap-3">
+        <div className={`kpi-tile ${sevConfig.tile}`}><AlertCircle className="h-5 w-5" /></div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Action required</span>
+            <span className={`status-pill ${top.severity === 'danger' ? 'status-error' : top.severity === 'warning' ? 'status-warning' : 'status-submitted'}`}>{alerts.length} alert{alerts.length > 1 ? 's' : ''}</span>
+          </div>
+          <div className="mt-0.5 text-sm font-bold text-slate-800">{top.title}</div>
+          <div className="text-xs text-slate-600">{top.message}</div>
+        </div>
+        <button onClick={() => onNavigate(top.module)} className={`btn-glass-primary flex flex-shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold ${sevConfig.text}`}>
+          {top.action} <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
+/* ---------- ESG Score Gauge — composite 0-100 score with letter grade ---------- */
+function EsgScoreGauge({ score }: { score: number }) {
+  const grade = score >= 90 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B+' : score >= 60 ? 'B' : score >= 50 ? 'C' : 'D'
+  const gradeColor = score >= 80 ? '#10b981' : score >= 70 ? '#3b82f6' : score >= 50 ? '#f59e0b' : '#ef4444'
+  const data = [{ name: 'score', value: score, fill: gradeColor }]
+  return (
+    <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+      className="glass glass-shimmer rounded-2xl p-5">
+      <div className="mb-2 flex items-center gap-2">
+        <div className="kpi-tile bg-gradient-to-br from-blue-500 to-cyan-600 text-white" style={{ width: 32, height: 32 }}><Award className="h-4 w-4" /></div>
+        <div>
+          <h3 className="text-sm font-bold text-slate-800">ESG Score</h3>
+          <p className="text-[11px] text-slate-500">Composite performance index</p>
+        </div>
+      </div>
+      <div className="relative h-40">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadialBarChart innerRadius="68%" outerRadius="100%" data={data} startAngle={90} endAngle={-270}>
+            <RadialBar background={{ fill: 'rgba(148,163,184,0.12)' }} dataKey="value" cornerRadius={12} />
+          </RadialBarChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="tabular-nums text-4xl font-bold text-slate-800">{score}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">/ 100</span>
+          <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-full text-base font-black" style={{ color: 'white', background: gradeColor }}>{grade}</span>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
+        <div className="flex items-center gap-1.5 rounded-md bg-emerald-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> A+ (90+)</div>
+        <div className="flex items-center gap-1.5 rounded-md bg-blue-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-blue-500" /> A (80+)</div>
+        <div className="flex items-center gap-1.5 rounded-md bg-amber-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> B (60+)</div>
+        <div className="flex items-center gap-1.5 rounded-md bg-rose-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> C/D (&lt;60)</div>
+      </div>
+    </motion.section>
+  )
+}
+
+/* ---------- KPI Drill-Down Modal — month-over-month breakdown ---------- */
+function KpiDrillDownModal({ type, data, onClose }: { type: 'emissions' | 'energy' | 'water' | 'waste' | null; data: any; onClose: () => void }) {
+  if (!type) return null
+  const trendArr = Object.entries(data.trends).map(([label, v]: any) => ({ label, ...v }))
+  const config = {
+    emissions: { title: 'Scope 1 & 2 Emissions', color: '#f43f5e', unit: 'tCO₂e', icon: Flame, total: data.kpis.totalEmissions, scope1: data.kpis.scope1, scope2: data.kpis.scope2 },
+    energy: { title: 'Energy Consumption', color: '#f59e0b', unit: 'GJ', icon: Zap, total: data.kpis.energyGJ, renewable: data.kpis.renewableShare },
+    water: { title: 'Water Withdrawal', color: '#06b6d4', unit: 'KL', icon: Droplet, total: data.kpis.waterWithdrawalKL, recycled: data.kpis.waterRecycledShare },
+    waste: { title: 'Waste Recovered', color: '#10b981', unit: '%', icon: Recycle, total: data.kpis.wasteRecycledShare, generated: data.kpis.wasteGeneratedT },
+  }[type]
+  const Icon = config.icon
+  const avg = trendArr.length > 0 ? trendArr.reduce((s: number, t: any) => s + t[type], 0) / trendArr.length : 0
+  const max = trendArr.length > 0 ? Math.max(...trendArr.map((t: any) => t[type])) : 0
+  const min = trendArr.length > 0 ? Math.min(...trendArr.map((t: any) => t[type])) : 0
+  return (
+    <AnimatePresence>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-sm">
+        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} onClick={(e) => e.stopPropagation()}
+          className="glass-strong w-full max-w-2xl rounded-3xl p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="kpi-tile" style={{ background: config.color + '20', color: config.color }}><Icon className="h-5 w-5" /></div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">{config.title} · Drill-down</h3>
+                <p className="text-xs text-slate-500">Month-over-month breakdown · {data.periods.length} periods</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X className="h-4 w-4" /></button>
+          </div>
+          {/* Summary stats */}
+          <div className="mb-4 grid grid-cols-4 gap-2">
+            <StatTile label="Total" value={config.total.toLocaleString()} unit={config.unit} />
+            <StatTile label="Average" value={avg.toLocaleString(undefined, { maximumFractionDigits: 1 })} unit={config.unit} />
+            <StatTile label="Peak" value={max.toLocaleString(undefined, { maximumFractionDigits: 1 })} unit={config.unit} />
+            <StatTile label="Lowest" value={min.toLocaleString(undefined, { maximumFractionDigits: 1 })} unit={config.unit} />
+          </div>
+          {/* Trend chart */}
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendArr} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+                <defs>
+                  <linearGradient id={`dd-${type}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={config.color} stopOpacity={0.5} />
+                    <stop offset="95%" stopColor={config.color} stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.15)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Area type="monotone" dataKey={type} stroke={config.color} strokeWidth={2.5} fill={`url(#dd-${type})`} name={`${config.title} (${config.unit})`} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Per-month table */}
+          <div className="mt-4 max-h-40 overflow-y-auto scroll-elegant">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0 bg-white/80 text-[10px] uppercase tracking-wide text-slate-400">
+                <tr><th className="px-2 py-1.5 text-left">Period</th><th className="px-2 py-1.5 text-right">Value</th><th className="px-2 py-1.5 text-right">vs Avg</th></tr>
+              </thead>
+              <tbody>
+                {trendArr.map((t: any) => {
+                  const delta = avg > 0 ? ((t[type] - avg) / avg) * 100 : 0
+                  return (
+                    <tr key={t.label} className="border-t border-slate-100">
+                      <td className="px-2 py-1.5 text-slate-600">{t.label}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-slate-800">{t[type].toLocaleString()} {config.unit}</td>
+                      <td className={`px-2 py-1.5 text-right tabular-nums ${delta < 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{delta > 0 ? '+' : ''}{delta.toFixed(1)}%</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
+
+function StatTile({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return (
+    <div className="rounded-xl bg-white/50 px-3 py-2 text-center">
+      <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="tabular-nums text-base font-bold text-slate-800">{value}</div>
+      <div className="text-[9px] text-slate-400">{unit}</div>
+    </div>
+  )
 }
