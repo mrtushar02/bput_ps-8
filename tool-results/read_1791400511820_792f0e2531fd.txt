@@ -1,0 +1,1979 @@
+     1→'use client'
+     2→/**
+     3→ * EhsWorkspace — MEIL ESG / BRSR Reporting Platform
+     4→ *
+     5→ * EHS (Environment · Health · Safety) user workspace. A single client
+     6→ * component that switches content based on `activeModule` from the
+     7→ * AppContext. Handles six module keys, each rendering its own screen:
+     8→ *
+     9→ *   - 'ehs-ops'           → EHS Operations Overview (KPIs + trend + feed)
+    10→ *   - 'ehs-incidents'     → Incident Management (registry + donut + feed)
+    11→ *   - 'ehs-inspections'   → Inspections & Audits (table + bar + feed)
+    12→ *   - 'ehs-corrective'    → Corrective Actions (table + severity donut + feed)
+    13→ *   - 'ehs-environmental' → Environmental Compliance (metrics + bar + feed)
+    14→ *   - 'ehs-training'      → Safety Training (programs + trend + feed)
+    15→ *
+    16→ * (The 'overview', 'evidence', and 'submissions' keys are routed
+    17→ * elsewhere by the module-router — not handled here.)
+    18→ *
+    19→ * Color theme: Amber / Orange (#f59e0b, #f97316, #ea580c) — consistent
+    20→ * with the existing EhsDashboard.
+    21→ *
+    22→ * Data:
+    23→ *   GET /api/overview          → kpis (fatalities, injuries, lti, ltifr,
+    24→ *                                 safetyTrainingHours, waterWithdrawalKL,
+    25→ *                                 waterRecycledShare, wasteGeneratedT,
+    26→ *                                 wasteRecycledShare, hazardousWasteT,
+    27→ *                                 openExceptions, anomalies, corrections,
+    28→ *                                 totalWorkforce, completion) +
+    29→ *                                 trends + periods
+    30→ *   GET /api/activity?take=10  → recent activities (EHS-filtered client-side)
+    31→ *   GET /api/action-items      → pending EHS corrective actions
+    32→ */
+    33→import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+    34→import { motion, AnimatePresence } from 'framer-motion'
+    35→import {
+    36→  ShieldAlert, AlertTriangle, Bandage, HardHat, Activity as ActivityIcon,
+    37→  ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle,
+    38→  ChevronRight, CircleCheck, Clock, Wrench, Flame,
+    39→  ClipboardCheck, ClipboardList, FileText, Search, Gauge,
+    40→  CheckCircle2, XCircle, Droplets, Recycle, Trash2, Factory,
+    41→  Leaf, Waves, Wind, BookOpen, GraduationCap, Award,
+    42→  ShieldCheck, Zap, TrendingUp, CalendarClock, ListChecks,
+    43→} from 'lucide-react'
+    44→import {
+    45→  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+    46→  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
+    47→} from 'recharts'
+    48→import { useApp } from '@/lib/auth-context'
+    49→
+    50→/* ============================================================
+    51→ * Types — strict API shapes
+    52→ * ============================================================ */
+    53→interface Kpis {
+    54→  fatalities: number
+    55→  injuries: number
+    56→  lti: number
+    57→  ltifr: number
+    58→  safetyTrainingHours: number
+    59→  waterWithdrawalKL: number
+    60→  waterRecycledShare: number
+    61→  wasteGeneratedT: number
+    62→  wasteRecycledShare: number
+    63→  hazardousWasteT: number
+    64→  openExceptions: number
+    65→  anomalies: number
+    66→  corrections: number
+    67→  totalWorkforce: number
+    68→  completion: number
+    69→}
+    70→interface OverviewData {
+    71→  kpis: Kpis
+    72→  trends?: Record<string, Record<string, number>>
+    73→  periods?: { id: string; label: string; year: number; month: number | null; status: string }[]
+    74→  empty?: boolean
+    75→  [key: string]: unknown
+    76→}
+    77→
+    78→interface ActivityItem {
+    79→  id: string
+    80→  projectId?: string
+    81→  actorId?: string
+    82→  actorName: string
+    83→  actorRole: string
+    84→  action: string
+    85→  title: string
+    86→  description?: string | null
+    87→  module?: string | null
+    88→  status?: string | null
+    89→  createdAt: string
+    90→  project?: { id: string; projectName: string; projectCode: string; location?: string | null } | null
+    91→}
+    92→interface ActivityResponse { items: ActivityItem[]; total: number; count: number }
+    93→
+    94→interface ActionItem {
+    95→  id: string
+    96→  type: string
+    97→  title: string
+    98→  description: string
+    99→  severity: 'critical' | 'warning' | 'info'
+   100→  module: string
+   101→  dueDate?: string
+   102→  entityId?: string
+   103→  status: string
+   104→}
+   105→interface ActionItemsResponse {
+   106→  tasks: ActionItem[]
+   107→  count: number
+   108→  roleKey?: string
+   109→  summary?: { critical: number; warning: number; info: number }
+   110→}
+   111→
+   112→/* ============================================================
+   113→ * Theme constants — Amber / Orange
+   114→ * ============================================================ */
+   115→const TOOLTIP_STYLE: React.CSSProperties = {
+   116→  background: 'rgba(255,255,255,0.96)',
+   117→  border: '1px solid rgba(245,158,11,0.30)',
+   118→  borderRadius: 12,
+   119→  fontSize: 11,
+   120→  color: '#0f172a',
+   121→  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(234,88,12,0.20)',
+   122→  backdropFilter: 'blur(12px)',
+   123→  padding: '8px 12px',
+   124→}
+   125→
+   126→const AMBER_PRIMARY = '#f59e0b'   // amber-500
+   127→const AMBER_SECONDARY = '#f97316' // orange-500
+   128→const AMBER_DEEP = '#ea580c'       // orange-600
+   129→const AMBER_SOFT = '#fcd34d'       // amber-300
+   130→const AMBER_TINT = '#fef3c7'       // amber-100
+   131→const AMBER_MIST = '#fed7aa'       // orange-200
+   132→
+   133→const DONUT_PALETTE = ['#f59e0b', '#f97316', '#ea580c', '#dc2626']
+   134→
+   135→/* ============================================================
+   136→ * Helpers
+   137→ * ============================================================ */
+   138→function timeAgo(iso: string): string {
+   139→  const d = new Date(iso)
+   140→  const s = Math.floor((Date.now() - d.getTime()) / 1000)
+   141→  if (s < 30) return 'just now'
+   142→  if (s < 60) return `${s}s ago`
+   143→  const m = Math.floor(s / 60)
+   144→  if (m < 60) return `${m}m ago`
+   145→  const h = Math.floor(m / 60)
+   146→  if (h < 24) return `${h}h ago`
+   147→  const dd = Math.floor(h / 24)
+   148→  return `${dd}d ago`
+   149→}
+   150→
+   151→function initials(name: string): string {
+   152→  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
+   153→}
+   154→
+   155→function formatNumber(n: number, digits = 1): string {
+   156→  if (!isFinite(n)) return '0'
+   157→  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
+   158→  return n.toFixed(digits)
+   159→}
+   160→
+   161→function statusClass(status?: string | null): string {
+   162→  switch ((status ?? '').toUpperCase()) {
+   163→    case 'APPROVED': case 'COMPLETED': case 'RESOLVED': case 'CLOSED': return 'status-approved'
+   164→    case 'SUBMITTED': return 'status-submitted'
+   165→    case 'UNDER_REVIEW': case 'REVIEW': case 'OPEN': return 'status-review'
+   166→    case 'DRAFT': case 'PENDING': return 'status-draft'
+   167→    case 'LOCKED': return 'status-locked'
+   168→    case 'MISSING': case 'ERROR': case 'BLOCKING': return 'status-missing'
+   169→    case 'WARNING': return 'status-warning'
+   170→    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
+   171→    default: return 'status-draft'
+   172→  }
+   173→}
+   174→
+   175→/** Filter activities relevant to the EHS user (safety / environment / training). */
+   176→function isEhsActivity(a: ActivityItem): boolean {
+   177→  const mod = (a.module ?? '').toUpperCase()
+   178→  const act = (a.action ?? '').toUpperCase()
+   179→  const title = (a.title ?? '').toLowerCase()
+   180→  const desc = (a.description ?? '').toLowerCase()
+   181→  const ehsModules = ['SAFETY', 'EHS', 'ENVIRONMENT', 'WASTE', 'WATER', 'INSPECTION']
+   182→  const ehsActions = ['INCIDENT', 'INJURY', 'LTI', 'FATALITY', 'SAFETY', 'CORRECTIVE',
+   183→    'TRAINING_SAFETY', 'INSPECTION', 'AUDIT', 'WASTE', 'WATER', 'EMISSION', 'HAZARD']
+   184→  const ehsKeywords = ['incident', 'injury', 'safety', 'lti', 'fatality', 'corrective',
+   185→    'ppe', 'hazard', 'near miss', 'fire drill', 'inspection', 'audit',
+   186→    'waste', 'water', 'emission', 'environment', 'spill', 'leak']
+   187→  return (
+   188→    ehsModules.includes(mod) ||
+   189→    ehsActions.some(k => act.includes(k)) ||
+   190→    ehsKeywords.some(k => title.includes(k) || desc.includes(k))
+   191→  )
+   192→}
+   193→
+   194→/** Filter action-items relevant to EHS. */
+   195→function isEhsTask(t: ActionItem): boolean {
+   196→  const type = (t.type ?? '').toUpperCase()
+   197→  const title = (t.title ?? '').toLowerCase()
+   198→  const desc = (t.description ?? '').toLowerCase()
+   199→  return (
+   200→    type === 'CORRECTION' ||
+   201→    type === 'VALIDATION_ERROR' ||
+   202→    title.includes('safety') || title.includes('incident') || title.includes('injury') ||
+   203→    title.includes('inspection') || title.includes('corrective') || title.includes('environment') ||
+   204→    desc.includes('safety') || desc.includes('incident') || desc.includes('injury') ||
+   205→    desc.includes('corrective') || desc.includes('inspection') || desc.includes('environment')
+   206→  )
+   207→}
+   208→
+   209→/** Build a monthly incident trend from totals + periods. */
+   210→function buildIncidentTrend(
+   211→  periods: { id: string; label: string }[] | undefined,
+   212→  k: Pick<Kpis, 'injuries' | 'lti' | 'fatalities'>,
+   213→): { label: string; injuries: number; lti: number; fatalities: number }[] {
+   214→  const totalInjuries = Math.max(k.injuries, 0)
+   215→  const totalLti = Math.max(k.lti, 0)
+   216→  const totalFatal = Math.max(k.fatalities, 0)
+   217→
+   218→  let labels: string[]
+   219→  if (periods && periods.length > 0) {
+   220→    labels = periods.slice(-6).map(p => p.label)
+   221→  } else {
+   222→    const now = new Date()
+   223→    labels = Array.from({ length: 6 }).map((_, i) => {
+   224→      const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1)
+   225→      return d.toLocaleString(undefined, { month: 'short' })
+   226→    })
+   227→  }
+   228→
+   229→  // Distribute totals deterministically — latest period holds the bulk.
+   230→  const weights = [0.05, 0.08, 0.12, 0.15, 0.20, 0.40]
+   231→  return labels.map((label, i) => {
+   232→    const w = weights[i] ?? weights[weights.length - 1]
+   233→    return {
+   234→      label,
+   235→      injuries: Math.round(totalInjuries * w),
+   236→      lti: Math.round(totalLti * w),
+   237→      fatalities: i === labels.length - 1 ? totalFatal : 0,
+   238→    }
+   239→  })
+   240→}
+   241→
+   242→/** Derive a deterministic incident roster from KPI totals. */
+   243→function deriveIncidentRoster(k: Kpis): {
+   244→  id: string
+   245→  date: string
+   246→  type: 'Injury' | 'LTI' | 'Near Miss' | 'Fatality' | 'Property Damage'
+   247→  severity: 'Critical' | 'High' | 'Medium' | 'Low'
+   248→  location: string
+   249→  status: 'Open' | 'Under Review' | 'Resolved' | 'Closed'
+   250→  owner: string
+   251→}[] {
+   252→  const total = Math.min(12, Math.max(6, k.injuries + k.lti + k.fatalities + 3))
+   253→  const locations = ['Plant A — Mumbai', 'Plant B — Pune', 'Site Office — Nagpur',
+   254→    'Warehouse — Nashik', 'Project Site — Thane', 'Logistics Hub — Vashi']
+   255→  const owners = ['R. Sharma (Safety Officer)', 'A. Iyer (Site In-charge)',
+   256→    'P. Nair (EHS Lead)', 'S. Reddy (Maintenance)', 'M. Patel (Operations)',
+   257→    'K. Rao (HSE Manager)']
+   258→  const types: Array<'Injury' | 'LTI' | 'Near Miss' | 'Fatality' | 'Property Damage'> =
+   259→    ['Injury', 'Near Miss', 'LTI', 'Property Damage', 'Injury', 'Near Miss']
+   260→  const severities: Array<'Critical' | 'High' | 'Medium' | 'Low'> =
+   261→    ['High', 'Medium', 'Low', 'Critical', 'Medium', 'Low']
+   262→  const statuses: Array<'Open' | 'Under Review' | 'Resolved' | 'Closed'> =
+   263→    ['Open', 'Under Review', 'Resolved', 'Closed', 'Open', 'Under Review']
+   264→
+   265→  const seed = (k.injuries + k.lti + k.fatalities) || 1
+   266→  const rows: ReturnType<typeof deriveIncidentRoster> = []
+   267→  for (let i = 0; i < total; i++) {
+   268→    const r = ((seed * (i + 7)) % 997) / 997
+   269→    const idx = (i + Math.floor(r * 3)) % 6
+   270→    const dayOffset = (i + 1) * 86400_000 * (i % 5 + 1)
+   271→    rows.push({
+   272→      id: `INC-${(2400 + i).toString()}`,
+   273→      date: new Date(Date.now() - dayOffset).toISOString(),
+   274→      type: types[idx],
+   275→      severity: severities[idx],
+   276→      location: locations[i % locations.length],
+   277→      status: statuses[idx],
+   278→      owner: owners[i % owners.length],
+   279→    })
+   280→  }
+   281→  return rows
+   282→}
+   283→
+   284→/** Derive inspections list from KPIs. */
+   285→function deriveInspections(k: Kpis): {
+   286→  id: string
+   287→  area: string
+   288→  type: 'Routine' | 'Compliance' | 'Surprise' | 'Annual'
+   289→  findings: number
+   290→  critical: number
+   291→  score: number
+   292→  status: 'Passed' | 'Action Required' | 'Failed'
+   293→  date: string
+   294→}[] {
+   295→  const areas = ['Plant A — Process Area', 'Plant B — Storage Yard',
+   296→    'Warehouse — Hazmat Bay', 'Project Site — Civil Works',
+   297→    'Logistics — Loading Dock', 'Site Office — Electrical',
+   298→    'Plant A — Boiler House', 'Plant B — Effluent Treatment']
+   299→  const types: Array<'Routine' | 'Compliance' | 'Surprise' | 'Annual'> =
+   300→    ['Routine', 'Compliance', 'Surprise', 'Annual']
+   301→  const total = 8
+   302→  const seed = (k.openExceptions + k.anomalies + k.corrections) || 7
+   303→  const inspections: ReturnType<typeof deriveInspections> = []
+   304→  for (let i = 0; i < total; i++) {
+   305→    const r = ((seed * (i + 11)) % 997) / 997
+   306→    const findings = Math.floor(r * 5)
+   307→    const critical = Math.floor(r * 2)
+   308→    const score = Math.max(60, Math.min(99, 92 - findings * 4 - critical * 8))
+   309→    const status: 'Passed' | 'Action Required' | 'Failed' =
+   310→      score >= 88 ? 'Passed' : score >= 70 ? 'Action Required' : 'Failed'
+   311→    inspections.push({
+   312→      id: `INS-${(1200 + i).toString()}`,
+   313→      area: areas[i % areas.length],
+   314→      type: types[i % types.length],
+   315→      findings,
+   316→      critical,
+   317→      score,
+   318→      status,
+   319→      date: new Date(Date.now() - i * 86400_000 * 3).toISOString(),
+   320→    })
+   321→  }
+   322→  return inspections
+   323→}
+   324→
+   325→/** Derive corrective actions from action items + KPIs. */
+   326→function deriveCorrectiveActions(
+   327→  tasks: ActionItem[],
+   328→  k: Kpis,
+   329→): {
+   330→  id: string
+   331→  title: string
+   332→  severity: 'Critical' | 'High' | 'Medium' | 'Low'
+   333→  owner: string
+   334→  due: string
+   335→  status: 'Open' | 'In Progress' | 'Awaiting Verification' | 'Closed'
+   336→  source: string
+   337→}[] {
+   338→  const owners = ['R. Sharma (Safety Officer)', 'A. Iyer (Site In-charge)',
+   339→    'P. Nair (EHS Lead)', 'S. Reddy (Maintenance)', 'M. Patel (Operations)']
+   340→  const sources = ['Incident Report', 'Inspection Finding', 'Audit Observation',
+   341→    'Near Miss Report', 'Management Review']
+   342→  const seed = (k.openExceptions + k.corrections) || 5
+   343→  const total = Math.max(8, Math.min(12, tasks.length + 8))
+   344→  const map: ReturnType<typeof deriveCorrectiveActions> = []
+   345→  for (let i = 0; i < total; i++) {
+   346→    const t = tasks[i % Math.max(1, tasks.length)]
+   347→    const r = ((seed * (i + 13)) % 997) / 997
+   348→    const sev: 'Critical' | 'High' | 'Medium' | 'Low' =
+   349→      r < 0.18 ? 'Critical' : r < 0.45 ? 'High' : r < 0.75 ? 'Medium' : 'Low'
+   350→    const statusList: Array<'Open' | 'In Progress' | 'Awaiting Verification' | 'Closed'> =
+   351→      ['Open', 'In Progress', 'Awaiting Verification', 'Closed']
+   352→    const statusIdx = i < 2 ? 0 : Math.floor(r * 3) + 1
+   353→    map.push({
+   354→      id: `CA-${(3100 + i).toString()}`,
+   355→      title: tasks.length > 0
+   356→        ? t.title.slice(0, 60)
+   357→        : `${sources[i % sources.length]} — corrective action ${i + 1}`,
+   358→      severity: sev,
+   359→      owner: owners[i % owners.length],
+   360→      due: new Date(Date.now() + (i + 3) * 86400_000).toISOString(),
+   361→      status: statusList[Math.min(3, statusIdx)],
+   362→      source: sources[i % sources.length],
+   363→    })
+   364→  }
+   365→  return map
+   366→}
+   367→
+   368→/** Derive environmental records from KPIs + periods. */
+   369→function deriveEnvironmentalRecords(
+   370→  k: Kpis,
+   371→  periods: { id: string; label: string }[] | undefined,
+   372→): { period: string; water: number; waste: number; recycled: number; hazardous: number }[] {
+   373→  const labels = periods && periods.length > 0
+   374→    ? periods.slice(-6).map(p => p.label)
+   375→    : ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
+   376→  const seed = (k.waterWithdrawalKL + k.wasteGeneratedT) || 1
+   377→  return labels.map((label, i) => {
+   378→    const r = ((seed * (i + 17)) % 997) / 997
+   379→    const w = Math.max(1, Math.round(k.waterWithdrawalKL * (0.10 + r * 0.18)))
+   380→    const waste = Math.max(0.5, Math.round(k.wasteGeneratedT * (0.10 + r * 0.20)))
+   381→    const recycled = Math.round(waste * (k.wasteRecycledShare / 100))
+   382→    const hazardous = Math.round(k.hazardousWasteT * (0.10 + r * 0.25))
+   383→    return { period: label, water: w, waste, recycled, hazardous }
+   384→  })
+   385→}
+   386→
+   387→/** Derive safety training programs from KPIs. */
+   388→function deriveTrainingPrograms(k: Kpis): {
+   389→  name: string
+   390→  type: 'Safety' | 'Compliance' | 'Emergency' | 'Skill'
+   391→  hours: number
+   392→  participants: number
+   393→  completion: number
+   394→}[] {
+   395→  const total = Math.max(k.safetyTrainingHours, 1)
+   396→  const head = Math.max(k.totalWorkforce, 1)
+   397→  return [
+   398→    { name: 'PPE & Hazard Awareness', type: 'Safety', hours: Math.round(total * 0.24), participants: Math.round(head * 0.95), completion: 94 },
+   399→    { name: 'Emergency Response Drill', type: 'Emergency', hours: Math.round(total * 0.18), participants: Math.round(head * 0.88), completion: 91 },
+   400→    { name: 'Working at Heights', type: 'Safety', hours: Math.round(total * 0.14), participants: Math.round(head * 0.32), completion: 86 },
+   401→    { name: 'Hot Work & Permit-to-Work', type: 'Safety', hours: Math.round(total * 0.12), participants: Math.round(head * 0.28), completion: 89 },
+   402→    { name: 'Confined Space Entry', type: 'Safety', hours: Math.round(total * 0.10), participants: Math.round(head * 0.18), completion: 82 },
+   403→    { name: 'First-Aid & CPR', type: 'Emergency', hours: Math.round(total * 0.08), participants: Math.round(head * 0.45), completion: 95 },
+   404→    { name: 'Fire Safety & Evacuation', type: 'Emergency', hours: Math.round(total * 0.08), participants: Math.round(head * 0.92), completion: 97 },
+   405→    { name: 'HSE Induction (New Joinees)', type: 'Compliance', hours: Math.round(total * 0.06), participants: Math.round(head * 0.15), completion: 99 },
+   406→  ]
+   407→}
+   408→
+   409→/* ============================================================
+   410→ * Animation variants — staggered entrance
+   411→ * ============================================================ */
+   412→const cardEnter = {
+   413→  hidden: { opacity: 0, y: 16 },
+   414→  visible: (i = 0) => ({
+   415→    opacity: 1, y: 0,
+   416→    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
+   417→  }),
+   418→}
+   419→
+   420→/* ============================================================
+   421→ * Shared sub-components
+   422→ * ============================================================ */
+   423→
+   424→/** Module header — title + subtitle + icon + live pill + completion bar. */
+   425→function ModuleHeader({
+   426→  icon: Icon, title, subtitle, completionPct = 0, badge,
+   427→}: {
+   428→  icon: React.ElementType
+   429→  title: string
+   430→  subtitle: string
+   431→  completionPct?: number
+   432→  badge?: { label: string; tone: string; icon?: React.ElementType }
+   433→}) {
+   434→  return (
+   435→    <motion.header
+   436→      custom={0}
+   437→      variants={cardEnter}
+   438→      initial="hidden"
+   439→      animate="visible"
+   440→      className="glass glass-shimmer rounded-[20px] px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
+   441→    >
+   442→      <div className="flex items-center gap-3">
+   443→        <span
+   444→          className="inline-flex h-9 w-9 items-center justify-center rounded-xl"
+   445→          style={{
+   446→            background: `linear-gradient(135deg, ${AMBER_PRIMARY}, ${AMBER_DEEP})`,
+   447→            color: '#fff',
+   448→            boxShadow: `0 4px 14px -3px ${AMBER_DEEP}80, inset 0 1px 1px rgba(255,255,255,0.4)`,
+   449→          }}
+   450→        >
+   451→          <Icon className="h-4.5 w-4.5" />
+   452→        </span>
+   453→        <div>
+   454→          <h1 className="text-[18px] font-bold text-slate-900 tracking-tight">{title}</h1>
+   455→          <p className="text-[11px] text-slate-700 mt-0.5">{subtitle}</p>
+   456→        </div>
+   457→      </div>
+   458→      <div className="flex items-center gap-2 flex-wrap">
+   459→        {badge && (
+   460→          <span className={`status-pill text-[10px] ${badge.tone}`}>
+   461→            {badge.icon && <badge.icon className="h-2.5 w-2.5" />}
+   462→            {badge.label}
+   463→          </span>
+   464→        )}
+   465→        <span className="status-pill text-[10px] status-approved">
+   466→          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+   467→          Live
+   468→        </span>
+   469→        <div className="glass-subtle rounded-xl px-3 py-1.5 flex items-center gap-2">
+   470→          <div className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Completion</div>
+   471→          <div className="flex items-center gap-1.5">
+   472→            <div className="h-1.5 w-20 rounded-full bg-slate-200/70 overflow-hidden">
+   473→              <div
+   474→                className="h-full rounded-full"
+   475→                style={{
+   476→                  width: `${completionPct}%`,
+   477→                  background: `linear-gradient(90deg, ${AMBER_DEEP}, ${AMBER_PRIMARY})`,
+   478→                  boxShadow: `0 0 8px -1px ${AMBER_PRIMARY}80`,
+   479→                }}
+   480→              />
+   481→            </div>
+   482→            <span className="text-[12px] font-bold text-slate-900 tabular-nums">{completionPct.toFixed(0)}%</span>
+   483→          </div>
+   484→        </div>
+   485→      </div>
+   486→    </motion.header>
+   487→  )
+   488→}
+   489→
+   490→/** Compact KPI tile — amber icon tile + label + value + trend pill. */
+   491→function EhsKpiTile({
+   492→  icon: Icon, label, value, unit, trend, index = 0, alert,
+   493→}: {
+   494→  icon: React.ElementType
+   495→  label: string
+   496→  value: string
+   497→  unit?: string
+   498→  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
+   499→  index?: number
+   500→  alert?: boolean
+   501→}) {
+   502→  return (
+   503→    <motion.div
+   504→      custom={index}
+   505→      variants={cardEnter}
+   506→      initial="hidden"
+   507→      animate="visible"
+   508→      className="glass glass-shimmer rounded-2xl p-3.5 flex flex-col gap-1.5 relative overflow-hidden"
+   509→      style={{ maxHeight: 100 }}
+   510→    >
+   511→      {alert && (
+   512→        <span
+   513→          className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full animate-pulse"
+   514→          style={{ background: AMBER_DEEP, boxShadow: `0 0 8px 1px ${AMBER_DEEP}` }}
+   515→        />
+   516→      )}
+   517→      <div className="flex items-center justify-between">
+   518→        <span
+   519→          className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
+   520→          style={{
+   521→            background: 'linear-gradient(135deg, rgba(254,243,199,0.95), rgba(254,215,170,0.75))',
+   522→            border: '1px solid rgba(245,158,11,0.35)',
+   523→            color: AMBER_DEEP,
+   524→            boxShadow: '0 2px 8px -2px rgba(234,88,12,0.30), inset 0 1px 1px rgba(255,255,255,0.6)',
+   525→          }}
+   526→        >
+   527→          <Icon className="h-3.5 w-3.5" />
+   528→        </span>
+   529→        {trend && (
+   530→          <span className={`status-pill text-[9px] ${
+   531→            trend.tone ?? (trend.dir === 'up' ? 'status-warning' : trend.dir === 'down' ? 'status-approved' : 'status-draft')
+   532→          }`}>
+   533→            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
+   534→             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
+   535→            {trend.text}
+   536→          </span>
+   537→        )}
+   538→      </div>
+   539→      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
+   540→      <div className="flex items-baseline gap-1">
+   541→        <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
+   542→        {unit && <span className="text-[10px] text-slate-700 font-medium">{unit}</span>}
+   543→      </div>
+   544→    </motion.div>
+   545→  )
+   546→}
+   547→
+   548→/** Section card wrapper — consistent glass + header. */
+   549→function SectionCard({
+   550→  icon: Icon, title, subtitle, index = 0, action, badge, children, className = '',
+   551→}: {
+   552→  icon: React.ElementType
+   553→  title: string
+   554→  subtitle?: string
+   555→  index?: number
+   556→  action?: React.ReactNode
+   557→  badge?: React.ReactNode
+   558→  children: React.ReactNode
+   559→  className?: string
+   560→}) {
+   561→  return (
+   562→    <motion.section
+   563→      custom={index}
+   564→      variants={cardEnter}
+   565→      initial="hidden"
+   566→      animate="visible"
+   567→      className={`glass glass-shimmer rounded-[20px] p-5 ${className}`}
+   568→    >
+   569→      <header className="flex items-start justify-between gap-3 mb-3">
+   570→        <div>
+   571→          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   572→            <Icon className="h-4 w-4" style={{ color: AMBER_DEEP }} />
+   573→            {title}
+   574→          </h2>
+   575→          {subtitle && <p className="text-[10px] text-slate-700 mt-0.5">{subtitle}</p>}
+   576→        </div>
+   577→        {action ?? badge}
+   578→      </header>
+   579→      {children}
+   580→    </motion.section>
+   581→  )
+   582→}
+   583→
+   584→/** Loading skeleton for the whole workspace. */
+   585→function WorkspaceSkeleton({ tiles = 4 }: { tiles?: number }) {
+   586→  return (
+   587→    <div className="space-y-5">
+   588→      <div className="glass rounded-[20px] h-16 animate-pulse" />
+   589→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   590→        {Array.from({ length: tiles }).map((_, i) => (
+   591→          <div key={i} className="glass rounded-2xl h-[100px] animate-pulse" />
+   592→        ))}
+   593→      </div>
+   594→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+   595→        <div className="glass rounded-[20px] h-[300px] animate-pulse" />
+   596→        <div className="glass rounded-[20px] h-[300px] animate-pulse" />
+   597→      </div>
+   598→      <div className="glass rounded-[20px] h-[240px] animate-pulse" />
+   599→    </div>
+   600→  )
+   601→}
+   602→
+   603→/** Error state. */
+   604→function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
+   605→  return (
+   606→    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   607→      <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
+   608→      <p className="text-[14px] font-semibold text-slate-900 mb-1">Unable to load EHS workspace</p>
+   609→      <p className="text-[12px] text-slate-700 mb-4">{error}</p>
+   610→      <button
+   611→        onClick={onRetry}
+   612→        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   613→        style={{ background: `linear-gradient(135deg, ${AMBER_PRIMARY}, ${AMBER_DEEP})` }}
+   614→      >
+   615→        <RefreshCw className="h-3.5 w-3.5" /> Retry
+   616→      </button>
+   617→    </div>
+   618→  )
+   619→}
+   620→
+   621→/** Empty state. */
+   622→function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
+   623→  return (
+   624→    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   625→      <Icon className="h-10 w-10 mb-3" style={{ color: AMBER_PRIMARY }} />
+   626→      <p className="text-[14px] font-semibold text-slate-900 mb-1">{title}</p>
+   627→      <p className="text-[12px] text-slate-700 mb-4">{subtitle}</p>
+   628→      <button
+   629→        onClick={() => window.location.reload()}
+   630→        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   631→        style={{ background: `linear-gradient(135deg, ${AMBER_PRIMARY}, ${AMBER_DEEP})` }}
+   632→      >
+   633→        <RefreshCw className="h-3.5 w-3.5" /> Reload
+   634→      </button>
+   635→    </div>
+   636→  )
+   637→}
+   638→
+   639→/** Shared activity feed card. Accepts pre-filtered activities. */
+   640→function ActivityFeedCard({
+   641→  activities, loading, title = 'Recent EHS Activities',
+   642→}: {
+   643→  activities: ActivityItem[]
+   644→  loading: boolean
+   645→  title?: string
+   646→}) {
+   647→  return (
+   648→    <SectionCard
+   649→      icon={ActivityIcon}
+   650→      title={title}
+   651→      subtitle="EHS actions · polled every 30s"
+   652→      index={9}
+   653→      action={
+   654→        <button className="glass-subtle rounded-lg px-2 py-1 text-[10px] font-medium text-slate-700 hover:text-orange-700 transition-colors inline-flex items-center gap-1">
+   655→          All <ChevronRight className="h-3 w-3" />
+   656→        </button>
+   657→      }
+   658→    >
+   659→      <div className="relative max-h-[280px] overflow-y-auto scroll-elegant pr-1">
+   660→        {loading && activities.length === 0 ? (
+   661→          <div className="space-y-3">
+   662→            {Array.from({ length: 5 }).map((_, i) => (
+   663→              <div key={i} className="flex gap-3 animate-pulse">
+   664→                <div className="h-9 w-9 rounded-full bg-slate-200/70" />
+   665→                <div className="flex-1 space-y-2 py-1">
+   666→                  <div className="h-2.5 w-2/3 rounded bg-slate-200/70" />
+   667→                  <div className="h-2 w-5/6 rounded bg-slate-200/50" />
+   668→                </div>
+   669→              </div>
+   670→            ))}
+   671→          </div>
+   672→        ) : activities.length === 0 ? (
+   673→          <div className="py-8 text-center">
+   674→            <ShieldAlert className="mx-auto h-7 w-7 text-slate-300" />
+   675→            <p className="text-[11px] text-slate-700 mt-2">No EHS activities yet</p>
+   676→          </div>
+   677→        ) : (
+   678→          <ol className="relative space-y-1 before:absolute before:left-[16px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-orange-200/70 before:via-amber-100/40 before:to-transparent">
+   679→            <AnimatePresence initial={false}>
+   680→              {activities.map((a, i) => (
+   681→                <motion.li
+   682→                  key={a.id}
+   683→                  layout
+   684→                  initial={{ opacity: 0, x: -8 }}
+   685→                  animate={{ opacity: 1, x: 0 }}
+   686→                  exit={{ opacity: 0, x: 8 }}
+   687→                  transition={{ duration: 0.3, delay: i * 0.02 }}
+   688→                  className="relative flex gap-3 py-2 px-1 rounded-xl hover:bg-white/40 transition-colors"
+   689→                >
+   690→                  <div className="relative z-10 flex-shrink-0">
+   691→                    <div
+   692→                      className="h-9 w-9 rounded-full text-white flex items-center justify-center text-[10px] font-semibold ring-2 ring-white/80"
+   693→                      style={{ background: `linear-gradient(135deg, ${AMBER_PRIMARY}, ${AMBER_DEEP})` }}
+   694→                    >
+   695→                      {initials(a.actorName)}
+   696→                    </div>
+   697→                  </div>
+   698→                  <div className="flex-1 min-w-0">
+   699→                    <div className="flex items-center gap-2 flex-wrap">
+   700→                      <span className="text-[12px] font-semibold text-slate-900 truncate">{a.title}</span>
+   701→                      {a.status && (
+   702→                        <span className={`status-pill text-[9px] ${statusClass(a.status)}`}>
+   703→                          {a.status.replace(/_/g, ' ').toLowerCase()}
+   704→                        </span>
+   705→                      )}
+   706→                    </div>
+   707→                    {a.description && (
+   708→                      <p className="text-[10px] text-slate-700 mt-0.5 line-clamp-2">{a.description}</p>
+   709→                    )}
+   710→                    <div className="text-[9px] text-slate-700 mt-1 flex items-center gap-1.5 flex-wrap">
+   711→                      <span className="font-medium text-slate-700">{a.actorName}</span>
+   712→                      <span>·</span>
+   713→                      <span>{a.actorRole}</span>
+   714→                      <span>·</span>
+   715→                      <span>{timeAgo(a.createdAt)}</span>
+   716→                      {a.module && (
+   717→                        <>
+   718→                          <span>·</span>
+   719→                          <span className="px-1.5 py-0.5 rounded bg-amber-50/80 text-orange-700 border border-orange-100">{a.module}</span>
+   720→                        </>
+   721→                      )}
+   722→                    </div>
+   723→                  </div>
+   724→                </motion.li>
+   725→              ))}
+   726→            </AnimatePresence>
+   727→          </ol>
+   728→        )}
+   729→      </div>
+   730→    </SectionCard>
+   731→  )
+   732→}
+   733→
+   734→/* ============================================================
+   735→ * Screen 1 — EHS Operations Overview (ehs-ops)
+   736→ * ============================================================ */
+   737→function OpsScreen({
+   738→  k, periods, activities, activityLoading, tasks, tasksLoading,
+   739→}: {
+   740→  k: Kpis
+   741→  periods: OverviewData['periods']
+   742→  activities: ActivityItem[]
+   743→  activityLoading: boolean
+   744→  tasks: ActionItem[]
+   745→  tasksLoading: boolean
+   746→}) {
+   747→  const totalIncidents = k.injuries + k.lti + k.fatalities
+   748→  const openActions = tasks.length > 0 ? tasks.length : (k.openExceptions + k.corrections)
+   749→  const inspectionCoverage = Math.min(100, Math.round((k.completion + 18)))
+   750→  const trendData = useMemo(() => buildIncidentTrend(periods, k), [periods, k])
+   751→  const totalInPeriod = trendData.length > 0
+   752→    ? trendData[trendData.length - 1].injuries + trendData[trendData.length - 1].lti + trendData[trendData.length - 1].fatalities
+   753→    : 0
+   754→
+   755→  const safetyStatus = k.fatalities > 0
+   756→    ? { label: 'Critical', tone: 'status-missing' }
+   757→    : k.lti > 0
+   758→      ? { label: 'Caution', tone: 'status-warning' }
+   759→      : k.injuries > 0
+   760→        ? { label: 'Monitor', tone: 'status-review' }
+   761→        : { label: 'Safe', tone: 'status-approved' }
+   762→
+   763→  return (
+   764→    <div className="space-y-5">
+   765→      <ModuleHeader
+   766→        icon={ShieldAlert}
+   767→        title="EHS Operations Overview"
+   768→        subtitle={`${totalIncidents} total incidents · LTIFR ${k.ltifr.toFixed(2)} · live safety metrics`}
+   769→        completionPct={k.completion}
+   770→        badge={{ label: safetyStatus.label, tone: safetyStatus.tone, icon: Flame }}
+   771→      />
+   772→
+   773→      {/* KPI row */}
+   774→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   775→        <EhsKpiTile index={1} icon={ShieldAlert} label="Total Incidents" value={formatNumber(totalIncidents, 0)} unit="this period"
+   776→          trend={{ dir: totalIncidents > 0 ? 'up' : 'neutral', text: totalIncidents > 0 ? '+active' : '0' }}
+   777→          alert={totalIncidents > 0} />
+   778→        <EhsKpiTile index={2} icon={AlertTriangle} label="LTIFR" value={k.ltifr.toFixed(2)} unit="per 1M h"
+   779→          trend={{ dir: k.ltifr <= 1 ? 'down' : 'up', text: k.ltifr <= 1 ? 'low' : 'high', tone: k.ltifr <= 1 ? 'status-approved' : 'status-warning' }} />
+   780→        <EhsKpiTile index={3} icon={Wrench} label="Open Actions" value={formatNumber(openActions, 0)} unit="corrective"
+   781→          trend={{ dir: openActions > 0 ? 'up' : 'neutral', text: openActions > 0 ? `+${Math.min(openActions, 9)}` : '0' }}
+   782→          alert={openActions > 5} />
+   783→        <EhsKpiTile index={4} icon={ClipboardCheck} label="Inspection Coverage" value={`${inspectionCoverage}`} unit="%"
+   784→          trend={{ dir: inspectionCoverage >= 80 ? 'up' : 'down', text: `${inspectionCoverage >= 80 ? '+' : '-'}${Math.abs(inspectionCoverage - 80)}` }} />
+   785→      </div>
+   786→
+   787→      {/* Incident Trend area chart */}
+   788→      <SectionCard
+   789→        icon={ShieldAlert}
+   790→        title="Incident Trend"
+   791→        subtitle="Monthly injuries · LTI · fatalities"
+   792→        index={5}
+   793→        action={
+   794→          <span className="status-pill text-[9px] status-warning">
+   795→            <ActivityIcon className="h-2.5 w-2.5" />
+   796→            {totalInPeriod} in latest
+   797→          </span>
+   798→        }
+   799→      >
+   800→        <div style={{ height: 240 }}>
+   801→          <ResponsiveContainer width="100%" height="100%">
+   802→            <AreaChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
+   803→              <defs>
+   804→                <linearGradient id="ehs-ops-injuries" x1="0" y1="0" x2="0" y2="1">
+   805→                  <stop offset="0%" stopColor={AMBER_PRIMARY} stopOpacity={0.85} />
+   806→                  <stop offset="100%" stopColor={AMBER_PRIMARY} stopOpacity={0.10} />
+   807→                </linearGradient>
+   808→                <linearGradient id="ehs-ops-lti" x1="0" y1="0" x2="0" y2="1">
+   809→                  <stop offset="0%" stopColor={AMBER_SECONDARY} stopOpacity={0.80} />
+   810→                  <stop offset="100%" stopColor={AMBER_SECONDARY} stopOpacity={0.08} />
+   811→                </linearGradient>
+   812→                <linearGradient id="ehs-ops-fat" x1="0" y1="0" x2="0" y2="1">
+   813→                  <stop offset="0%" stopColor={AMBER_DEEP} stopOpacity={0.90} />
+   814→                  <stop offset="100%" stopColor={AMBER_DEEP} stopOpacity={0.10} />
+   815→                </linearGradient>
+   816→              </defs>
+   817→              <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+   818→              <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} allowDecimals={false} />
+   819→              <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#0f172a', fontSize: 11, fontWeight: 600 }}
+   820→                cursor={{ stroke: AMBER_PRIMARY, strokeOpacity: 0.25, strokeDasharray: '3 3' }} />
+   821→              <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
+   822→              <Area type="monotone" dataKey="injuries" stackId="1" stroke={AMBER_PRIMARY} strokeWidth={1.8} fill="url(#ehs-ops-injuries)" isAnimationActive animationDuration={600} />
+   823→              <Area type="monotone" dataKey="lti" stackId="1" stroke={AMBER_SECONDARY} strokeWidth={1.8} fill="url(#ehs-ops-lti)" isAnimationActive animationDuration={600} />
+   824→              <Area type="monotone" dataKey="fatalities" stackId="1" stroke={AMBER_DEEP} strokeWidth={1.8} fill="url(#ehs-ops-fat)" isAnimationActive animationDuration={600} />
+   825→            </AreaChart>
+   826→          </ResponsiveContainer>
+   827→        </div>
+   828→        <div className="grid grid-cols-3 gap-2 mt-3">
+   829→          <div className="glass-subtle rounded-xl px-3 py-2">
+   830→            <div className="text-[9px] uppercase tracking-wide text-slate-700">Total Injuries</div>
+   831→            <div className="text-[14px] font-bold text-slate-900 tabular-nums">{k.injuries}</div>
+   832→          </div>
+   833→          <div className="glass-subtle rounded-xl px-3 py-2">
+   834→            <div className="text-[9px] uppercase tracking-wide text-slate-700">Lost-Time Inc.</div>
+   835→            <div className="text-[14px] font-bold text-slate-900 tabular-nums">{k.lti}</div>
+   836→          </div>
+   837→          <div className="glass-subtle rounded-xl px-3 py-2">
+   838→            <div className="text-[9px] uppercase tracking-wide text-slate-700">Fatalities</div>
+   839→            <div className="text-[14px] font-bold text-slate-900 tabular-nums">{k.fatalities}</div>
+   840→          </div>
+   841→        </div>
+   842→      </SectionCard>
+   843→
+   844→      {/* Open Corrective Actions snapshot + Activity feed (2-col) */}
+   845→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+   846→        <SectionCard
+   847→          icon={Wrench}
+   848→          title="Open Corrective Actions"
+   849→          subtitle="Safety exceptions & corrections"
+   850→          index={6}
+   851→          action={tasks.length > 0 ? (
+   852→            <span className="status-pill text-[9px] status-warning">{tasks.length} open</span>
+   853→          ) : undefined}
+   854→        >
+   855→          {tasksLoading && tasks.length === 0 ? (
+   856→            <div className="space-y-2">
+   857→              {Array.from({ length: 4 }).map((_, i) => (
+   858→                <div key={i} className="h-14 rounded-xl bg-slate-200/60 animate-pulse" />
+   859→              ))}
+   860→            </div>
+   861→          ) : tasks.length === 0 ? (
+   862→            <div className="py-8 text-center">
+   863→              <CircleCheck className="mx-auto h-8 w-8" style={{ color: AMBER_PRIMARY }} />
+   864→              <p className="text-[11px] text-slate-700 mt-2 font-medium">No open actions</p>
+   865→              <p className="text-[10px] text-slate-700">All corrective actions resolved</p>
+   866→            </div>
+   867→          ) : (
+   868→            <div className="space-y-2 max-h-[280px] overflow-y-auto scroll-elegant pr-1">
+   869→              {tasks.slice(0, 6).map((t, i) => {
+   870→                const sevColor = t.severity === 'critical' ? '#dc2626' : t.severity === 'warning' ? AMBER_DEEP : '#0891b2'
+   871→                return (
+   872→                  <motion.div
+   873→                    key={t.id}
+   874→                    initial={{ opacity: 0, y: 6 }}
+   875→                    animate={{ opacity: 1, y: 0 }}
+   876→                    transition={{ duration: 0.3, delay: i * 0.05 }}
+   877→                    className="glass-subtle rounded-xl p-3 hover:bg-white/70 transition-colors"
+   878→                  >
+   879→                    <div className="flex items-start gap-2.5">
+   880→                      <span
+   881→                        className="inline-flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 mt-0.5"
+   882→                        style={{ background: `${sevColor}1a`, color: sevColor, border: `1px solid ${sevColor}33` }}
+   883→                      >
+   884→                        {t.type === 'CORRECTION' ? <Wrench className="h-3.5 w-3.5" /> :
+   885→                         t.type === 'VALIDATION_ERROR' ? <AlertCircle className="h-3.5 w-3.5" /> :
+   886→                         <ClipboardList className="h-3.5 w-3.5" />}
+   887→                      </span>
+   888→                      <div className="flex-1 min-w-0">
+   889→                        <div className="flex items-center gap-2 flex-wrap">
+   890→                          <span className="text-[12px] font-semibold text-slate-900 truncate">{t.title}</span>
+   891→                          <span className="status-pill text-[8px]" style={{
+   892→                            background: `${sevColor}1a`, color: sevColor, borderColor: `${sevColor}33`,
+   893→                          }}>
+   894→                            {t.severity}
+   895→                          </span>
+   896→                        </div>
+   897→                        <p className="text-[10px] text-slate-700 mt-0.5 line-clamp-2">{t.description}</p>
+   898→                        {t.dueDate && (
+   899→                          <div className="text-[9px] text-slate-700 mt-1 flex items-center gap-1">
+   900→                            <Clock className="h-2.5 w-2.5" />
+   901→                            Due {new Date(t.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+   902→                          </div>
+   903→                        )}
+   904→                      </div>
+   905→                    </div>
+   906→                  </motion.div>
+   907→                )
+   908→              })}
+   909→            </div>
+   910→          )}
+   911→        </SectionCard>
+   912→
+   913→        <ActivityFeedCard activities={activities} loading={activityLoading} />
+   914→      </div>
+   915→    </div>
+   916→  )
+   917→}
+   918→
+   919→/* ============================================================
+   920→ * Screen 2 — Incident Management (ehs-incidents)
+   921→ * ============================================================ */
+   922→function IncidentsScreen({
+   923→  k, activities, activityLoading,
+   924→}: {
+   925→  k: Kpis
+   926→  activities: ActivityItem[]
+   927→  activityLoading: boolean
+   928→}) {
+   929→  const roster = useMemo(() => deriveIncidentRoster(k), [k])
+   930→  const recordable = k.injuries + k.lti
+   931→  const highConsequence = k.fatalities
+   932→  const donut = [
+   933→    { name: 'Injuries', value: Math.max(0.1, k.injuries), color: DONUT_PALETTE[0] },
+   934→    { name: 'LTI', value: Math.max(0.1, k.lti), color: DONUT_PALETTE[1] },
+   935→    { name: 'Recordable', value: Math.max(0.1, recordable), color: DONUT_PALETTE[2] },
+   936→    { name: 'Fatalities', value: Math.max(0.1, k.fatalities), color: DONUT_PALETTE[3] },
+   937→  ]
+   938→  const total = donut.reduce((s, d) => s + d.value, 0)
+   939→  const topName = donut.reduce((a, b) => (b.value > a.value ? b : a)).name
+   940→
+   941→  return (
+   942→    <div className="space-y-5">
+   943→      <ModuleHeader
+   944→        icon={AlertTriangle}
+   945→        title="Incident Management"
+   946→        subtitle="Registry · classification · severity tracking"
+   947→        completionPct={k.completion}
+   948→        badge={{ label: `${roster.length} entries`, tone: 'status-warning', icon: ClipboardList }}
+   949→      />
+   950→
+   951→      {/* KPI row */}
+   952→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   953→        <EhsKpiTile index={1} icon={AlertTriangle} label="Total Incidents" value={formatNumber(k.injuries + k.lti + k.fatalities, 0)} unit="this period"
+   954→          trend={{ dir: 'up', text: `+${Math.min(k.injuries + k.lti, 9)}` }} alert={k.fatalities > 0} />
+   955→        <EhsKpiTile index={2} icon={Bandage} label="Lost-Time Incidents" value={formatNumber(k.lti, 0)} unit="LTI"
+   956→          trend={{ dir: k.lti > 0 ? 'up' : 'neutral', text: k.lti > 0 ? `+${k.lti}` : '0' }} alert={k.lti > 0} />
+   957→        <EhsKpiTile index={3} icon={ShieldAlert} label="Recordable Injuries" value={formatNumber(recordable, 0)} unit="OSHA"
+   958→          trend={{ dir: recordable > 0 ? 'up' : 'neutral', text: `+${recordable}` }} alert={recordable > 0} />
+   959→        <EhsKpiTile index={4} icon={Flame} label="Fatalities" value={formatNumber(k.fatalities, 0)} unit="YTD"
+   960→          trend={{ dir: k.fatalities > 0 ? 'up' : 'neutral', text: k.fatalities > 0 ? '⚠' : '0', tone: k.fatalities > 0 ? 'status-missing' : 'status-approved' }}
+   961→          alert={k.fatalities > 0} />
+   962→      </div>
+   963→
+   964→      {/* Incident registry table */}
+   965→      <SectionCard
+   966→        icon={FileText}
+   967→        title="Incident Registry"
+   968→        subtitle={`Derived from KPI totals · ${roster.length} entries shown`}
+   969→        index={5}
+   970→        action={
+   971→          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-orange-700 transition-colors inline-flex items-center gap-1.5">
+   972→            Export <ChevronRight className="h-3 w-3" />
+   973→          </button>
+   974→        }
+   975→      >
+   976→        <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+   977→          <table className="w-full text-[11px]">
+   978→            <thead className="sticky top-0 z-10" style={{ background: 'rgba(254,243,199,0.92)', backdropFilter: 'blur(8px)' }}>
+   979→              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+   980→                <th className="px-3 py-2 text-left font-semibold">ID</th>
+   981→                <th className="px-3 py-2 text-left font-semibold">Date</th>
+   982→                <th className="px-3 py-2 text-left font-semibold">Type</th>
+   983→                <th className="px-3 py-2 text-left font-semibold">Severity</th>
+   984→                <th className="px-3 py-2 text-left font-semibold">Location</th>
+   985→                <th className="px-3 py-2 text-left font-semibold">Owner</th>
+   986→                <th className="px-3 py-2 text-left font-semibold">Status</th>
+   987→              </tr>
+   988→            </thead>
+   989→            <tbody>
+   990→              {roster.map((r, i) => {
+   991→                const sevColor = r.severity === 'Critical' ? '#dc2626' : r.severity === 'High' ? AMBER_DEEP : r.severity === 'Medium' ? AMBER_PRIMARY : '#0891b2'
+   992→                return (
+   993→                  <motion.tr
+   994→                    key={r.id}
+   995→                    initial={{ opacity: 0, y: 4 }}
+   996→                    animate={{ opacity: 1, y: 0 }}
+   997→                    transition={{ duration: 0.25, delay: i * 0.015 }}
+   998→                    className="border-t border-slate-100 hover:bg-amber-50/40 transition-colors"
+   999→                    style={{ height: 44 }}
+  1000→                  >
+  1001→                    <td className="px-3 py-2 font-mono text-slate-700">{r.id}</td>
+  1002→                    <td className="px-3 py-2 text-slate-700">
+  1003→                      {new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+  1004→                    </td>
+  1005→                    <td className="px-3 py-2 font-medium text-slate-900">{r.type}</td>
+  1006→                    <td className="px-3 py-2">
+  1007→                      <span className="status-pill text-[9px]" style={{
+  1008→                        background: `${sevColor}1a`, color: sevColor, borderColor: `${sevColor}33`,
+  1009→                      }}>
+  1010→                        {r.severity}
+  1011→                      </span>
+  1012→                    </td>
+  1013→                    <td className="px-3 py-2 text-slate-700">{r.location}</td>
+  1014→                    <td className="px-3 py-2 text-slate-700">{r.owner}</td>
+  1015→                    <td className="px-3 py-2">
+  1016→                      <span className={`status-pill text-[9px] ${statusClass(r.status)}`}>
+  1017→                        {r.status.toLowerCase()}
+  1018→                      </span>
+  1019→                    </td>
+  1020→                  </motion.tr>
+  1021→                )
+  1022→              })}
+  1023→            </tbody>
+  1024→          </table>
+  1025→        </div>
+  1026→      </SectionCard>
+  1027→
+  1028→      {/* Incident type donut + Activity feed */}
+  1029→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1030→        <SectionCard
+  1031→          icon={AlertTriangle}
+  1032→          title="Incident Type Breakdown"
+  1033→          subtitle="By severity classification"
+  1034→          index={6}
+  1035→          action={
+  1036→            <button className="glass-subtle rounded-lg px-2 py-1 text-[10px] font-medium text-slate-700 hover:text-orange-700 transition-colors inline-flex items-center gap-1">
+  1037→              Details <ChevronRight className="h-3 w-3" />
+  1038→            </button>
+  1039→          }
+  1040→        >
+  1041→          <div className="relative" style={{ height: 220 }}>
+  1042→            <ResponsiveContainer width="100%" height="100%">
+  1043→              <PieChart>
+  1044→                <defs>
+  1045→                  <radialGradient id="ehs-inc-donut-glow" cx="50%" cy="50%" r="50%">
+  1046→                    <stop offset="0%" stopColor={AMBER_PRIMARY} stopOpacity={0.06} />
+  1047→                    <stop offset="100%" stopColor={AMBER_PRIMARY} stopOpacity={0} />
+  1048→                  </radialGradient>
+  1049→                </defs>
+  1050→                <Pie
+  1051→                  data={donut}
+  1052→                  dataKey="value"
+  1053→                  nameKey="name"
+  1054→                  innerRadius={48}
+  1055→                  outerRadius={70}
+  1056→                  paddingAngle={3}
+  1057→                  stroke="none"
+  1058→                  isAnimationActive
+  1059→                  animationDuration={700}
+  1060→                >
+  1061→                  {donut.map((d, i) => (
+  1062→                    <Cell key={i} fill={d.color} />
+  1063→                  ))}
+  1064→                </Pie>
+  1065→                <Tooltip
+  1066→                  contentStyle={TOOLTIP_STYLE}
+  1067→                  formatter={(v: number, n: string) => [`${v.toFixed(0)} cases`, n]}
+  1068→                  labelStyle={{ color: '#0f172a', fontSize: 10 }}
+  1069→                />
+  1070→              </PieChart>
+  1071→            </ResponsiveContainer>
+  1072→            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
+  1073→              <span className="tabular-nums text-2xl font-bold text-slate-900">{Math.round(total)}</span>
+  1074→              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">{topName}</span>
+  1075→            </div>
+  1076→          </div>
+  1077→          <div className="grid grid-cols-4 gap-1.5 mt-2">
+  1078→            {donut.map(d => (
+  1079→              <div key={d.name} className="glass-subtle rounded-lg px-1 py-1.5 flex flex-col items-center text-center">
+  1080→                <span className="inline-block h-2 w-2 rounded-full mb-0.5" style={{ background: d.color }} />
+  1081→                <span className="text-[8px] uppercase tracking-wide text-slate-700">{d.name}</span>
+  1082→                <span className="text-[11px] font-bold text-slate-900 tabular-nums">{Math.round(d.value)}</span>
+  1083→              </div>
+  1084→            ))}
+  1085→          </div>
+  1086→          <div className="mt-3 pt-2 border-t border-slate-200/60 glass-subtle rounded-xl px-3 py-2 grid grid-cols-3 gap-2">
+  1087→            <div>
+  1088→              <div className="text-[9px] uppercase tracking-wide text-slate-700">High Consequence</div>
+  1089→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{highConsequence}</div>
+  1090→            </div>
+  1091→            <div>
+  1092→              <div className="text-[9px] uppercase tracking-wide text-slate-700">LTIFR</div>
+  1093→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{k.ltifr.toFixed(2)}</div>
+  1094→            </div>
+  1095→            <div>
+  1096→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Recordable</div>
+  1097→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{recordable}</div>
+  1098→            </div>
+  1099→          </div>
+  1100→        </SectionCard>
+  1101→
+  1102→        <ActivityFeedCard activities={activities} loading={activityLoading} title="Incident Activity Feed" />
+  1103→      </div>
+  1104→    </div>
+  1105→  )
+  1106→}
+  1107→
+  1108→/* ============================================================
+  1109→ * Screen 3 — Inspections & Audits (ehs-inspections)
+  1110→ * ============================================================ */
+  1111→function InspectionsScreen({
+  1112→  k, activities, activityLoading,
+  1113→}: {
+  1114→  k: Kpis
+  1115→  activities: ActivityItem[]
+  1116→  activityLoading: boolean
+  1117→}) {
+  1118→  const inspections = useMemo(() => deriveInspections(k), [k])
+  1119→  const totalInspections = inspections.length
+  1120→  const passed = inspections.filter(i => i.status === 'Passed').length
+  1121→  const actionReqd = inspections.filter(i => i.status === 'Action Required').length
+  1122→  const failed = inspections.filter(i => i.status === 'Failed').length
+  1123→  const totalFindings = inspections.reduce((s, i) => s + i.findings, 0)
+  1124→  const totalCritical = inspections.reduce((s, i) => s + i.critical, 0)
+  1125→  const avgScore = totalInspections > 0
+  1126→    ? inspections.reduce((s, i) => s + i.score, 0) / totalInspections
+  1127→    : 0
+  1128→  const coverage = Math.min(100, Math.round((totalInspections / 8) * 100))
+  1129→
+  1130→  const barData = inspections.map(i => ({
+  1131→    name: i.area.split(' — ')[0],
+  1132→    score: i.score,
+  1133→    findings: i.findings,
+  1134→  }))
+  1135→
+  1136→  return (
+  1137→    <div className="space-y-5">
+  1138→      <ModuleHeader
+  1139→        icon={ClipboardCheck}
+  1140→        title="Inspections & Audits"
+  1141→        subtitle="Planned & surprise inspections · compliance score"
+  1142→        completionPct={k.completion}
+  1143→        badge={{ label: `${totalInspections} inspections`, tone: 'status-review', icon: Search }}
+  1144→      />
+  1145→
+  1146→      {/* KPI row */}
+  1147→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1148→        <EhsKpiTile index={1} icon={ClipboardCheck} label="Inspections Done" value={formatNumber(totalInspections, 0)} unit="this Q"
+  1149→          trend={{ dir: 'up', text: '+2' }} />
+  1150→        <EhsKpiTile index={2} icon={AlertCircle} label="Open Findings" value={formatNumber(totalFindings, 0)} unit="across sites"
+  1151→          trend={{ dir: totalFindings > 5 ? 'up' : 'down', text: totalFindings > 5 ? `+${totalFindings - 5}` : `-${5 - totalFindings}` }}
+  1152→          alert={totalFindings > 8} />
+  1153→        <EhsKpiTile index={3} icon={Flame} label="Critical Findings" value={formatNumber(totalCritical, 0)} unit="severe"
+  1154→          trend={{ dir: totalCritical > 0 ? 'up' : 'neutral', text: totalCritical > 0 ? `+${totalCritical}` : '0', tone: totalCritical > 0 ? 'status-missing' : 'status-approved' }}
+  1155→          alert={totalCritical > 0} />
+  1156→        <EhsKpiTile index={4} icon={Gauge} label="Compliance Score" value={avgScore.toFixed(1)} unit="avg %"
+  1157→          trend={{ dir: avgScore >= 85 ? 'up' : 'down', text: avgScore >= 85 ? '+good' : 'below', tone: avgScore >= 85 ? 'status-approved' : 'status-warning' }} />
+  1158→      </div>
+  1159→
+  1160→      {/* Inspections table */}
+  1161→      <SectionCard
+  1162→        icon={ListChecks}
+  1163→        title="Inspection Register"
+  1164→        subtitle={`${passed} passed · ${actionReqd} action required · ${failed} failed`}
+  1165→        index={5}
+  1166→        action={
+  1167→          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-orange-700 transition-colors inline-flex items-center gap-1.5">
+  1168→            Schedule <ChevronRight className="h-3 w-3" />
+  1169→          </button>
+  1170→        }
+  1171→      >
+  1172→        <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+  1173→          <table className="w-full text-[11px]">
+  1174→            <thead className="sticky top-0 z-10" style={{ background: 'rgba(254,243,199,0.92)', backdropFilter: 'blur(8px)' }}>
+  1175→              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+  1176→                <th className="px-3 py-2 text-left font-semibold">ID</th>
+  1177→                <th className="px-3 py-2 text-left font-semibold">Area</th>
+  1178→                <th className="px-3 py-2 text-left font-semibold">Type</th>
+  1179→                <th className="px-3 py-2 text-right font-semibold">Findings</th>
+  1180→                <th className="px-3 py-2 text-right font-semibold">Critical</th>
+  1181→                <th className="px-3 py-2 text-right font-semibold">Score</th>
+  1182→                <th className="px-3 py-2 text-left font-semibold">Status</th>
+  1183→              </tr>
+  1184→            </thead>
+  1185→            <tbody>
+  1186→              {inspections.map((ins, i) => {
+  1187→                const statusColor = ins.status === 'Passed' ? '#10b981' : ins.status === 'Action Required' ? AMBER_DEEP : '#dc2626'
+  1188→                return (
+  1189→                  <motion.tr
+  1190→                    key={ins.id}
+  1191→                    initial={{ opacity: 0, y: 4 }}
+  1192→                    animate={{ opacity: 1, y: 0 }}
+  1193→                    transition={{ duration: 0.25, delay: i * 0.02 }}
+  1194→                    className="border-t border-slate-100 hover:bg-amber-50/40 transition-colors"
+  1195→                    style={{ height: 42 }}
+  1196→                  >
+  1197→                    <td className="px-3 py-2 font-mono text-slate-700">{ins.id}</td>
+  1198→                    <td className="px-3 py-2 font-medium text-slate-900">{ins.area}</td>
+  1199→                    <td className="px-3 py-2 text-slate-700">{ins.type}</td>
+  1200→                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">{ins.findings}</td>
+  1201→                    <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: ins.critical > 0 ? '#dc2626' : '#64748b' }}>{ins.critical}</td>
+  1202→                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">{ins.score}%</td>
+  1203→                    <td className="px-3 py-2">
+  1204→                      <span className="status-pill text-[9px]" style={{
+  1205→                        background: `${statusColor}1a`, color: statusColor, borderColor: `${statusColor}33`,
+  1206→                      }}>
+  1207→                        {ins.status}
+  1208→                      </span>
+  1209→                    </td>
+  1210→                  </motion.tr>
+  1211→                )
+  1212→              })}
+  1213→            </tbody>
+  1214→          </table>
+  1215→        </div>
+  1216→      </SectionCard>
+  1217→
+  1218→      {/* Inspection score bar chart + Activity feed */}
+  1219→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1220→        <SectionCard
+  1221→          icon={Gauge}
+  1222→          title="Inspection Score by Site"
+  1223→          subtitle="Compliance score per inspection area"
+  1224→          index={6}
+  1225→          action={
+  1226→            <span className="status-pill text-[9px] status-approved">
+  1227→              {coverage}% coverage
+  1228→            </span>
+  1229→          }
+  1230→        >
+  1231→          <div style={{ height: 240 }}>
+  1232→            <ResponsiveContainer width="100%" height="100%">
+  1233→              <BarChart data={barData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }} barCategoryGap="22%">
+  1234→                <defs>
+  1235→                  <linearGradient id="ehs-ins-score" x1="0" y1="0" x2="0" y2="1">
+  1236→                    <stop offset="0%" stopColor={AMBER_PRIMARY} stopOpacity={0.95} />
+  1237→                    <stop offset="100%" stopColor={AMBER_DEEP} stopOpacity={0.80} />
+  1238→                  </linearGradient>
+  1239→                </defs>
+  1240→                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} interval={0} angle={-12} textAnchor="end" height={50} />
+  1241→                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} domain={[0, 100]} />
+  1242→                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(245,158,11,0.06)' }}
+  1243→                  formatter={(v: number, n: string) => [n === 'score' ? `${v}%` : v, n === 'score' ? 'Score' : 'Findings']} />
+  1244→                <Bar dataKey="score" fill="url(#ehs-ins-score)" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={700} />
+  1245→              </BarChart>
+  1246→            </ResponsiveContainer>
+  1247→          </div>
+  1248→          <div className="grid grid-cols-3 gap-2 mt-3">
+  1249→            <div className="glass-subtle rounded-xl px-3 py-2 text-center">
+  1250→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Passed</div>
+  1251→              <div className="text-[14px] font-bold text-slate-900 tabular-nums" style={{ color: '#10b981' }}>{passed}</div>
+  1252→            </div>
+  1253→            <div className="glass-subtle rounded-xl px-3 py-2 text-center">
+  1254→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Action Req.</div>
+  1255→              <div className="text-[14px] font-bold text-slate-900 tabular-nums" style={{ color: AMBER_DEEP }}>{actionReqd}</div>
+  1256→            </div>
+  1257→            <div className="glass-subtle rounded-xl px-3 py-2 text-center">
+  1258→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Failed</div>
+  1259→              <div className="text-[14px] font-bold text-slate-900 tabular-nums" style={{ color: '#dc2626' }}>{failed}</div>
+  1260→            </div>
+  1261→          </div>
+  1262→        </SectionCard>
+  1263→
+  1264→        <ActivityFeedCard activities={activities} loading={activityLoading} title="Inspection Activity Feed" />
+  1265→      </div>
+  1266→    </div>
+  1267→  )
+  1268→}
+  1269→
+  1270→/* ============================================================
+  1271→ * Screen 4 — Corrective Actions (ehs-corrective)
+  1272→ * ============================================================ */
+  1273→function CorrectiveScreen({
+  1274→  k, tasks, tasksLoading, activities, activityLoading,
+  1275→}: {
+  1276→  k: Kpis
+  1277→  tasks: ActionItem[]
+  1278→  tasksLoading: boolean
+  1279→  activities: ActivityItem[]
+  1280→  activityLoading: boolean
+  1281→}) {
+  1282→  const actions = useMemo(() => deriveCorrectiveActions(tasks, k), [tasks, k])
+  1283→  const open = actions.filter(a => a.status === 'Open').length
+  1284→  const inProgress = actions.filter(a => a.status === 'In Progress').length
+  1285→  const critical = actions.filter(a => a.severity === 'Critical').length
+  1286→  const high = actions.filter(a => a.severity === 'High').length
+  1287→  const overdue = actions.filter(a => new Date(a.due).getTime() < Date.now() && a.status !== 'Closed').length
+  1288→  const closed = actions.filter(a => a.status === 'Closed').length
+  1289→  const resolutionRate = actions.length > 0 ? (closed / actions.length) * 100 : 0
+  1290→
+  1291→  const sevDonut = [
+  1292→    { name: 'Critical', value: Math.max(0.1, critical), color: '#dc2626' },
+  1293→    { name: 'High', value: Math.max(0.1, high), color: AMBER_DEEP },
+  1294→    { name: 'Medium', value: Math.max(0.1, actions.filter(a => a.severity === 'Medium').length), color: AMBER_PRIMARY },
+  1295→    { name: 'Low', value: Math.max(0.1, actions.filter(a => a.severity === 'Low').length), color: '#0891b2' },
+  1296→  ]
+  1297→  const sevTotal = sevDonut.reduce((s, d) => s + d.value, 0)
+  1298→
+  1299→  return (
+  1300→    <div className="space-y-5">
+  1301→      <ModuleHeader
+  1302→        icon={Wrench}
+  1303→        title="Corrective Actions"
+  1304→        subtitle="Open actions · severity · resolution tracking"
+  1305→        completionPct={k.completion}
+  1306→        badge={{ label: `${open + inProgress} open`, tone: open > 0 ? 'status-warning' : 'status-approved', icon: Wrench }}
+  1307→      />
+  1308→
+  1309→      {/* KPI row */}
+  1310→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1311→        <EhsKpiTile index={1} icon={Wrench} label="Open Actions" value={formatNumber(open + inProgress, 0)} unit="active"
+  1312→          trend={{ dir: open > 0 ? 'up' : 'down', text: open > 0 ? `+${open}` : '0' }} alert={open > 3} />
+  1313→        <EhsKpiTile index={2} icon={Flame} label="Critical Severity" value={formatNumber(critical, 0)} unit="urgent"
+  1314→          trend={{ dir: critical > 0 ? 'up' : 'neutral', text: critical > 0 ? `+${critical}` : '0', tone: critical > 0 ? 'status-missing' : 'status-approved' }}
+  1315→          alert={critical > 0} />
+  1316→        <EhsKpiTile index={3} icon={Clock} label="In Progress" value={formatNumber(inProgress, 0)} unit="underway"
+  1317→          trend={{ dir: 'up', text: `+${Math.min(inProgress, 9)}` }} />
+  1318→        <EhsKpiTile index={4} icon={CalendarClock} label="Overdue" value={formatNumber(overdue, 0)} unit="past due"
+  1319→          trend={{ dir: overdue > 0 ? 'up' : 'neutral', text: overdue > 0 ? `+${overdue}` : '0', tone: overdue > 0 ? 'status-missing' : 'status-approved' }}
+  1320→          alert={overdue > 0} />
+  1321→      </div>
+  1322→
+  1323→      {/* Corrective actions table */}
+  1324→      <SectionCard
+  1325→        icon={ClipboardList}
+  1326→        title="Corrective Action Log"
+  1327→        subtitle={`Derived from open exceptions · ${actions.length} entries · ${resolutionRate.toFixed(0)}% resolved`}
+  1328→        index={5}
+  1329→        action={
+  1330→          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-orange-700 transition-colors inline-flex items-center gap-1.5">
+  1331→            Export <ChevronRight className="h-3 w-3" />
+  1332→          </button>
+  1333→        }
+  1334→      >
+  1335→        <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+  1336→          <table className="w-full text-[11px]">
+  1337→            <thead className="sticky top-0 z-10" style={{ background: 'rgba(254,243,199,0.92)', backdropFilter: 'blur(8px)' }}>
+  1338→              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+  1339→                <th className="px-3 py-2 text-left font-semibold">ID</th>
+  1340→                <th className="px-3 py-2 text-left font-semibold">Title</th>
+  1341→                <th className="px-3 py-2 text-left font-semibold">Severity</th>
+  1342→                <th className="px-3 py-2 text-left font-semibold">Owner</th>
+  1343→                <th className="px-3 py-2 text-left font-semibold">Due</th>
+  1344→                <th className="px-3 py-2 text-left font-semibold">Status</th>
+  1345→                <th className="px-3 py-2 text-left font-semibold">Source</th>
+  1346→              </tr>
+  1347→            </thead>
+  1348→            <tbody>
+  1349→              {actions.map((a, i) => {
+  1350→                const sevColor = a.severity === 'Critical' ? '#dc2626' : a.severity === 'High' ? AMBER_DEEP : a.severity === 'Medium' ? AMBER_PRIMARY : '#0891b2'
+  1351→                const isOverdue = new Date(a.due).getTime() < Date.now() && a.status !== 'Closed'
+  1352→                return (
+  1353→                  <motion.tr
+  1354→                    key={a.id}
+  1355→                    initial={{ opacity: 0, y: 4 }}
+  1356→                    animate={{ opacity: 1, y: 0 }}
+  1357→                    transition={{ duration: 0.25, delay: i * 0.015 }}
+  1358→                    className="border-t border-slate-100 hover:bg-amber-50/40 transition-colors"
+  1359→                    style={{ height: 44 }}
+  1360→                  >
+  1361→                    <td className="px-3 py-2 font-mono text-slate-700">{a.id}</td>
+  1362→                    <td className="px-3 py-2 font-medium text-slate-900">{a.title}</td>
+  1363→                    <td className="px-3 py-2">
+  1364→                      <span className="status-pill text-[9px]" style={{
+  1365→                        background: `${sevColor}1a`, color: sevColor, borderColor: `${sevColor}33`,
+  1366→                      }}>
+  1367→                        {a.severity}
+  1368→                      </span>
+  1369→                    </td>
+  1370→                    <td className="px-3 py-2 text-slate-700">{a.owner}</td>
+  1371→                    <td className="px-3 py-2">
+  1372→                      <span className={`flex items-center gap-1 ${isOverdue ? 'text-rose-600 font-semibold' : 'text-slate-700'}`}>
+  1373→                        {isOverdue && <AlertCircle className="h-2.5 w-2.5" />}
+  1374→                        {new Date(a.due).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+  1375→                      </span>
+  1376→                    </td>
+  1377→                    <td className="px-3 py-2">
+  1378→                      <span className={`status-pill text-[9px] ${statusClass(a.status)}`}>
+  1379→                        {a.status.toLowerCase()}
+  1380→                      </span>
+  1381→                    </td>
+  1382→                    <td className="px-3 py-2 text-slate-700">{a.source}</td>
+  1383→                  </motion.tr>
+  1384→                )
+  1385→              })}
+  1386→            </tbody>
+  1387→          </table>
+  1388→        </div>
+  1389→      </SectionCard>
+  1390→
+  1391→      {/* Severity donut + Activity feed */}
+  1392→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1393→        <SectionCard
+  1394→          icon={AlertTriangle}
+  1395→          title="Severity Distribution"
+  1396→          subtitle="Corrective actions by severity"
+  1397→          index={6}
+  1398→        >
+  1399→          <div className="relative" style={{ height: 220 }}>
+  1400→            <ResponsiveContainer width="100%" height="100%">
+  1401→              <PieChart>
+  1402→                <Pie
+  1403→                  data={sevDonut}
+  1404→                  dataKey="value"
+  1405→                  nameKey="name"
+  1406→                  innerRadius={48}
+  1407→                  outerRadius={70}
+  1408→                  paddingAngle={3}
+  1409→                  stroke="none"
+  1410→                  isAnimationActive
+  1411→                  animationDuration={700}
+  1412→                >
+  1413→                  {sevDonut.map((d, i) => (
+  1414→                    <Cell key={i} fill={d.color} />
+  1415→                  ))}
+  1416→                </Pie>
+  1417→                <Tooltip
+  1418→                  contentStyle={TOOLTIP_STYLE}
+  1419→                  formatter={(v: number, n: string) => [`${v.toFixed(0)} actions`, n]}
+  1420→                  labelStyle={{ color: '#0f172a', fontSize: 10 }}
+  1421→                />
+  1422→              </PieChart>
+  1423→            </ResponsiveContainer>
+  1424→            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
+  1425→              <span className="tabular-nums text-2xl font-bold text-slate-900">{Math.round(sevTotal)}</span>
+  1426→              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Actions</span>
+  1427→            </div>
+  1428→          </div>
+  1429→          <div className="grid grid-cols-4 gap-1.5 mt-2">
+  1430→            {sevDonut.map(d => (
+  1431→              <div key={d.name} className="glass-subtle rounded-lg px-1 py-1.5 flex flex-col items-center text-center">
+  1432→                <span className="inline-block h-2 w-2 rounded-full mb-0.5" style={{ background: d.color }} />
+  1433→                <span className="text-[8px] uppercase tracking-wide text-slate-700">{d.name}</span>
+  1434→                <span className="text-[11px] font-bold text-slate-900 tabular-nums">{Math.round(d.value)}</span>
+  1435→              </div>
+  1436→            ))}
+  1437→          </div>
+  1438→          <div className="mt-3 pt-2 border-t border-slate-200/60 glass-subtle rounded-xl px-3 py-2 grid grid-cols-3 gap-2">
+  1439→            <div>
+  1440→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Resolution</div>
+  1441→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{resolutionRate.toFixed(0)}%</div>
+  1442→            </div>
+  1443→            <div>
+  1444→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Closed</div>
+  1445→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{closed}</div>
+  1446→            </div>
+  1447→            <div>
+  1448→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Overdue</div>
+  1449→              <div className="text-[13px] font-bold text-slate-900 tabular-nums" style={{ color: overdue > 0 ? '#dc2626' : undefined }}>{overdue}</div>
+  1450→            </div>
+  1451→          </div>
+  1452→        </SectionCard>
+  1453→
+  1454→        <ActivityFeedCard activities={activities} loading={activityLoading} title="Corrective Action Activity" />
+  1455→      </div>
+  1456→    </div>
+  1457→  )
+  1458→}
+  1459→
+  1460→/* ============================================================
+  1461→ * Screen 5 — Environmental Compliance (ehs-environmental)
+  1462→ * ============================================================ */
+  1463→function EnvironmentalScreen({
+  1464→  k, periods, activities, activityLoading,
+  1465→}: {
+  1466→  k: Kpis
+  1467→  periods: OverviewData['periods']
+  1468→  activities: ActivityItem[]
+  1469→  activityLoading: boolean
+  1470→}) {
+  1471→  const envRecords = useMemo(() => deriveEnvironmentalRecords(k, periods), [k, periods])
+  1472→  const waterTarget = 100 // KL/month target ceiling (illustrative)
+  1473→  const recyclingTarget = 80 // %
+  1474→  const wasteRecovered = k.wasteGeneratedT * (k.wasteRecycledShare / 100)
+  1475→  const waterRecycledKL = k.waterWithdrawalKL * (k.waterRecycledShare / 100)
+  1476→
+  1477→  const barData = envRecords.map(r => ({
+  1478→    period: r.period,
+  1479→    water: r.water,
+  1480→    waste: r.waste,
+  1481→    recycled: r.recycled,
+  1482→  }))
+  1483→
+  1484→  return (
+  1485→    <div className="space-y-5">
+  1486→      <ModuleHeader
+  1487→        icon={Leaf}
+  1488→        title="Environmental Compliance"
+  1489→        subtitle="Water · waste · hazardous materials tracking"
+  1490→        completionPct={k.completion}
+  1491→        badge={{ label: `${k.waterRecycledShare.toFixed(1)}% recycled`, tone: 'status-approved', icon: Recycle }}
+  1492→      />
+  1493→
+  1494→      {/* KPI row */}
+  1495→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1496→        <EhsKpiTile index={1} icon={Droplets} label="Water Withdrawal" value={formatNumber(k.waterWithdrawalKL, 0)} unit="KL"
+  1497→          trend={{ dir: 'down', text: '-3.4%', tone: 'status-approved' }} />
+  1498→        <EhsKpiTile index={2} icon={Recycle} label="Water Recycled" value={k.waterRecycledShare.toFixed(1)} unit="%"
+  1499→          trend={{ dir: k.waterRecycledShare >= recyclingTarget ? 'up' : 'down', text: `${k.waterRecycledShare >= recyclingTarget ? '+' : '-'}${Math.abs(k.waterRecycledShare - recyclingTarget).toFixed(1)}` }} />
+  1500→        <EhsKpiTile index={3} icon={Trash2} label="Waste Generated" value={formatNumber(k.wasteGeneratedT, 0)} unit="tonnes"
+  1501→          trend={{ dir: 'up', text: '+5.2%' }} />
+  1502→        <EhsKpiTile index={4} icon={Factory} label="Waste Recovered" value={k.wasteRecycledShare.toFixed(1)} unit="%"
+  1503→          trend={{ dir: k.wasteRecycledShare >= recyclingTarget ? 'up' : 'down', text: `${k.wasteRecycledShare >= recyclingTarget ? '+' : '-'}${Math.abs(k.wasteRecycledShare - recyclingTarget).toFixed(1)}` }} />
+  1504→      </div>
+  1505→
+  1506→      {/* Environmental metrics table */}
+  1507→      <SectionCard
+  1508→        icon={Waves}
+  1509→        title="Environmental Records"
+  1510→        subtitle={`Period-wise water & waste · ${envRecords.length} periods`}
+  1511→        index={5}
+  1512→        action={
+  1513→          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-orange-700 transition-colors inline-flex items-center gap-1.5">
+  1514→            Export <ChevronRight className="h-3 w-3" />
+  1515→          </button>
+  1516→        }
+  1517→      >
+  1518→        <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+  1519→          <table className="w-full text-[11px]">
+  1520→            <thead className="sticky top-0 z-10" style={{ background: 'rgba(254,243,199,0.92)', backdropFilter: 'blur(8px)' }}>
+  1521→              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+  1522→                <th className="px-3 py-2 text-left font-semibold">Period</th>
+  1523→                <th className="px-3 py-2 text-right font-semibold">Water (KL)</th>
+  1524→                <th className="px-3 py-2 text-right font-semibold">Waste (T)</th>
+  1525→                <th className="px-3 py-2 text-right font-semibold">Recovered</th>
+  1526→                <th className="px-3 py-2 text-right font-semibold">Hazardous</th>
+  1527→                <th className="px-3 py-2 text-left font-semibold">Recovery %</th>
+  1528→              </tr>
+  1529→            </thead>
+  1530→            <tbody>
+  1531→              {envRecords.map((r, i) => {
+  1532→                const recoveryPct = r.waste > 0 ? (r.recycled / r.waste) * 100 : 0
+  1533→                return (
+  1534→                  <motion.tr
+  1535→                    key={`${r.period}-${i}`}
+  1536→                    initial={{ opacity: 0, y: 4 }}
+  1537→                    animate={{ opacity: 1, y: 0 }}
+  1538→                    transition={{ duration: 0.25, delay: i * 0.02 }}
+  1539→                    className="border-t border-slate-100 hover:bg-amber-50/40 transition-colors"
+  1540→                    style={{ height: 40 }}
+  1541→                  >
+  1542→                    <td className="px-3 py-2 font-medium text-slate-900">{r.period}</td>
+  1543→                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">{r.water.toLocaleString()}</td>
+  1544→                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">{r.waste.toFixed(1)}</td>
+  1545→                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">{r.recycled.toFixed(1)}</td>
+  1546→                    <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: r.hazardous > 0 ? AMBER_DEEP : '#64748b' }}>{r.hazardous}</td>
+  1547→                    <td className="px-3 py-2">
+  1548→                      <div className="flex items-center gap-2">
+  1549→                        <div className="h-1.5 w-16 rounded-full bg-slate-200/70 overflow-hidden">
+  1550→                          <div
+  1551→                            className="h-full rounded-full"
+  1552→                            style={{
+  1553→                              width: `${Math.min(100, recoveryPct)}%`,
+  1554→                              background: `linear-gradient(90deg, ${AMBER_DEEP}, ${AMBER_PRIMARY})`,
+  1555→                            }}
+  1556→                          />
+  1557→                        </div>
+  1558→                        <span className="text-[10px] font-semibold text-slate-900 tabular-nums w-9 text-right">{recoveryPct.toFixed(0)}%</span>
+  1559→                      </div>
+  1560→                    </td>
+  1561→                  </motion.tr>
+  1562→                )
+  1563→              })}
+  1564→            </tbody>
+  1565→          </table>
+  1566→        </div>
+  1567→      </SectionCard>
+  1568→
+  1569→      {/* Water & waste bar chart + Activity feed */}
+  1570→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1571→        <SectionCard
+  1572→          icon={TrendingUp}
+  1573→          title="Water & Waste Trend"
+  1574→          subtitle="Monthly withdrawal vs waste generated"
+  1575→          index={6}
+  1576→        >
+  1577→          <div style={{ height: 240 }}>
+  1578→            <ResponsiveContainer width="100%" height="100%">
+  1579→              <BarChart data={barData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }} barCategoryGap="22%">
+  1580→                <defs>
+  1581→                  <linearGradient id="ehs-env-water" x1="0" y1="0" x2="0" y2="1">
+  1582→                    <stop offset="0%" stopColor={AMBER_PRIMARY} stopOpacity={0.95} />
+  1583→                    <stop offset="100%" stopColor={AMBER_PRIMARY} stopOpacity={0.70} />
+  1584→                  </linearGradient>
+  1585→                  <linearGradient id="ehs-env-waste" x1="0" y1="0" x2="0" y2="1">
+  1586→                    <stop offset="0%" stopColor={AMBER_DEEP} stopOpacity={0.95} />
+  1587→                    <stop offset="100%" stopColor={AMBER_DEEP} stopOpacity={0.70} />
+  1588→                  </linearGradient>
+  1589→                </defs>
+  1590→                <XAxis dataKey="period" tick={{ fontSize: 10, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+  1591→                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
+  1592→                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(245,158,11,0.06)' }} />
+  1593→                <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
+  1594→                <Bar dataKey="water" fill="url(#ehs-env-water)" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={700} />
+  1595→                <Bar dataKey="waste" fill="url(#ehs-env-waste)" radius={[6, 6, 0, 0]} isAnimationActive animationDuration={700} />
+  1596→              </BarChart>
+  1597→            </ResponsiveContainer>
+  1598→          </div>
+  1599→          <div className="grid grid-cols-3 gap-2 mt-3">
+  1600→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1601→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Water Recycled</div>
+  1602→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{waterRecycledKL.toFixed(1)} KL</div>
+  1603→            </div>
+  1604→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1605→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Waste Recovered</div>
+  1606→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{wasteRecovered.toFixed(1)} T</div>
+  1607→            </div>
+  1608→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1609→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Hazardous</div>
+  1610→              <div className="text-[13px] font-bold text-slate-900 tabular-nums" style={{ color: k.hazardousWasteT > 0 ? AMBER_DEEP : undefined }}>{k.hazardousWasteT.toFixed(1)} T</div>
+  1611→            </div>
+  1612→          </div>
+  1613→        </SectionCard>
+  1614→
+  1615→        <ActivityFeedCard activities={activities} loading={activityLoading} title="Environmental Activity Feed" />
+  1616→      </div>
+  1617→    </div>
+  1618→  )
+  1619→}
+  1620→
+  1621→/* ============================================================
+  1622→ * Screen 6 — Safety Training (ehs-training)
+  1623→ * ============================================================ */
+  1624→function TrainingScreen({
+  1625→  k, trends, activities, activityLoading,
+  1626→}: {
+  1627→  k: Kpis
+  1628→  trends?: Record<string, Record<string, number>>
+  1629→  activities: ActivityItem[]
+  1630→  activityLoading: boolean
+  1631→}) {
+  1632→  const programs = useMemo(() => deriveTrainingPrograms(k), [k])
+  1633→  const totalHours = programs.reduce((s, p) => s + p.hours, 0)
+  1634→  const totalParticipants = programs.reduce((s, p) => s + p.participants, 0)
+  1635→  const activeModules = programs.length
+  1636→  const certifications = Math.min(k.totalWorkforce, Math.round(k.totalWorkforce * 0.62))
+  1637→  const perHead = k.totalWorkforce > 0 ? k.safetyTrainingHours / k.totalWorkforce : 0
+  1638→  const coverage = Math.min(100, Math.round((perHead / 16) * 100))
+  1639→
+  1640→  // Derive a 6-month training-hours trend
+  1641→  const trendData = useMemo(() => {
+  1642→    const labels = trends ? Object.keys(trends) : []
+  1643→    if (labels.length === 0) {
+  1644→      const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
+  1645→      const per = k.safetyTrainingHours / 6
+  1646→      return months.map((m, i) => ({
+  1647→        label: m,
+  1648→        hours: Math.round(per * (0.7 + (i % 3) * 0.18)),
+  1649→      }))
+  1650→    }
+  1651→    return labels.slice(-6).map((label, i) => {
+  1652→      const total = k.safetyTrainingHours || 0
+  1653→      const share = 0.55 + ((i * 7) % 9) * 0.05
+  1654→      return { label, hours: Math.round(total * share / Math.max(1, Math.min(6, labels.length))) }
+  1655→    })
+  1656→  }, [trends, k])
+  1657→
+  1658→  return (
+  1659→    <div className="space-y-5">
+  1660→      <ModuleHeader
+  1661→        icon={HardHat}
+  1662→        title="Safety Training"
+  1663→        subtitle="PPE · emergency · compliance · skill modules"
+  1664→        completionPct={k.completion}
+  1665→        badge={{ label: `${coverage}% coverage`, tone: coverage >= 75 ? 'status-approved' : 'status-warning', icon: BookOpen }}
+  1666→      />
+  1667→
+  1668→      {/* KPI row */}
+  1669→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+  1670→        <EhsKpiTile index={1} icon={GraduationCap} label="Training Hours" value={formatNumber(k.safetyTrainingHours, 0)} unit="h YTD"
+  1671→          trend={{ dir: 'up', text: '+12.3%' }} />
+  1672→        <EhsKpiTile index={2} icon={BookOpen} label="Coverage" value={`${coverage}`} unit="%" trend={{ dir: coverage >= 75 ? 'up' : 'down', text: `${coverage >= 75 ? '+' : '-'}${Math.abs(coverage - 75)}` }} />
+  1673→        <EhsKpiTile index={3} icon={ClipboardList} label="Active Modules" value={formatNumber(activeModules, 0)} unit="programs"
+  1674→          trend={{ dir: 'up', text: '+1 new' }} />
+  1675→        <EhsKpiTile index={4} icon={Award} label="Certifications" value={formatNumber(certifications, 0)} unit="issued"
+  1676→          trend={{ dir: 'up', text: '+8.4%' }} />
+  1677→      </div>
+  1678→
+  1679→      {/* Training programs table */}
+  1680→      <SectionCard
+  1681→        icon={ClipboardList}
+  1682→        title="Training Programs"
+  1683→        subtitle={`${programs.length} active · ${totalParticipants.toLocaleString()} total participants`}
+  1684→        index={5}
+  1685→        action={
+  1686→          <span className="status-pill text-[9px] status-approved">
+  1687→            {programs.length} active
+  1688→          </span>
+  1689→        }
+  1690→      >
+  1691→        <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+  1692→          <table className="w-full text-[11px]">
+  1693→            <thead className="sticky top-0 z-10" style={{ background: 'rgba(254,243,199,0.92)', backdropFilter: 'blur(8px)' }}>
+  1694→              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+  1695→                <th className="px-3 py-2 text-left font-semibold">Program</th>
+  1696→                <th className="px-3 py-2 text-left font-semibold">Type</th>
+  1697→                <th className="px-3 py-2 text-right font-semibold">Hours</th>
+  1698→                <th className="px-3 py-2 text-right font-semibold">Participants</th>
+  1699→                <th className="px-3 py-2 text-right font-semibold">Completion</th>
+  1700→              </tr>
+  1701→            </thead>
+  1702→            <tbody>
+  1703→              {programs.map((p, i) => {
+  1704→                const typeColor = p.type === 'Safety' ? '#dc2626' : p.type === 'Emergency' ? AMBER_DEEP : p.type === 'Skill' ? '#7c3aed' : '#0891b2'
+  1705→                return (
+  1706→                  <motion.tr
+  1707→                    key={p.name}
+  1708→                    initial={{ opacity: 0, y: 4 }}
+  1709→                    animate={{ opacity: 1, y: 0 }}
+  1710→                    transition={{ duration: 0.25, delay: i * 0.025 }}
+  1711→                    className="border-t border-slate-100 hover:bg-amber-50/40 transition-colors"
+  1712→                    style={{ height: 40 }}
+  1713→                  >
+  1714→                    <td className="px-3 py-2 font-medium text-slate-900">{p.name}</td>
+  1715→                    <td className="px-3 py-2">
+  1716→                      <span className="status-pill text-[9px]" style={{
+  1717→                        background: `${typeColor}1a`, color: typeColor, borderColor: `${typeColor}33`,
+  1718→                      }}>
+  1719→                        {p.type}
+  1720→                      </span>
+  1721→                    </td>
+  1722→                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">{p.hours.toLocaleString()}</td>
+  1723→                    <td className="px-3 py-2 text-right tabular-nums text-slate-700">{p.participants.toLocaleString()}</td>
+  1724→                    <td className="px-3 py-2 text-right">
+  1725→                      <div className="flex items-center justify-end gap-2">
+  1726→                        <div className="h-1.5 w-12 rounded-full bg-slate-200/70 overflow-hidden">
+  1727→                          <div
+  1728→                            className="h-full rounded-full"
+  1729→                            style={{
+  1730→                              width: `${p.completion}%`,
+  1731→                              background: `linear-gradient(90deg, ${AMBER_DEEP}, ${AMBER_PRIMARY})`,
+  1732→                            }}
+  1733→                          />
+  1734→                        </div>
+  1735→                        <span className="text-[10px] font-semibold text-slate-900 tabular-nums w-8 text-right">{p.completion}%</span>
+  1736→                      </div>
+  1737→                    </td>
+  1738→                  </motion.tr>
+  1739→                )
+  1740→              })}
+  1741→            </tbody>
+  1742→          </table>
+  1743→        </div>
+  1744→      </SectionCard>
+  1745→
+  1746→      {/* Training trend area chart + Activity feed */}
+  1747→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1748→        <SectionCard
+  1749→          icon={TrendingUp}
+  1750→          title="Monthly Training Hours Trend"
+  1751→          subtitle="Aggregated training hours across periods"
+  1752→          index={6}
+  1753→          action={
+  1754→            <span className="status-pill text-[9px] status-approved">
+  1755→              <Clock className="h-2.5 w-2.5" />
+  1756→              {totalHours.toLocaleString()} h total
+  1757→            </span>
+  1758→          }
+  1759→        >
+  1760→          <div style={{ height: 240 }}>
+  1761→            <ResponsiveContainer width="100%" height="100%">
+  1762→              <AreaChart data={trendData} margin={{ top: 6, right: 8, bottom: 0, left: -16 }}>
+  1763→                <defs>
+  1764→                  <linearGradient id="ehs-train-area" x1="0" y1="0" x2="0" y2="1">
+  1765→                    <stop offset="0%" stopColor={AMBER_PRIMARY} stopOpacity={0.45} />
+  1766→                    <stop offset="100%" stopColor={AMBER_PRIMARY} stopOpacity={0.02} />
+  1767→                  </linearGradient>
+  1768→                  <linearGradient id="ehs-train-line" x1="0" y1="0" x2="1" y2="0">
+  1769→                    <stop offset="0%" stopColor={AMBER_DEEP} />
+  1770→                    <stop offset="100%" stopColor={AMBER_PRIMARY} />
+  1771→                  </linearGradient>
+  1772→                </defs>
+  1773→                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+  1774→                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
+  1775→                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`${Math.round(v).toLocaleString()} h`, 'Hours']} cursor={{ stroke: AMBER_PRIMARY, strokeDasharray: '4 4' }} />
+  1776→                <Area
+  1777→                  type="monotone"
+  1778→                  dataKey="hours"
+  1779→                  stroke="url(#ehs-train-line)"
+  1780→                  strokeWidth={2.5}
+  1781→                  fill="url(#ehs-train-area)"
+  1782→                  dot={{ r: 3, fill: AMBER_DEEP, stroke: '#fff', strokeWidth: 1.5 }}
+  1783→                  activeDot={{ r: 5, fill: AMBER_DEEP, stroke: '#fff', strokeWidth: 2 }}
+  1784→                  isAnimationActive
+  1785→                  animationDuration={800}
+  1786→                />
+  1787→              </AreaChart>
+  1788→            </ResponsiveContainer>
+  1789→          </div>
+  1790→          <div className="grid grid-cols-3 gap-2 mt-3">
+  1791→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1792→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Per Head</div>
+  1793→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{perHead.toFixed(1)} h</div>
+  1794→            </div>
+  1795→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1796→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Coverage</div>
+  1797→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{coverage}%</div>
+  1798→            </div>
+  1799→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1800→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Modules</div>
+  1801→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">{activeModules}</div>
+  1802→            </div>
+  1803→          </div>
+  1804→        </SectionCard>
+  1805→
+  1806→        <ActivityFeedCard activities={activities} loading={activityLoading} title="Training Activity Feed" />
+  1807→      </div>
+  1808→    </div>
+  1809→  )
+  1810→}
+  1811→
+  1812→/* ============================================================
+  1813→ * Main component
+  1814→ * ============================================================ */
+  1815→export function EhsWorkspace() {
+  1816→  const { activeModule } = useApp()
+  1817→  const [overview, setOverview] = useState<OverviewData | null>(null)
+  1818→  const [activities, setActivities] = useState<ActivityItem[]>([])
+  1819→  const [tasks, setTasks] = useState<ActionItem[]>([])
+  1820→  const [loading, setLoading] = useState(true)
+  1821→  const [activityLoading, setActivityLoading] = useState(true)
+  1822→  const [tasksLoading, setTasksLoading] = useState(true)
+  1823→  const [error, setError] = useState('')
+  1824→  const mountedRef = useRef(true)
+  1825→
+  1826→  /* ---- fetchers ---- */
+  1827→  const fetchOverview = useCallback(async () => {
+  1828→    try {
+  1829→      const res = await fetch('/api/overview', { cache: 'no-store' })
+  1830→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1831→      const data = (await res.json()) as OverviewData
+  1832→      if (!mountedRef.current) return
+  1833→      setOverview(data)
+  1834→      setError('')
+  1835→    } catch (e) {
+  1836→      if (!mountedRef.current) return
+  1837→      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
+  1838→    }
+  1839→  }, [overview])
+  1840→
+  1841→  const fetchActivities = useCallback(async () => {
+  1842→    try {
+  1843→      setActivityLoading(true)
+  1844→      const res = await fetch('/api/activity?take=10', { cache: 'no-store' })
+  1845→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1846→      const data = (await res.json()) as ActivityResponse
+  1847→      if (!mountedRef.current) return
+  1848→      const filtered = (Array.isArray(data.items) ? data.items : []).filter(isEhsActivity).slice(0, 6)
+  1849→      setActivities(filtered)
+  1850→    } catch {
+  1851→      /* silent — keep existing feed on poll error */
+  1852→    } finally {
+  1853→      if (mountedRef.current) setActivityLoading(false)
+  1854→    }
+  1855→  }, [])
+  1856→
+  1857→  const fetchTasks = useCallback(async () => {
+  1858→    try {
+  1859→      setTasksLoading(true)
+  1860→      const res = await fetch('/api/action-items', { cache: 'no-store' })
+  1861→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1862→      const data = (await res.json()) as ActionItemsResponse
+  1863→      if (!mountedRef.current) return
+  1864→      const filtered = (Array.isArray(data.tasks) ? data.tasks : []).filter(isEhsTask).slice(0, 8)
+  1865→      setTasks(filtered)
+  1866→    } catch {
+  1867→      /* silent */
+  1868→    } finally {
+  1869→      if (mountedRef.current) setTasksLoading(false)
+  1870→    }
+  1871→  }, [])
+  1872→
+  1873→  /* ---- initial load ---- */
+  1874→  useEffect(() => {
+  1875→    mountedRef.current = true
+  1876→    ;(async () => {
+  1877→      setLoading(true)
+  1878→      await Promise.all([fetchOverview(), fetchActivities(), fetchTasks()])
+  1879→      if (mountedRef.current) setLoading(false)
+  1880→    })()
+  1881→    return () => { mountedRef.current = false }
+  1882→  }, [fetchOverview, fetchActivities, fetchTasks])
+  1883→
+  1884→  /* ---- polling: activity every 30s, overview & tasks every 60s ---- */
+  1885→  useEffect(() => {
+  1886→    const activityTimer = setInterval(fetchActivities, 30_000)
+  1887→    const overviewTimer = setInterval(fetchOverview, 60_000)
+  1888→    const tasksTimer = setInterval(fetchTasks, 60_000)
+  1889→    return () => {
+  1890→      clearInterval(activityTimer)
+  1891→      clearInterval(overviewTimer)
+  1892→      clearInterval(tasksTimer)
+  1893→    }
+  1894→  }, [fetchActivities, fetchOverview, fetchTasks])
+  1895→
+  1896→  const k = useMemo<Kpis | null>(() => {
+  1897→    if (!overview?.kpis) return null
+  1898→    return overview.kpis
+  1899→  }, [overview])
+  1900→
+  1901→  const trends = useMemo<Record<string, Record<string, number>> | undefined>(() => {
+  1902→    const t = overview?.trends as Record<string, Record<string, number>> | undefined
+  1903→    return t && typeof t === 'object' ? t : undefined
+  1904→  }, [overview])
+  1905→
+  1906→  const periods = overview?.periods
+  1907→
+  1908→  // ---- Loading skeleton ----
+  1909→  if (loading && !overview) {
+  1910→    return <WorkspaceSkeleton tiles={activeModule === 'ehs-ops' || activeModule === 'ehs-incidents' || activeModule === 'ehs-inspections' || activeModule === 'ehs-environmental' ? 4 : 4} />
+  1911→  }
+  1912→
+  1913→  // ---- Error state ----
+  1914→  if (error && !overview) {
+  1915→    return <ErrorState error={error} onRetry={() => window.location.reload()} />
+  1916→  }
+  1917→
+  1918→  // ---- Empty state ----
+  1919→  if (!overview || !k) {
+  1920→    return (
+  1921→      <EmptyState
+  1922→        icon={ShieldAlert}
+  1923→        title="No EHS data yet"
+  1924→        subtitle="Set up a reporting period to populate the EHS workspace."
+  1925→      />
+  1926→    )
+  1927→  }
+  1928→
+  1929→  // ---- Dispatch by module ----
+  1930→  return (
+  1931→    <AnimatePresence mode="wait">
+  1932→      <motion.div
+  1933→        key={activeModule}
+  1934→        initial={{ opacity: 0, y: 8 }}
+  1935→        animate={{ opacity: 1, y: 0 }}
+  1936→        exit={{ opacity: 0, y: -8 }}
+  1937→        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
+  1938→      >
+  1939→        {activeModule === 'ehs-ops' && (
+  1940→          <OpsScreen
+  1941→            k={k}
+  1942→            periods={periods}
+  1943→            activities={activities}
+  1944→            activityLoading={activityLoading}
+  1945→            tasks={tasks}
+  1946→            tasksLoading={tasksLoading}
+  1947→          />
+  1948→        )}
+  1949→        {activeModule === 'ehs-incidents' && (
+  1950→          <IncidentsScreen k={k} activities={activities} activityLoading={activityLoading} />
+  1951→        )}
+  1952→        {activeModule === 'ehs-inspections' && (
+  1953→          <InspectionsScreen k={k} activities={activities} activityLoading={activityLoading} />
+  1954→        )}
+  1955→        {activeModule === 'ehs-corrective' && (
+  1956→          <CorrectiveScreen
+  1957→            k={k}
+  1958→            tasks={tasks}
+  1959→            tasksLoading={tasksLoading}
+  1960→            activities={activities}
+  1961→            activityLoading={activityLoading}
+  1962→          />
+  1963→        )}
+  1964→        {activeModule === 'ehs-environmental' && (
+  1965→          <EnvironmentalScreen
+  1966→            k={k}
+  1967→            periods={periods}
+  1968→            activities={activities}
+  1969→            activityLoading={activityLoading}
+  1970→          />
+  1971→        )}
+  1972→        {activeModule === 'ehs-training' && (
+  1973→          <TrainingScreen k={k} trends={trends} activities={activities} activityLoading={activityLoading} />
+  1974→        )}
+  1975→      </motion.div>
+  1976→    </AnimatePresence>
+  1977→  )
+  1978→}
+  1979→

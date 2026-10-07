@@ -1,0 +1,2065 @@
+============================================================
+PROJECT
+============================================================
+
+MEIL ESG / BRSR Enterprise Reporting Platform
+
+ROLE:
+SITE USER / PROJECT-SITE USER
+
+SCREEN:
+MY PROJECTS
+
+PRIMARY OBJECTIVE:
+Rebuild the Site User "My Projects" screen as a premium,
+professional enterprise business workspace based directly on the
+provided reference image.
+
+The reference image is the PRIMARY VISUAL DESIGN REFERENCE.
+
+IMPORTANT:
+Replicate the design language, layout structure, proportions,
+spacing, card placement, hierarchy, table treatment, project
+details panel, KPI strip, progress visualization, and overall
+business-product feel.
+
+DO NOT copy any demo/sample content from the reference.
+
+Do NOT hardcode:
+
+- project names
+- project codes
+- locations
+- dates
+- person names
+- KPI values
+- percentages
+- sample statuses
+- sample tasks
+- sample module counts
+- sample map labels
+
+The reference is used ONLY as the visual and structural benchmark.
+
+Actual production data must come from the backend.
+
+============================================================
+1. DESIGN GOAL
+============================================================
+
+The final screen should feel like a:
+
+PROJECT PORTFOLIO MANAGEMENT CENTER
++
+SITE OPERATIONS WORKSPACE
++
+ESG PROJECT MONITORING PANEL
+
+It must feel like a professional business platform.
+
+It must NOT feel like:
+
+- generic admin dashboard
+- basic project management app
+- old ERP
+- consumer application
+- gaming UI
+- cyberpunk interface
+- overly decorative dashboard
+
+The screen should immediately communicate:
+
+WHAT PROJECTS ARE ASSIGNED
+WHAT THEIR CURRENT STATUS IS
+HOW COMPLETE THEY ARE
+WHAT NEEDS ATTENTION
+WHICH PROJECT IS SELECTED
+WHAT THE SELECTED PROJECT CONTAINS
+WHAT IS DUE NEXT
+
+============================================================
+2. PRIMARY REFERENCE STRUCTURE
+============================================================
+
+Use the same overall composition as the reference.
+
+The screen contains:
+
+ROW 1:
+4 KPI cards
+
+ROW 2:
+Large Projects Registry
++
+Right Project Details panel
+
+ROW 3:
+Project ESG Progress
++
+Submission Status
++
+Upcoming Deadlines
+
+This three-layer structure is HARD LOCKED.
+
+Do not replace the composition with a generic dashboard.
+
+============================================================
+3. OVERALL PAGE GRID
+============================================================
+
+Desktop layout:
+
+WIDTH:
+full available content area
+
+Horizontal margins:
+approximately 10–20px from dashboard content boundary
+
+MAIN GRID:
+
+TOP:
+4 equal KPI cards
+
+MIDDLE:
+approximately 67–68% LEFT
+approximately 32–33% RIGHT
+
+LEFT:
+large project table
+
+RIGHT:
+project details card
+
+BOTTOM:
+approximately 35% LEFT
+approximately 32% CENTER
+approximately 33% RIGHT
+
+This asymmetrical business layout must remain.
+
+Do not convert all cards to equal-width boxes.
+
+============================================================
+4. PAGE BACKGROUND
+============================================================
+
+Base:
+white / near-white
+
+Atmosphere:
+very faint muted sky-blue
+
+Lighting:
+subtle cool-blue illumination
+
+No strong gradient.
+
+No dark background.
+
+No neon.
+
+No saturated decorative background.
+
+The background should create the same calm,
+premium SaaS atmosphere as the reference.
+
+============================================================
+5. CARD DESIGN
+============================================================
+
+All major cards must use the same premium design system.
+
+Background:
+semi-opaque white
+
+Glass:
+very subtle frost
+
+Border:
+1px low-opacity cool blue/gray
+
+Radius:
+16–20px
+
+Shadow:
+soft diffused shadow
+
+Internal padding:
+18–22px
+
+Cards should look lightly elevated from the background.
+
+Do NOT overdo glass blur.
+
+============================================================
+6. GLOBAL TYPOGRAPHY
+============================================================
+
+Use:
+
+Inter
+or
+Plus Jakarta Sans
+
+Main titles:
+18–24px
+
+Card titles:
+13–16px
+
+Body:
+11–13px
+
+Metadata:
+10–12px
+
+Table:
+10–12px
+
+Numbers:
+22–30px
+
+Use medium / semibold hierarchy.
+
+Avoid excessive bolding.
+
+============================================================
+7. TOP KPI STRIP
+============================================================
+
+Create exactly 4 KPI cards across the top.
+
+The reference shows:
+
+1. Total Assigned Projects
+2. Data Completion
+3. Pending Submissions
+4. Approved Submissions
+
+KEEP THESE KPI CONCEPTS.
+
+Do NOT copy the reference values.
+
+Each KPI card must include:
+
+- small professional icon
+- KPI title
+- primary dynamic value
+- supporting description
+- optional trend / delta
+- subtle secondary icon or indicator
+- hover elevation
+
+============================================================
+8. KPI CARD 1
+============================================================
+
+TITLE:
+Total Assigned Projects
+
+VALUE:
+dynamic backend count
+
+SUPPORTING TEXT:
+dynamic scope / assignment context
+
+VISUAL:
+project / briefcase / layers icon
+
+Do not hardcode the count.
+
+============================================================
+9. KPI CARD 2
+============================================================
+
+TITLE:
+Data Completion
+
+VALUE:
+dynamic percentage
+
+SUPPORTING:
+dynamic comparison/trend where available
+
+Visual:
+
+circular progress indicator or progress ring
+
+Do not hardcode percentage.
+
+============================================================
+10. KPI CARD 3
+============================================================
+
+TITLE:
+Pending Submissions
+
+VALUE:
+dynamic count
+
+SUPPORTING:
+dynamic project scope
+
+Visual:
+
+document / submission icon
+
+============================================================
+11. KPI CARD 4
+============================================================
+
+TITLE:
+Approved Submissions
+
+VALUE:
+dynamic count
+
+SUPPORTING:
+current reporting period
+
+Visual:
+
+approval / shield / verification icon
+
+============================================================
+12. KPI INTERACTION
+============================================================
+
+KPI cards should be clickable where appropriate.
+
+Examples:
+
+Total Assigned Projects
+→ filters project table to all assigned projects
+
+Data Completion
+→ highlights projects with incomplete data
+
+Pending Submissions
+→ filters submissions
+
+Approved Submissions
+→ filters approved submissions
+
+Do not navigate to unrelated screens.
+
+============================================================
+13. PROJECT REGISTRY — MAIN LEFT PANEL
+============================================================
+
+Create the large primary project-management card.
+
+Header:
+
+MY PROJECTS
+
+Subtitle:
+show a concise role-appropriate description.
+
+RIGHT SIDE:
+optional small action control
+
+Then:
+
+FILTER / SEARCH TOOLBAR
+
+============================================================
+14. PROJECT SEARCH
+============================================================
+
+Add a compact rounded search field.
+
+Search by:
+
+project name
+
+project code
+
+supported searchable project metadata
+
+Search must be backend-driven where appropriate.
+
+Do not use static search arrays.
+
+============================================================
+15. PROJECT FILTERS
+============================================================
+
+Place compact filter controls in one horizontal row.
+
+Filters:
+
+Business Unit
+
+Status
+
+Reporting Period
+
+Project Type
+
+Optional additional supported project filter
+
+Each control should look like:
+
+small rounded select
+subtle glass background
+thin border
+compact typography
+
+============================================================
+16. VIEW SWITCHER
+============================================================
+
+Add a small view switcher:
+
+List view
+Grid/card view
+
+The reference emphasizes a compact table/list control.
+
+The default view must be:
+
+LIST / TABLE
+
+Do not make the grid view the primary view.
+
+============================================================
+17. EXPORT
+============================================================
+
+Provide a compact:
+
+Export
+
+button/control.
+
+Use only actual backend-derived project data.
+
+Do not export static client-side records.
+
+============================================================
+18. PROJECT TABLE
+============================================================
+
+Create a premium project registry table.
+
+The table should visually match the reference.
+
+Columns should include appropriate actual Site User project data.
+
+Core visual fields:
+
+Project identity
+
+Project code
+
+Business Unit
+
+Location
+
+Type
+
+Project progress
+
+Data completion
+
+Status
+
+Actions
+
+Use the actual backend model to determine exact fields.
+
+Do not blindly copy sample columns if repository schema differs.
+
+============================================================
+19. PROJECT IDENTITY CELL
+============================================================
+
+Each project row should contain:
+
+small project thumbnail/avatar/icon where actual project imagery
+is available
+
+project name
+
+secondary metadata
+
+project code
+
+The project name should be visually stronger than metadata.
+
+Do not use random placeholder images.
+
+============================================================
+20. BUSINESS UNIT CELL
+============================================================
+
+Show actual assigned Business Unit.
+
+Use compact text.
+
+Do not expose hierarchy outside user's authorization scope.
+
+============================================================
+21. LOCATION CELL
+============================================================
+
+Show actual project location if available.
+
+Use small location icon.
+
+Keep the visual footprint compact.
+
+============================================================
+22. PROJECT TYPE CELL
+============================================================
+
+Use compact semantic pill/badge.
+
+Examples conceptually:
+
+Tunnel
+Water
+Energy
+Infrastructure
+
+But ONLY render values returned by backend.
+
+Do not hardcode sample categories.
+
+============================================================
+23. PROGRESS CELL
+============================================================
+
+Create a thin horizontal progress bar.
+
+Structure:
+
+progress track
+
+primary blue fill
+
+percentage/value
+
+Use rounded bar ends.
+
+The progress bar must be dynamic.
+
+============================================================
+24. DATA COMPLETION CELL
+============================================================
+
+Use a compact circular progress indicator.
+
+Structure:
+
+small ring
+
+center percentage
+
+The ring should use the approved semantic/primary colors.
+
+Do not use large charts.
+
+============================================================
+25. STATUS CELL
+============================================================
+
+Use compact status badge/pill.
+
+Possible states:
+
+Active
+Planning
+On Hold
+Completed
+etc.
+
+Only render states supported by backend workflow/state model.
+
+============================================================
+26. ACTION CELL
+============================================================
+
+Use a compact three-dot action button.
+
+Possible actions:
+
+Open Project
+
+View Details
+
+Open Data Entry
+
+View Evidence
+
+View Submissions
+
+Only show actions permitted for the Site User.
+
+Never expose administrative actions.
+
+============================================================
+27. SELECTED ROW
+============================================================
+
+When a project is selected:
+
+Highlight the row.
+
+Use:
+
+thin blue left indicator
+
+very subtle blue background
+
+slightly elevated appearance
+
+The selected project must immediately correspond to the
+Project Details panel on the right.
+
+============================================================
+28. RIGHT PROJECT DETAILS PANEL
+============================================================
+
+This is the SECOND MOST IMPORTANT component on the page.
+
+Create a dedicated premium Project Details card.
+
+Top:
+
+PROJECT DETAILS
+
+Right:
+
+Edit
+
+The Edit control must only appear when the Site User has the
+appropriate permission.
+
+============================================================
+29. PROJECT IMAGE / HERO AREA
+============================================================
+
+At the top of the details panel:
+
+large rounded project image/banner.
+
+Use actual project image if available.
+
+Maintain:
+
+wide image ratio
+
+rounded corners
+
+clean crop
+
+soft edge
+
+Do not use decorative placeholder imagery in production.
+
+If no image exists:
+show a clean empty state / neutral project visual.
+
+============================================================
+30. PROJECT TITLE AREA
+============================================================
+
+Below image:
+
+Project Name
+
+Project Status badge
+
+Project Code
+
+Location
+
+Do not use sample values.
+
+Use backend values.
+
+============================================================
+31. PROJECT DETAIL TABS
+============================================================
+
+Create exactly these tabs:
+
+Overview
+ESG Progress
+Recent Activity
+Team
+Documents
+
+These tabs must exist inside the Project Details panel.
+
+Active tab:
+
+Overview
+
+Use a thin blue underline.
+
+Keep tabs compact.
+
+============================================================
+32. PROJECT DETAIL — OVERVIEW
+============================================================
+
+Show key project metadata.
+
+Fields:
+
+Project Code
+
+Business Unit
+
+Project Type
+
+Start Date
+
+End Date
+
+Reporting Period
+
+Project Lead
+
+Description
+
+Display only actual backend fields.
+
+Use a clean two-column label/value structure.
+
+Example structural pattern:
+
+LABEL                  VALUE
+
+No demo values.
+
+============================================================
+33. OPTIONAL MINI PROJECT MAP
+============================================================
+
+Where actual project location is available,
+show a compact project-location map or location preview.
+
+IMPORTANT:
+
+Do not allow the map to dominate the panel.
+
+The reference uses a small supporting map visual.
+
+Use it only as a compact secondary visual element.
+
+============================================================
+34. PROJECT DETAIL — ESG PROGRESS
+============================================================
+
+When this tab is selected:
+
+show module progress.
+
+Sections:
+
+Energy
+
+Water
+
+Waste
+
+Safety
+
+Other supported ESG modules
+
+Each module:
+
+completion %
+
+status
+
+progress ring/bar
+
+optional evidence state
+
+optional submission state
+
+Use actual backend data.
+
+============================================================
+35. PROJECT DETAIL — RECENT ACTIVITY
+============================================================
+
+Show project-specific activity timeline.
+
+Examples conceptually:
+
+data updated
+
+evidence uploaded
+
+submission created
+
+validation completed
+
+correction required
+
+submission approved
+
+Only render actual system events.
+
+Each activity:
+
+icon
+
+action
+
+timestamp
+
+actor where authorized
+
+status
+
+============================================================
+36. PROJECT DETAIL — TEAM
+============================================================
+
+Show actual assigned project/site team.
+
+Each member:
+
+avatar where available
+
+name
+
+role
+
+activity/status
+
+Do not invent people.
+
+Do not use random avatars.
+
+============================================================
+37. PROJECT DETAIL — DOCUMENTS
+============================================================
+
+Show project documents.
+
+Fields:
+
+Document
+
+Type
+
+Uploaded
+
+Status
+
+Integrity / verification where available
+
+Actions:
+
+View
+
+Open
+
+Verify
+
+Only show authorized documents.
+
+============================================================
+38. BOTTOM LEFT — PROJECT ESG PROGRESS
+============================================================
+
+Create a large summary card:
+
+PROJECT ESG PROGRESS
+
+This should update when a project is selected.
+
+Use compact circular progress rings.
+
+Each module should have:
+
+module name
+
+completion %
+
+status
+
+Recommended conceptual areas:
+
+Energy
+
+Water
+
+Waste
+
+Safety
+
+Other relevant Site ESG module
+
+Only display modules actually supported by project data.
+
+============================================================
+39. ESG PROGRESS VISUAL STYLE
+============================================================
+
+Use small circular progress rings.
+
+Ring:
+
+thin
+
+rounded
+
+minimal
+
+Clean.
+
+Do not create large dashboard gauges.
+
+The ring should feel like a compact business KPI.
+
+============================================================
+40. BOTTOM CENTER — SUBMISSION STATUS
+============================================================
+
+Create a table-style business card:
+
+SUBMISSION STATUS
+
+Show modules / submission categories.
+
+Columns:
+
+Module
+
+Total
+
+Submitted
+
+Under Review
+
+Approved
+
+Pending
+
+The exact columns must be based on actual submission model/data.
+
+Use small count pills.
+
+Do not hardcode sample counts.
+
+============================================================
+41. SUBMISSION STATUS VISUAL STYLE
+============================================================
+
+Use:
+
+very compact table
+
+small status-colored counters
+
+minimal separators
+
+readable typography
+
+white glass background
+
+No heavy borders.
+
+============================================================
+42. BOTTOM RIGHT — UPCOMING DEADLINES
+============================================================
+
+Create:
+
+UPCOMING DEADLINES
+
+Show:
+
+Task
+
+Project
+
+Due Date
+
+Status
+
+Only show actual backend tasks/deadlines.
+
+Use subtle status pills.
+
+Sort by nearest due date.
+
+============================================================
+43. DEADLINE STATUS
+============================================================
+
+Use restrained semantic states:
+
+Pending
+
+In Progress
+
+Completed
+
+Overdue
+
+At Risk
+
+Only show supported state values.
+
+Never generate fake deadlines.
+
+============================================================
+44. PAGE INFORMATION HIERARCHY
+============================================================
+
+Visual priority must be:
+
+1. Project portfolio
+
+2. Selected project
+
+3. Data completion
+
+4. Submission status
+
+5. ESG progress
+
+6. Upcoming deadlines
+
+The selected Project Details panel should always remain visually
+prominent.
+
+============================================================
+45. BUSINESS WEBSITE FEEL
+============================================================
+
+The screen must feel like a polished internal business website.
+
+Use:
+
+wide whitespace
+
+clear visual hierarchy
+
+compact professional controls
+
+rounded data surfaces
+
+large project image
+
+clean tables
+
+minimal charts
+
+business-style filters
+
+clean metrics
+
+Do not overload the screen.
+
+============================================================
+46. DESIGN BALANCE
+============================================================
+
+LEFT SIDE:
+data-heavy
+
+RIGHT SIDE:
+context-rich
+
+BOTTOM:
+analytical
+
+This balance is critical.
+
+Do not turn the right panel into another large dashboard.
+
+============================================================
+47. COLOR SYSTEM
+============================================================
+
+DO NOT CHANGE THE EXISTING APPROVED PALETTE.
+
+Use:
+
+White
+Off-white
+
+Very faint muted sky-blue
+
+Soft blue illumination
+
+Existing primary blue
+
+Existing secondary purple
+
+Existing semantic colors
+
+No unrelated palette additions.
+
+============================================================
+48. CARD FINISH
+============================================================
+
+Every card must have:
+
+consistent radius
+
+consistent padding
+
+consistent border
+
+consistent shadow
+
+consistent title spacing
+
+consistent action placement
+
+Do not create individually styled cards without a shared system.
+
+============================================================
+49. HOVER EFFECTS
+============================================================
+
+Project rows:
+
+subtle highlight
+
+KPI cards:
+
+1–3px elevation
+
+Buttons:
+
+soft background transition
+
+Project tabs:
+
+smooth underline transition
+
+No exaggerated movement.
+
+============================================================
+50. MICRO ANIMATIONS
+============================================================
+
+Use:
+
+150–300ms
+
+Fade
+
+Soft slide
+
+Tiny elevation
+
+Progress ring reveal
+
+Skeleton shimmer
+
+No heavy animation.
+
+============================================================
+51. RESPONSIVE LAYOUT
+============================================================
+
+Desktop priority:
+
+1280
+1440
+1600
+1920
+
+At smaller widths:
+
+KPI cards wrap
+
+Project table becomes horizontally scrollable
+
+Project Details moves below project table
+
+Bottom cards stack
+
+Filters wrap
+
+No clipping.
+
+============================================================
+52. TABLE RESPONSIVENESS
+============================================================
+
+Do not squeeze all columns into unreadable widths.
+
+At narrower widths:
+
+allow horizontal scroll
+
+keep Project column sticky if appropriate
+
+keep important Status/Action visible where possible.
+
+============================================================
+53. BACKEND DATA
+============================================================
+
+MANDATORY:
+
+Connect this screen to the existing backend.
+
+Use actual project records.
+
+Fetch:
+
+authorized projects
+
+project hierarchy
+
+business unit
+
+project status
+
+project type
+
+location
+
+progress
+
+data completion
+
+reporting period
+
+submission status
+
+ESG progress
+
+deadlines
+
+team
+
+documents
+
+recent activity
+
+============================================================
+54. API ARCHITECTURE
+============================================================
+
+Use:
+
+React
+↓
+API service
+↓
+FastAPI
+↓
+Authentication
+↓
+Project/Site authorization
+↓
+Database
+↓
+Response
+↓
+UI
+
+Do not create fake data.
+
+Do not use frontend-only business truth.
+
+============================================================
+55. PROJECT SCOPE
+============================================================
+
+The Site User must only receive projects they are authorized
+to access.
+
+Backend must enforce:
+
+user
+→ project relationship
+→ organization scope
+→ reporting scope
+
+Never trust:
+
+client project ID
+
+frontend project filter
+
+localStorage role
+
+client scope
+
+============================================================
+56. PROJECT SELECTION
+============================================================
+
+When a user selects a project:
+
+FETCH or select backend-backed project detail.
+
+Update:
+
+Project Details
+
+ESG Progress
+
+Submission Status
+
+Recent Activity
+
+Team
+
+Documents
+
+Upcoming Deadlines
+
+Do not leave stale information from the previously selected project.
+
+============================================================
+57. PERIOD FILTER
+============================================================
+
+When Reporting Period changes:
+
+refresh all period-sensitive:
+
+progress
+
+submission status
+
+ESG data
+
+deadlines
+
+activity where applicable
+
+Do not mix periods.
+
+============================================================
+58. SEARCH / FILTER SYNC
+============================================================
+
+Filters must update the visible project list.
+
+All filters should be reflected in the data request/query when
+backend filtering exists.
+
+Do not fetch all enterprise projects and merely hide them on the
+frontend if backend scoped endpoints are available.
+
+============================================================
+59. REFRESH / SYNCHRONIZATION
+============================================================
+
+After:
+
+data entry
+
+evidence upload
+
+submission
+
+correction
+
+validation
+
+approval
+
+project update
+
+the My Projects screen must update relevant values.
+
+Refresh:
+
+project row
+
+data completion
+
+submission KPI
+
+project progress
+
+activity
+
+deadlines
+
+documents
+
+============================================================
+60. NO FULL PAGE RELOAD
+============================================================
+
+Use a controlled refresh/invalidation strategy.
+
+Do not require full browser reload for normal mutations.
+
+============================================================
+61. LOADING STATE
+============================================================
+
+Create skeleton versions of:
+
+KPI cards
+
+project table rows
+
+project image/details
+
+bottom cards
+
+The skeleton should preserve final layout dimensions.
+
+============================================================
+62. EMPTY STATE
+============================================================
+
+When no projects exist:
+
+show professional empty state.
+
+Message:
+
+No assigned projects available.
+
+Add appropriate action if supported.
+
+Do NOT render fake projects.
+
+============================================================
+63. ERROR STATE
+============================================================
+
+When projects cannot be loaded:
+
+show:
+
+Unable to load your projects.
+
+Retry
+
+Do not display cached fake/demo projects as fallback truth.
+
+============================================================
+64. PROJECT DETAIL ERROR
+============================================================
+
+If a selected project's details fail:
+
+keep the project list visible.
+
+Show error state inside Project Details.
+
+Do not clear unrelated project data unnecessarily.
+
+============================================================
+65. DATA VALIDATION
+============================================================
+
+Before displaying progress-related values:
+
+ensure backend data is valid.
+
+Do not display:
+
+NaN
+
+undefined
+
+negative completion
+
+completion > 100
+
+invalid dates
+
+============================================================
+66. ACCESSIBILITY
+============================================================
+
+Implement:
+
+keyboard navigation
+
+focus state
+
+semantic table
+
+ARIA labels
+
+accessible filters
+
+accessible tabs
+
+accessible drawer/details
+
+keyboard action controls
+
+============================================================
+67. PERFORMANCE
+============================================================
+
+Use:
+
+pagination
+
+efficient project queries
+
+debounced search
+
+request deduplication
+
+lazy load project detail where appropriate
+
+avoid unnecessary API requests
+
+Do not fetch all project documents before the user opens
+Project Details.
+
+============================================================
+68. COMPONENT ARCHITECTURE
+============================================================
+
+Recommended structure:
+
+frontend/src/features/organization/
+
+MyProjectModule.jsx
+
+ProjectPortfolio.jsx
+
+ProjectKpiStrip.jsx
+
+ProjectFilters.jsx
+
+ProjectTable.jsx
+
+ProjectRow.jsx
+
+ProjectDetailsPanel.jsx
+
+ProjectDetailsHeader.jsx
+
+ProjectDetailsTabs.jsx
+
+ProjectOverviewTab.jsx
+
+ProjectESGProgressTab.jsx
+
+ProjectRecentActivityTab.jsx
+
+ProjectTeamTab.jsx
+
+ProjectDocumentsTab.jsx
+
+ProjectESGProgressCard.jsx
+
+SubmissionStatusCard.jsx
+
+UpcomingDeadlinesCard.jsx
+
+============================================================
+69. SHARED COMPONENTS
+============================================================
+
+Use/reuse:
+
+GlassCard
+
+MetricCard
+
+ProgressRing
+
+ProgressBar
+
+StatusBadge
+
+FilterSelect
+
+SearchInput
+
+DataTable
+
+Tabs
+
+DetailDrawer
+
+ActivityTimeline
+
+Avatar
+
+DocumentList
+
+DeadlineList
+
+EmptyState
+
+ErrorState
+
+Skeleton
+
+============================================================
+70. DO NOT CREATE DUPLICATE DATA LOGIC
+============================================================
+
+Do not calculate business truth independently in each component.
+
+Backend should be the source of truth.
+
+Frontend should display and format the returned data.
+
+============================================================
+71. NO DEMO DETAILS
+============================================================
+
+DO NOT ADD:
+
+sample project names
+
+sample project codes
+
+sample employees
+
+sample numbers
+
+sample dates
+
+sample locations
+
+sample map data
+
+sample deadlines
+
+sample statuses
+
+sample submission counts
+
+sample ESG percentages
+
+sample KPI values
+
+sample documents
+
+sample team members
+
+The screenshot is ONLY a design reference.
+
+============================================================
+72. NO MOCK FALLBACKS
+============================================================
+
+Search the implementation for:
+
+mock
+
+demo
+
+fake
+
+fallback
+
+synthetic
+
+hardcoded
+
+Date.now
+
+Math.random
+
+localStorage
+
+placeholder
+
+Remove inappropriate production business-data usage.
+
+When data is unavailable:
+
+LOADING
+
+EMPTY
+
+ERROR
+
+RETRY
+
+Never fake it.
+
+============================================================
+73. PROJECT EDIT
+============================================================
+
+If Edit functionality already exists:
+
+keep it.
+
+If not:
+
+do not invent unauthorized editing.
+
+The Edit button should only appear when the backend permissions
+allow it.
+
+============================================================
+74. PROJECT IMAGE HANDLING
+============================================================
+
+Use actual project image if present.
+
+If image is unavailable:
+
+use an elegant neutral empty visual.
+
+Do not use random external images.
+
+Do not use fake project imagery.
+
+============================================================
+75. MAP
+============================================================
+
+The map/location visual is secondary.
+
+Use a compact map only when actual project geolocation is
+available.
+
+Do not make the map the primary feature of the screen.
+
+============================================================
+76. FILTER BAR DESIGN
+============================================================
+
+Search field:
+
+rounded
+
+white/glass
+
+small search icon
+
+Filters:
+
+compact
+
+uniform height
+
+consistent radius
+
+Export:
+
+outline/glass treatment
+
+Do not use oversized controls.
+
+============================================================
+77. ACTION BUTTON DESIGN
+============================================================
+
+Primary action:
+
+blue
+
+rounded
+
+compact
+
+Secondary:
+
+glass/outline
+
+Danger:
+
+restrained red only for destructive action
+
+Never use giant buttons.
+
+============================================================
+78. VISUAL QA
+============================================================
+
+After implementation compare the result against the supplied
+reference image.
+
+Check:
+
+overall proportions
+
+KPI height
+
+project table width
+
+right panel width
+
+card placement
+
+bottom card proportions
+
+spacing
+
+padding
+
+border radius
+
+shadow
+
+glass opacity
+
+table density
+
+thumbnail size
+
+filter alignment
+
+status pill size
+
+progress ring size
+
+typography
+
+visual hierarchy
+
+background atmosphere
+
+The implementation should feel extremely close to the reference
+composition.
+
+============================================================
+79. DO NOT CHANGE GLOBAL DESIGN SYSTEM
+============================================================
+
+Keep:
+
+MEIL branding
+
+existing approved palette
+
+existing global shell
+
+existing typography
+
+existing icon family
+
+existing liquid-glass language
+
+Only rebuild the internal My Projects screen composition.
+
+============================================================
+80. FINAL SCREEN STRUCTURE
+============================================================
+
+The final page must visually follow:
+
+┌─────────────────────────────────────────────────────────────┐
+│ KPI 1       │ KPI 2       │ KPI 3       │ KPI 4             │
+├───────────────────────────────────────────┬─────────────────┤
+│                                           │                 │
+│               MY PROJECTS                 │ PROJECT DETAILS │
+│                                           │                 │
+│ Search / Filters / View / Export          │ Project Image   │
+│                                           │ Project Info    │
+│ Project Table                             │ Tabs            │
+│                                           │ Overview        │
+│                                           │ ESG Progress    │
+│                                           │ Activity        │
+│                                           │ Team            │
+│                                           │ Documents       │
+│                                           │                 │
+├──────────────────────┬────────────────────┼─────────────────┤
+│ PROJECT ESG          │ SUBMISSION STATUS  │ UPCOMING         │
+│ PROGRESS             │                    │ DEADLINES        │
+│                      │                    │                 │
+│ Rings / Modules      │ Compact Table      │ Task Table       │
+│                      │                    │                 │
+└──────────────────────┴────────────────────┴─────────────────┘
+
+This composition is the PRIMARY visual target.
+
+============================================================
+81. FINAL USER EXPERIENCE
+============================================================
+
+When the Site User opens My Projects:
+
+They should immediately understand:
+
+HOW MANY PROJECTS ARE ASSIGNED
+
+HOW COMPLETE THEIR DATA IS
+
+WHICH SUBMISSIONS ARE PENDING
+
+WHICH SUBMISSIONS ARE APPROVED
+
+WHICH PROJECT IS SELECTED
+
+HOW THAT PROJECT IS PERFORMING
+
+WHAT ESG MODULES ARE COMPLETE
+
+WHAT SUBMISSIONS ARE PENDING
+
+WHAT DOCUMENTS EXIST
+
+WHO IS ON THE TEAM
+
+WHAT IS DUE NEXT
+
+============================================================
+82. FINAL IMPLEMENTATION REQUIREMENT
+============================================================
+
+This must be a REAL WORKING SCREEN.
+
+Implement:
+
+UI
+UX
+LAYOUT
+FILTERING
+SEARCH
+PROJECT SELECTION
+DETAIL VIEW
+TABS
+API
+DATABASE
+AUTHORIZATION
+DATA FETCHING
+STATE MANAGEMENT
+SYNC
+LOADING
+EMPTY
+ERROR
+RESPONSIVE
+TESTING
+
+Do not stop after UI implementation.
+
+============================================================
+83. FINAL TESTING
+============================================================
+
+Test:
+
+1. Site User login.
+
+2. My Projects route.
+
+3. Assigned project list.
+
+4. Unauthorized project does not appear.
+
+5. Search.
+
+6. Business Unit filter.
+
+7. Status filter.
+
+8. Reporting Period filter.
+
+9. Project selection.
+
+10. Project Details loads.
+
+11. ESG Progress loads.
+
+12. Recent Activity loads.
+
+13. Team loads.
+
+14. Documents load.
+
+15. Submission Status loads.
+
+16. Upcoming Deadlines load.
+
+17. Data refresh after mutation.
+
+18. No stale project details.
+
+19. Error state.
+
+20. Empty state.
+
+21. Logout.
+
+============================================================
+84. FINAL BUILD
+============================================================
+
+Run:
+
+npm run build
+
+Verify:
+
+0 compilation errors
+
+0 broken imports
+
+0 undefined components
+
+0 broken routes
+
+0 obvious runtime errors
+
+============================================================
+85. FINAL REPORT
+============================================================
+
+Create:
+
+MEIL_PS08_SITE_USER_MY_PROJECTS_VERIFICATION.md
+
+Include:
+
+Screen implemented
+
+Components
+
+Navigation
+
+Backend APIs
+
+Database sources
+
+Project scope
+
+Search/filter verification
+
+Project detail verification
+
+ESG progress
+
+Submission status
+
+Deadline data
+
+Sync behavior
+
+Loading/error/empty states
+
+Security
+
+E2E tests
+
+Build result
+
+Exact commit SHA tested
+
+============================================================
+FINAL RULE
+============================================================
+
+REPLICATE THE REFERENCE'S DESIGN LANGUAGE AND LAYOUT.
+
+DO NOT REPLICATE ITS DEMO DATA.
+
+The final product must look like the same premium design system,
+but all business data must come from the real MEIL backend.
+
+Do not declare COMPLETE until UI + backend + database +
+authorization + synchronization + testing are all verified.

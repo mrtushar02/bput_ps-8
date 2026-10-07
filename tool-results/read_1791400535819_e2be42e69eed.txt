@@ -1,0 +1,575 @@
+    42→const AMBER_LITE  = '#fbbf24'   // light amber
+    43→const CREAM       = '#fffbeb'   // warm cream surface
+    44→const WARM_INK    = '#451a03'   // deep brown ink for high contrast on warm surfaces
+    45→
+    46→// 8 amber/gold shades — one per ESG dimension in the radial bar chart
+    47→const DIM_PALETTE = [
+    48→  '#f59e0b', '#d97706', '#fbbf24', '#f97316',
+    49→  '#eab308', '#ca8a04', '#fcd34d', '#b45309',
+    50→]
+    51→
+    52→/* -------------------------------------------------------- grade + score */
+    53→
+    54→function gradeFromScore(score: number): { grade: string; label: string } {
+    55→  if (score >= 90) return { grade: 'A+', label: 'Exemplary' }
+    56→  if (score >= 80) return { grade: 'A',  label: 'Strong' }
+    57→  if (score >= 70) return { grade: 'B+', label: 'On Track' }
+    58→  if (score >= 60) return { grade: 'B',  label: 'Improving' }
+    59→  if (score >= 50) return { grade: 'C',  label: 'Watch' }
+    60→  return { grade: 'D', label: 'At Risk' }
+    61→}
+    62→
+    63→/* ------------------------------------------------------- trend helpers */
+    64→
+    65→function trendDelta(
+    66→  trends: { emissions: number; energy: number; water: number; waste: number }[] | undefined,
+    67→  key: 'emissions' | 'energy' | 'water' | 'waste'
+    68→): number | null {
+    69→  if (!trends || trends.length < 2) return null
+    70→  const arr = Object.values(trends)
+    71→  const last = arr[arr.length - 1][key]
+    72→  const prev = arr[arr.length - 2][key]
+    73→  if (prev === 0) return null
+    74→  return Math.round(((last - prev) / prev) * 1000) / 10
+    75→}
+    76→
+    77→type TrendPill =
+    78→  | { kind: 'delta'; value: number; goodWhen: 'up' | 'down' }
+    79→  | { kind: 'status'; text: string; tone: 'good' | 'watch' | 'risk' | 'neutral' }
+    80→
+    81→/* ------------------------------------------------------------- main */
+    82→
+    83→export function ExecutiveDashboard() {
+    84→  const [overview, setOverview] = useState<OverviewData | null>(null)
+    85→  const [insights, setInsights] = useState<Insight[]>([])
+    86→  const [loading, setLoading]       = useState(true)
+    87→  const [insightsLoading, setInsightsLoading] = useState(true)
+    88→  const [error, setError]           = useState('')
+    89→  const [refreshing, setRefreshing] = useState(false)
+    90→
+    91→  const load = async (silent = false) => {
+    92→    if (!silent) setRefreshing(true)
+    93→    try {
+    94→      const [ov, inx] = await Promise.all([
+    95→        fetch('/api/overview').then(r => r.json()),
+    96→        fetch('/api/insights').then(r => r.json()),
+    97→      ])
+    98→      setOverview(ov)
+    99→      setInsights(inx.insights || [])
+   100→      setError('')
+   101→    } catch (e: any) {
+   102→      setError(e.message)
+   103→    } finally {
+   104→      setLoading(false)
+   105→      setInsightsLoading(false)
+   106→      setRefreshing(false)
+   107→    }
+   108→  }
+   109→
+   110→  useEffect(() => {
+   111→    let cancelled = false
+   112→    Promise.all([
+   113→      fetch('/api/overview').then(r => r.json()),
+   114→      fetch('/api/insights').then(r => r.json()),
+   115→    ])
+   116→      .then(([ov, inx]) => {
+   117→        if (cancelled) return
+   118→        setOverview(ov)
+   119→        setInsights(inx.insights || [])
+   120→      })
+   121→      .catch(e => { if (!cancelled) setError(e.message) })
+   122→      .finally(() => {
+   123→        if (cancelled) return
+   124→        setLoading(false)
+   125→        setInsightsLoading(false)
+   126→      })
+   127→    return () => { cancelled = true }
+   128→  }, [])
+   129→
+   130→  // ESG composite score (0–100) — SAME formula as OverviewDashboard
+   131→  const esgScore = useMemo(() => {
+   132→    if (!overview) return 0
+   133→    const kk = overview.kpis
+   134→    const dims = [
+   135→      kk.brsrReadiness,                            // BRSR readiness weight
+   136→      kk.completion,                               // reporting completion
+   137→      kk.waterRecycledShare,                       // water circularity
+   138→      kk.wasteRecycledShare,                       // waste recovery
+   139→      kk.renewableShare,                           // renewable energy
+   140→      Math.min(kk.femaleShare * 2, 100),           // gender diversity (boost)
+   141→      Math.max(0, 100 - kk.ltifr * 20),            // safety (lower LTIFR = better)
+   142→      Math.max(0, 100 - kk.openExceptions * 5),     // data quality
+   143→    ]
+   144→    return Math.round(dims.reduce((s, v) => s + v, 0) / dims.length)
+   145→  }, [overview])
+   146→
+   147→  if (loading) return <ExecutiveSkeleton />
+   148→  if (error)  return <ExecutiveError message={error} onRetry={() => load()} />
+   149→  if (!overview) return null
+   150→
+   151→  const k = overview.kpis
+   152→  const trendArr = Object.values(overview.trends || {})
+   153→  const { grade, label: gradeLabel } = gradeFromScore(esgScore)
+   154→
+   155→  // 8 ESG dimensions for the radial breakdown
+   156→  const dims = [
+   157→    { name: 'BRSR',        value: k.brsrReadiness },
+   158→    { name: 'Completion', value: k.completion },
+   159→    { name: 'Water',      value: k.waterRecycledShare },
+   160→    { name: 'Waste',      value: k.wasteRecycledShare },
+   161→    { name: 'Renewables', value: k.renewableShare },
+   162→    { name: 'Diversity',  value: Math.min(k.femaleShare * 2, 100) },
+   163→    { name: 'Safety',     value: Math.max(0, 100 - k.ltifr * 20) },
+   164→    { name: 'Data Qual.', value: Math.max(0, 100 - k.openExceptions * 5) },
+   165→  ]
+   166→
+   167→  // ---- 2x4 compact KPI cards ----
+   168→  const row1: { icon: any; label: string; value: string; unit?: string; pill: TrendPill }[] = [
+   169→    { icon: Flame,   label: 'Emissions', value: k.totalEmissions.toLocaleString(),    unit: 'tCO₂e', pill: (() => { const d = trendDelta(trendArr, 'emissions'); return d === null ? { kind: 'status', text: 'Stable', tone: 'neutral' as const } : { kind: 'delta' as const, value: d, goodWhen: 'down' as const } })() },
+   170→    { icon: Zap,     label: 'Energy',    value: k.energyGJ.toLocaleString(),           unit: 'GJ',    pill: (() => { const d = trendDelta(trendArr, 'energy');    return d === null ? { kind: 'status', text: 'Stable', tone: 'neutral' as const } : { kind: 'delta' as const, value: d, goodWhen: 'down' as const } })() },
+   171→    { icon: Droplet, label: 'Water',     value: k.waterWithdrawalKL.toLocaleString(),  unit: 'KL',    pill: (() => { const d = trendDelta(trendArr, 'water');    return d === null ? { kind: 'status', text: 'Stable', tone: 'neutral' as const } : { kind: 'delta' as const, value: d, goodWhen: 'down' as const } })() },
+   172→    { icon: Recycle, label: 'Waste Rec.', value: String(k.wasteRecycledShare),          unit: '%',     pill: { kind: 'status', text: k.wasteRecycledShare >= 80 ? 'Strong' : k.wasteRecycledShare >= 50 ? 'Fair' : 'Watch', tone: k.wasteRecycledShare >= 80 ? 'good' : k.wasteRecycledShare >= 50 ? 'neutral' : 'watch' } },
+   173→  ]
+   174→  const row2: { icon: any; label: string; value: string; unit?: string; pill: TrendPill }[] = [
+   175→    { icon: Users,        label: 'Workforce',  value: k.totalWorkforce.toLocaleString(), unit: 'people', pill: { kind: 'status', text: k.totalWorkforce > 0 ? 'Active' : '—', tone: 'good' } },
+   176→    { icon: ShieldCheck, label: 'Safety · LTIFR', value: k.ltifr.toFixed(1),              unit: '/M hrs', pill: { kind: 'status', text: k.ltifr <= 1 ? 'Best-in-class' : k.ltifr <= 3 ? 'Acceptable' : 'Watch', tone: k.ltifr <= 1 ? 'good' : k.ltifr <= 3 ? 'neutral' : 'watch' } },
+   177→    { icon: FileCheck2,  label: 'BRSR Ready', value: String(k.brsrReadiness),             unit: '%',      pill: { kind: 'status', text: k.brsrMissing === 0 ? 'Complete' : `${k.brsrMissing} gaps`, tone: k.brsrMissing === 0 ? 'good' : 'watch' } },
+   178→    { icon: Gauge,       label: 'Completion', value: String(k.completion),               unit: '%',      pill: { kind: 'status', text: k.openExceptions === 0 ? 'On Track' : `${k.openExceptions} ex.`, tone: k.openExceptions === 0 ? 'good' : 'risk' } },
+   179→  ]
+   180→
+   181→  const heroSummary = `ESG performance is ${grade} with ${k.brsrReadiness.toFixed(1)}% BRSR readiness · ${k.completion}% reporting completion · ${k.openExceptions} open exceptions`
+   182→
+   183→  return (
+   184→    <div className="min-h-screen space-y-5">
+   185→      {/* ===== Top header strip ===== */}
+   186→      <motion.div
+   187→        initial={{ opacity: 0, y: -8 }}
+   188→        animate={{ opacity: 1, y: 0 }}
+   189→        transition={{ duration: 0.4 }}
+   190→        className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+   191→      >
+   192→        <div className="flex items-center gap-2.5">
+   193→          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-md shadow-amber-500/30">
+   194→            <Crown className="h-4 w-4" />
+   195→          </div>
+   196→          <div>
+   197→            <h1 className="text-xl font-bold tracking-tight text-amber-950">Executive Briefing</h1>
+   198→            <p className="text-[11px] text-amber-700/70">MEIL ESG · BRSR Reporting Platform · Group consolidated</p>
+   199→          </div>
+   200→        </div>
+   201→        <div className="flex items-center gap-2">
+   202→          <span className="status-pill status-approved">
+   203→            <Activity className="h-3 w-3" /> Live · auto-refresh
+   204→          </span>
+   205→          <button
+   206→            onClick={() => load()}
+   207→            disabled={refreshing}
+   208→            className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50/80 px-4 py-2 text-[11px] font-semibold text-amber-800 backdrop-blur-md transition hover:bg-amber-100 disabled:opacity-60"
+   209→          >
+   210→            <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+   211→            {refreshing ? 'Refreshing…' : 'Refresh'}
+   212→          </button>
+   213→        </div>
+   214→      </motion.div>
+   215→
+   216→      {/* ===== HERO — radial gauge + grade + executive summary (≈180px) ===== */}
+   217→      <motion.section
+   218→        initial={{ opacity: 0, y: 12 }}
+   219→        animate={{ opacity: 1, y: 0 }}
+   220→        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+   221→        className="relative overflow-hidden rounded-2xl border border-amber-200/60 p-5"
+   222→        style={{
+   223→          background:
+   224→            'linear-gradient(135deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.85) 50%, rgba(251,191,36,0.18) 100%)',
+   225→          boxShadow: '0 12px 40px -10px rgba(180,83,9,0.22), inset 0 1px 1px rgba(255,255,255,0.7)',
+   226→        }}
+   227→      >
+   228→        {/* warm decorative orbs */}
+   229→        <div className="pointer-events-none absolute -right-12 -top-10 h-44 w-44 rounded-full bg-amber-300/30 blur-3xl" />
+   230→        <div className="pointer-events-none absolute -bottom-12 left-1/3 h-40 w-40 rounded-full bg-yellow-200/40 blur-3xl" />
+   231→
+   232→        <div className="relative flex flex-col items-center gap-5 md:flex-row md:items-center md:gap-7">
+   233→          {/* Radial gauge — 120px */}
+   234→          <EsgGauge score={esgScore} grade={grade} />
+   235→
+   236→          {/* Grade + summary */}
+   237→          <div className="flex-1">
+   238→            <div className="flex flex-wrap items-center gap-2.5">
+   239→              <span className="rounded-full border border-amber-300/70 bg-amber-50/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+   240→                Composite ESG Score
+   241→              </span>
+   242→              <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/50 bg-gradient-to-r from-amber-100 to-yellow-50 px-2.5 py-1 text-[10px] font-semibold text-amber-900">
+   243→                <Award className="h-3 w-3 text-amber-600" />
+   244→                {gradeLabel}
+   245→              </span>
+   246→            </div>
+   247→            <h2 className="mt-2 text-lg font-bold leading-snug text-amber-950 md:text-xl">
+   248→              {heroSummary}
+   249→            </h2>
+   250→            <p className="mt-1.5 text-[12px] leading-relaxed text-amber-800/80">
+   251→              {k.orgs} group(s) · {k.projects} project(s) · {k.totalSubs} submissions ({k.approvedSubs} approved) · renewable share {k.renewableShare}% · water recycled {k.waterRecycledShare}%
+   252→            </p>
+   253→          </div>
+   254→        </div>
+   255→      </motion.section>
+   256→
+   257→      {/* ===== KPI GRID 2x4 — compact cards (max 120px each) ===== */}
+   258→      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+   259→        {[...row1, ...row2].map((c, i) => (
+   260→          <motion.div
+   261→            key={c.label}
+   262→            custom={i}
+   263→            initial={{ opacity: 0, y: 14 }}
+   264→            animate={{ opacity: 1, y: 0 }}
+   265→            transition={{ delay: 0.05 * i, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+   266→            className="group relative flex h-[118px] flex-col justify-between overflow-hidden rounded-xl border border-amber-200/60 p-3"
+   267→            style={{
+   268→              background:
+   269→                'linear-gradient(135deg, rgba(255,251,235,0.92) 0%, rgba(254,243,199,0.65) 100%)',
+   270→              boxShadow: '0 6px 20px -8px rgba(180,83,9,0.18), inset 0 1px 1px rgba(255,255,255,0.6)',
+   271→            }}
+   272→          >
+   273→            {/* glow on hover */}
+   274→            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-200/0 to-amber-200/0 opacity-0 transition-opacity duration-300 group-hover:from-amber-200/30 group-hover:opacity-100" />
+   275→
+   276→            <div className="relative flex items-start justify-between">
+   277→              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm shadow-amber-500/30">
+   278→                <c.icon className="h-3.5 w-3.5" strokeWidth={2.2} />
+   279→              </div>
+   280→              <TrendPillView pill={c.pill} />
+   281→            </div>
+   282→
+   283→            <div className="relative">
+   284→              <p className="text-[10px] font-medium uppercase tracking-wide text-amber-700/80">{c.label}</p>
+   285→              <div className="mt-0.5 flex items-baseline gap-1">
+   286→                <span className="text-[20px] font-bold leading-none tracking-tight text-amber-950">{c.value}</span>
+   287→                {c.unit && <span className="text-[10px] font-medium text-amber-700/70">{c.unit}</span>}
+   288→              </div>
+   289→            </div>
+   290→          </motion.div>
+   291→        ))}
+   292→      </div>
+   293→
+   294→      {/* ===== BOTTOM SPLIT 50/50 ===== */}
+   295→      <div className="grid gap-4 lg:grid-cols-2">
+   296→        {/* LEFT — ESG dimension breakdown */}
+   297→        <motion.section
+   298→          initial={{ opacity: 0, y: 16 }}
+   299→          animate={{ opacity: 1, y: 0 }}
+   300→          transition={{ delay: 0.1, duration: 0.5 }}
+   301→          className="rounded-2xl border border-amber-200/60 p-5"
+   302→          style={{
+   303→            background:
+   304→              'linear-gradient(135deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.7) 100%)',
+   305→            boxShadow: '0 8px 32px -8px rgba(180,83,9,0.18), inset 0 1px 1px rgba(255,255,255,0.6)',
+   306→          }}
+   307→        >
+   308→          <div className="mb-3 flex items-center justify-between">
+   309→            <div className="flex items-center gap-2">
+   310→              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm shadow-amber-500/30">
+   311→                <Gauge className="h-3.5 w-3.5" />
+   312→              </div>
+   313→              <div>
+   314→                <h3 className="text-sm font-bold text-amber-950">ESG Score Breakdown</h3>
+   315→                <p className="text-[10px] text-amber-700/70">8 dimensions · weighted equally</p>
+   316→              </div>
+   317→            </div>
+   318→            <span className="rounded-full border border-amber-300/60 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-900">
+   319→              Composite {esgScore}/100
+   320→            </span>
+   321→          </div>
+   322→
+   323→          <div className="grid grid-cols-[180px,1fr] items-center gap-3">
+   324→            <div className="relative h-[180px]">
+   325→              <ResponsiveContainer width="100%" height="100%">
+   326→                <RadialBarChart
+   327→                  innerRadius="22%"
+   328→                  outerRadius="100%"
+   329→                  data={dims.map((d, i) => ({ ...d, fill: DIM_PALETTE[i % DIM_PALETTE.length] }))}
+   330→                  startAngle={90}
+   331→                  endAngle={-270}
+   332→                >
+   333→                  <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+   334→                  <RadialBar background={{ fill: 'rgba(180,83,9,0.08)' }} dataKey="value" cornerRadius={6} />
+   335→                </RadialBarChart>
+   336→              </ResponsiveContainer>
+   337→              {/* center label */}
+   338→              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+   339→                <span className="text-3xl font-black leading-none text-amber-950">{esgScore}</span>
+   340→                <span className="mt-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700/80">ESG</span>
+   341→              </div>
+   342→            </div>
+   343→
+   344→            {/* dimension list */}
+   345→            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+   346→              {dims.map((d, i) => (
+   347→                <div key={d.name} className="flex items-center justify-between gap-2">
+   348→                  <div className="flex min-w-0 items-center gap-1.5">
+   349→                    <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: DIM_PALETTE[i % DIM_PALETTE.length] }} />
+   350→                    <span className="truncate text-[11px] font-medium text-amber-900/90">{d.name}</span>
+   351→                  </div>
+   352→                  <span className="text-[11px] font-bold text-amber-950">{d.value.toFixed(0)}</span>
+   353→                </div>
+   354→              ))}
+   355→            </div>
+   356→          </div>
+   357→        </motion.section>
+   358→
+   359→        {/* RIGHT — Top 3 AI Insights */}
+   360→        <motion.section
+   361→          initial={{ opacity: 0, y: 16 }}
+   362→          animate={{ opacity: 1, y: 0 }}
+   363→          transition={{ delay: 0.15, duration: 0.5 }}
+   364→          className="rounded-2xl border border-amber-200/60 p-5"
+   365→          style={{
+   366→            background:
+   367→              'linear-gradient(135deg, rgba(255,251,235,0.95) 0%, rgba(254,243,199,0.7) 100%)',
+   368→            boxShadow: '0 8px 32px -8px rgba(180,83,9,0.18), inset 0 1px 1px rgba(255,255,255,0.6)',
+   369→          }}
+   370→        >
+   371→          <div className="mb-3 flex items-center justify-between">
+   372→            <div className="flex items-center gap-2">
+   373→              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm shadow-amber-500/30">
+   374→                <Sparkles className="h-3.5 w-3.5" />
+   375→              </div>
+   376→              <div>
+   377→                <h3 className="text-sm font-bold text-amber-950">Top AI Insights</h3>
+   378→                <p className="text-[10px] text-amber-700/70">LLM-generated · ranked by severity</p>
+   379→              </div>
+   380→            </div>
+   381→            {insightsLoading && (
+   382→              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700/70">
+   383→                <RefreshCw className="h-3 w-3 animate-spin" /> Generating…
+   384→              </span>
+   385→            )}
+   386→          </div>
+   387→
+   388→          {insightsLoading ? (
+   389→            <div className="space-y-2.5">
+   390→              {[0, 1, 2].map(i => (
+   391→                <div key={i} className="h-[68px] animate-pulse rounded-xl bg-amber-100/60" />
+   392→              ))}
+   393→            </div>
+   394→          ) : insights.length === 0 ? (
+   395→            <div className="flex h-[220px] flex-col items-center justify-center text-center">
+   396→              <Sparkles className="h-8 w-8 text-amber-400/60" />
+   397→              <p className="mt-2 text-[12px] text-amber-800/70">No insights generated yet.</p>
+   398→            </div>
+   399→          ) : (
+   400→            <div className="space-y-2.5">
+   401→              {insights.slice(0, 3).map((ins, i) => (
+   402→                <InsightRow key={i} index={i} insight={ins} />
+   403→              ))}
+   404→            </div>
+   405→          )}
+   406→        </motion.section>
+   407→      </div>
+   408→    </div>
+   409→  )
+   410→}
+   411→
+   412→/* ============================================================ ESG Gauge */
+   413→
+   414→function EsgGauge({ score, grade }: { score: number; grade: string }) {
+   415→  const size = 120
+   416→  const stroke = 10
+   417→  const r = (size - stroke) / 2
+   418→  const c = 2 * Math.PI * r
+   419→  const pct = Math.max(0, Math.min(100, score)) / 100
+   420→  const dash = c * pct
+   421→  const gid = 'esg-gauge-amber'
+   422→
+   423→  return (
+   424→    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+   425→      <svg width={size} height={size} className="-rotate-90">
+   426→        <defs>
+   427→          <linearGradient id={gid} x1="0%" y1="0%" x2="100%" y2="100%">
+   428→            <stop offset="0%" stopColor={AMBER_LITE} />
+   429→            <stop offset="55%" stopColor={AMBER} />
+   430→            <stop offset="100%" stopColor={GOLD} />
+   431→          </linearGradient>
+   432→        </defs>
+   433→        {/* track */}
+   434→        <circle
+   435→          cx={size / 2} cy={size / 2} r={r}
+   436→          fill="none"
+   437→          stroke="rgba(180,83,9,0.14)"
+   438→          strokeWidth={stroke}
+   439→        />
+   440→        {/* progress */}
+   441→        <motion.circle
+   442→          cx={size / 2} cy={size / 2} r={r}
+   443→          fill="none"
+   444→          stroke={`url(#${gid})`}
+   445→          strokeWidth={stroke}
+   446→          strokeLinecap="round"
+   447→          strokeDasharray={`${dash} ${c - dash}`}
+   448→          initial={{ strokeDasharray: `0 ${c}` }}
+   449→          animate={{ strokeDasharray: `${dash} ${c - dash}` }}
+   450→          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+   451→          style={{ filter: 'drop-shadow(0 2px 6px rgba(245,158,11,0.45))' }}
+   452→        />
+   453→      </svg>
+   454→      {/* center overlay */}
+   455→      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+   456→        <motion.span
+   457→          initial={{ opacity: 0, scale: 0.6 }}
+   458→          animate={{ opacity: 1, scale: 1 }}
+   459→          transition={{ delay: 0.55, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+   460→          className="text-[28px] font-black leading-none text-amber-950"
+   461→        >
+   462→          {score}
+   463→        </motion.span>
+   464→        <motion.span
+   465→          initial={{ opacity: 0, y: 2 }}
+   466→          animate={{ opacity: 1, y: 0 }}
+   467→          transition={{ delay: 0.7, duration: 0.35 }}
+   468→          className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-[10px] font-black text-white shadow-sm"
+   469→        >
+   470→          {grade}
+   471→        </motion.span>
+   472→        <span className="mt-1 text-[8px] font-semibold uppercase tracking-wider text-amber-700/70">/ 100</span>
+   473→      </div>
+   474→    </div>
+   475→  )
+   476→}
+   477→
+   478→/* ====================================================== Trend Pill View */
+   479→
+   480→function TrendPillView({ pill }: { pill: TrendPill }) {
+   481→  if (pill.kind === 'delta') {
+   482→    const up = pill.value > 0
+   483→    const down = pill.value < 0
+   484→    const isGood =
+   485→      (pill.goodWhen === 'up' && up) || (pill.goodWhen === 'down' && down)
+   486→    const isBad =
+   487→      (pill.goodWhen === 'up' && down) || (pill.goodWhen === 'down' && up)
+   488→    const toneClass = isGood
+   489→      ? 'bg-emerald-100 text-emerald-700 border-emerald-200/60'
+   490→      : isBad
+   491→        ? 'bg-rose-100 text-rose-700 border-rose-200/60'
+   492→        : 'bg-amber-100 text-amber-800 border-amber-200/60'
+   493→    const Icon = up ? TrendingUp : down ? TrendingDown : Activity
+   494→    const text = pill.value === 0 ? '0%' : `${up ? '+' : ''}${pill.value}%`
+   495→    return (
+   496→      <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${toneClass}`}>
+   497→        <Icon className="h-2.5 w-2.5" strokeWidth={2.5} />
+   498→        {text}
+   499→      </span>
+   500→    )
+   501→  }
+   502→  // status pill
+   503→  const map: Record<string, string> = {
+   504→    good:    'bg-emerald-100 text-emerald-700 border-emerald-200/60',
+   505→    watch:   'bg-amber-100 text-amber-800 border-amber-200/60',
+   506→    risk:    'bg-rose-100 text-rose-700 border-rose-200/60',
+   507→    neutral: 'bg-amber-50 text-amber-700/80 border-amber-200/50',
+   508→  }
+   509→  return (
+   510→    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${map[pill.tone]}`}>
+   511→      {pill.text}
+   512→    </span>
+   513→  )
+   514→}
+   515→
+   516→/* ====================================================== Insight Row */
+   517→
+   518→function InsightRow({ insight, index }: { insight: Insight; index: number }) {
+   519→  const sev = insight.severity || 'positive'
+   520→  const cfg =
+   521→    sev === 'positive'
+   522→      ? { Icon: TrendingUp,   tile: 'bg-emerald-100 text-emerald-700', ring: 'border-emerald-200/50' }
+   523→      : sev === 'warning'
+   524→        ? { Icon: AlertTriangle, tile: 'bg-amber-100 text-amber-700',    ring: 'border-amber-200/60' }
+   525→        : { Icon: AlertOctagon,  tile: 'bg-rose-100 text-rose-700',     ring: 'border-rose-200/60' }
+   526→  const num = index + 1
+   527→
+   528→  return (
+   529→    <motion.div
+   530→      initial={{ opacity: 0, x: 12 }}
+   531→      animate={{ opacity: 1, x: 0 }}
+   532→      transition={{ delay: 0.2 + index * 0.08, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+   533→      className={`flex items-start gap-2.5 rounded-xl border ${cfg.ring} bg-white/60 p-2.5 backdrop-blur-sm transition hover:bg-white/80`}
+   534→    >
+   535→      <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 text-[12px] font-black text-white shadow-sm shadow-amber-500/30">
+   536→        {num}
+   537→      </div>
+   538→      <div className="min-w-0 flex-1">
+   539→        <div className="flex items-center gap-1.5">
+   540→          <div className={`flex h-4 w-4 items-center justify-center rounded ${cfg.tile}`}>
+   541→            <cfg.Icon className="h-2.5 w-2.5" strokeWidth={2.5} />
+   542→          </div>
+   543→          <p className="truncate text-[12px] font-bold text-amber-950">
+   544→            {insight.title || insight.category || 'Insight'}
+   545→          </p>
+   546→          <span className={`ml-auto inline-flex rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide ${cfg.tile}`}>
+   547→            {sev}
+   548→          </span>
+   549→        </div>
+   550→        <p className="mt-1 text-[11px] leading-snug text-amber-900/85">{insight.insight}</p>
+   551→        {insight.action && (
+   552→          <p className="mt-1 flex items-center gap-1 text-[10px] font-medium text-amber-700/80">
+   553→            <ChevronRight className="h-2.5 w-2.5" /> {insight.action}
+   554→          </p>
+   555→        )}
+   556→      </div>
+   557→    </motion.div>
+   558→  )
+   559→}
+   560→
+   561→/* ====================================================== Skeleton + Error */
+   562→
+   563→function ExecutiveSkeleton() {
+   564→  return (
+   565→    <div className="space-y-5">
+   566→      {/* header skeleton */}
+   567→      <div className="flex items-center justify-between">
+   568→        <div className="flex items-center gap-2.5">
+   569→          <div className="h-9 w-9 animate-pulse rounded-xl bg-amber-200/60" />
+   570→          <div className="space-y-1.5">
+   571→            <div className="h-4 w-44 animate-pulse rounded bg-amber-200/60" />
+   572→            <div className="h-2.5 w-32 animate-pulse rounded bg-amber-100" />
+   573→          </div>
+   574→        </div>
+   575→        <div className="h-8 w-32 animate-pulse rounded-full bg-amber-100" />
+   576→      </div>
+   577→
+   578→      {/* hero skeleton */}
+   579→      <div className="h-[180px] animate-pulse rounded-2xl border border-amber-200/60 bg-amber-100/50" />
+   580→
+   581→      {/* kpi grid skeleton */}
+   582→      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+   583→        {Array.from({ length: 8 }).map((_, i) => (
+   584→          <div key={i} className="h-[118px] animate-pulse rounded-xl border border-amber-200/60 bg-amber-100/50" />
+   585→        ))}
+   586→      </div>
+   587→
+   588→      {/* bottom split skeleton */}
+   589→      <div className="grid gap-4 lg:grid-cols-2">
+   590→        <div className="h-[280px] animate-pulse rounded-2xl border border-amber-200/60 bg-amber-100/50" />
+   591→        <div className="h-[280px] animate-pulse rounded-2xl border border-amber-200/60 bg-amber-100/50" />
+   592→      </div>
+   593→    </div>
+   594→  )
+   595→}
+   596→
+   597→function ExecutiveError({ message, onRetry }: { message: string; onRetry: () => void }) {
+   598→  return (
+   599→    <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+   600→      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-lg shadow-amber-500/40">
+   601→        <AlertOctagon className="h-7 w-7" />
+   602→      </div>
+   603→      <h2 className="mt-4 text-lg font-bold text-amber-950">Executive briefing unavailable</h2>
+   604→      <p className="mt-1 max-w-md text-[12px] text-amber-800/70">{message || 'Could not load consolidated ESG data from the reporting chain.'}</p>
+   605→      <button
+   606→        onClick={onRetry}
+   607→        className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2 text-[12px] font-semibold text-white shadow-md shadow-amber-500/30 transition hover:from-amber-600 hover:to-amber-700"
+   608→      >
+   609→        <RefreshCw className="h-3.5 w-3.5" /> Retry
+   610→      </button>
+   611→    </div>
+   612→  )
+   613→}
+   614→
+   615→export default ExecutiveDashboard
+   616→

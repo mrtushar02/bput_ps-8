@@ -1371,3 +1371,57 @@ Stage Summary:
 - Each workspace has its own color theme (amber, violet, rose, emerald) matching its dashboard
 - For roles without dedicated workspaces yet (reviewers, managers, auditor, executive, admin), their role-specific tabs will render the existing shared modules (Evidence, Submissions, Reports, Analytics, Audit, BRSR) — these are already built and role-aware
 - Ready for next step: build workspaces for remaining roles (reviewers, managers, BRSR, auditor, executive) and wire their role-specific tabs
+
+---
+Task ID: 29 (Complete All Remaining Role Workspaces + Screen Count)
+Agent: Lead Architect (main) + 3 subagents
+Task: Build all remaining role workspaces, wire all 55 unrouted keys, provide total screen count
+
+Work Log:
+- Found 55 unrouted module keys (missing from module-router) for roles: BU Reviewer, Subsidiary Reviewer, Group Reviewer, ESG Manager, ESG Analyst, BRSR Manager, Auditor, Executive.
+- Dispatched 3 subagents to build 8 new workspace components:
+  1. ReviewerWorkspace (reviewer-workspace.tsx) — 4 screens: Review Queue, My BU, Consolidation, Exceptions & SLA. Indigo/violet theme.
+  2. SubsidiaryWorkspace (subsidiary-workspace.tsx) — 4 screens: BU Review Center, Subsidiary ESG, BRSR Impact, Approvals. Blue/indigo-deep theme.
+  3. GroupWorkspace (group-workspace.tsx) — 6 screens: Group Consolidation, Enterprise ESG, BRSR Command, Assurance, Risk Management, Approvals & Lock. Navy/gold theme.
+  4. EsgManagerWorkspace (esg-manager-workspace.tsx) — 6 screens: KPI Management, ESG Performance, Data Completeness, Material ESG Risks, Targets & Progress, Cross-Functional. Teal/emerald theme.
+  5. EsgAnalystWorkspace (esg-analyst-workspace.tsx) — 8 screens: Data Explorer, ESG Metrics, Emissions Analysis, Energy & Resources, Social Analytics, Governance Analytics, Variance & Anomalies, Data Quality. Emerald-deep theme.
+  6. BrsrWorkspace (brsr-workspace.tsx) — 11 screens: Frameworks, Section A, Section B, Section C, BRSR Core, Disclosure Mapping, Evidence & Sources, Validation, Readiness, Report Builder, Approval & Issuance. Green/teal-deep theme.
+  7. AuditorWorkspace (auditor-workspace.tsx) — 10 screens: Engagements, Scope & Materiality, Evidence Review, Data Testing, BRSR Testing, Findings, Evidence Requests, Mgmt Responses, Assurance Status, Assurance Reports. Slate/steel theme.
+  8. ExecutiveWorkspace (executive-workspace.tsx) — 6 screens: Enterprise ESG, BRSR Readiness, Strategic Risks, Performance Trends, Business Units, Assurance Status. Amber/gold theme.
+
+- Rewrote module-router.tsx to route ALL 55 previously-unrouted keys to their respective workspaces. Total: 92 case branches covering all 15 roles' nav tabs.
+- Verified: ALL nav keys are now routed (0 unrouted).
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- ALL 55 previously-unrouted keys now routed ✓
+
+TOTAL SCREEN COUNT:
+- 15 unique overview dashboards (one per role)
+- 158 unique nav-tab screens (across 15 roles)
+- GRAND TOTAL: 173 screens
+
+Screen breakdown per role:
+  SUPER_ADMIN: 10 + 1 overview = 11
+  PROJECT_USER: 8 + 1 overview = 9
+  HR_USER: 7 + 1 overview = 8
+  EHS_USER: 12 + 1 overview = 13
+  PROCUREMENT_USER: 11 + 1 overview = 12
+  CSR_USER: 12 + 1 overview = 13
+  COMPLIANCE_USER: 12 + 1 overview = 13
+  BU_REVIEWER: 10 + 1 overview = 11
+  SUBSIDIARY_REVIEWER: 9 + 1 overview = 10
+  GROUP_REVIEWER: 10 + 1 overview = 11
+  ESG_MANAGER: 12 + 1 overview = 13
+  ESG_ANALYST: 11 + 1 overview = 12
+  BRSR_MANAGER: 13 + 1 overview = 14
+  AUDITOR: 12 + 1 overview = 13
+  EXECUTIVE: 9 + 1 overview = 10
+
+Total files:
+- 15 dashboard components (one per role)
+- 13 workspace components (HR, EHS, Procurement, CSR, Compliance, Reviewer, Subsidiary, Group, ESG Manager, ESG Analyst, BRSR, Auditor, Executive)
+- 11 shared module components (My Project, Data Entry, Evidence, Submissions, BRSR, Reports, Analytics, Audit, Admin, Team, CSV Import)
+- 1 module-router (92 case branches)
+- 1 role-nav config (15 roles, 158 nav items)
