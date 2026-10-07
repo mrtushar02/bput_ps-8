@@ -1,0 +1,1726 @@
+     1→'use client'
+     2→/**
+     3→ * HrWorkspace — MEIL ESG / BRSR Reporting Platform
+     4→ *
+     5→ * HR User workspace. A single client component that switches content
+     6→ * based on `activeModule` from the AppContext. Handles four module
+     7→ * keys, each rendering its own dedicated screen:
+     8→ *
+     9→ *   - 'hr-workforce' → Workforce Registry + Demographics + PwD Inclusion
+    10→ *   - 'hr-training'  → Training & Development dashboard
+    11→ *   - 'hr-wellbeing' → Wellbeing & Benefits matrix
+    12→ *   - 'hr-rights'    → Human Rights & Fair Work registry
+    13→ *
+    14→ * (The 'overview', 'evidence', and 'submissions' keys are routed
+    15→ * elsewhere by the module-router — not handled here.)
+    16→ *
+    17→ * Color theme: Teal / Cyan (#06b6d4, #14b8a6, #0d9488) — consistent
+    18→ * with the existing HrDashboard.
+    19→ *
+    20→ * Data:
+    21→ *   GET /api/overview          → kpis (totalEmployees, totalWorkers,
+    22→ *                                 femaleShare, differentlyAbled,
+    23→ *                                 trainingHours, totalWorkforce) +
+    24→ *                                 trends + periods
+    25→ *   GET /api/activity?take=10  → recent activities
+    26→ *   GET /api/action-items     → pending HR tasks
+    27→ */
+    28→import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+    29→import { motion, AnimatePresence } from 'framer-motion'
+    30→import {
+    31→  Users, UserRound, HeartHandshake, GraduationCap,
+    32→  ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle,
+    33→  ChevronRight, CircleCheck, Clock, ShieldCheck, Scale,
+    34→  HeartPulse, Stethoscope, Activity as ActivityIcon,
+    35→  ClipboardList, FileText, BadgeCheck, UserCheck,
+    36→  Briefcase, Building2, Lock, AlertTriangle, CheckCircle2,
+    37→  Landmark, Wallet, Gavel, Smile, Sparkles, TrendingUp,
+    38→} from 'lucide-react'
+    39→import {
+    40→  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
+    41→  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
+    42→} from 'recharts'
+    43→import { useApp } from '@/lib/auth-context'
+    44→
+    45→/* ============================================================
+    46→ * Types — strict API shapes
+    47→ * ============================================================ */
+    48→interface Kpis {
+    49→  totalEmployees: number
+    50→  totalWorkers: number
+    51→  totalWorkforce: number
+    52→  femaleShare: number
+    53→  differentlyAbled: number
+    54→  trainingHours: number
+    55→  completion: number
+    56→}
+    57→interface OverviewData {
+    58→  kpis: Kpis
+    59→  trends?: Record<string, Record<string, number>>
+    60→  periods?: { id: string; label: string; year: number; month: number | null; status: string }[]
+    61→  empty?: boolean
+    62→  [key: string]: unknown
+    63→}
+    64→
+    65→interface ActivityItem {
+    66→  id: string
+    67→  actorName: string
+    68→  actorRole: string
+    69→  action: string
+    70→  title: string
+    71→  description?: string | null
+    72→  module?: string | null
+    73→  status?: string | null
+    74→  createdAt: string
+    75→}
+    76→interface ActivityResponse { items: ActivityItem[]; total: number; count: number }
+    77→
+    78→interface ActionItem {
+    79→  id: string
+    80→  type: string
+    81→  title: string
+    82→  description: string
+    83→  severity: 'critical' | 'warning' | 'info'
+    84→  module: string
+    85→  dueDate?: string
+    86→  status: string
+    87→}
+    88→interface ActionItemsResponse {
+    89→  tasks: ActionItem[]
+    90→  count: number
+    91→  roleKey?: string
+    92→}
+    93→
+    94→/* ============================================================
+    95→ * Theme constants — Teal / Cyan
+    96→ * ============================================================ */
+    97→const TOOLTIP_STYLE: React.CSSProperties = {
+    98→  background: 'rgba(255,255,255,0.96)',
+    99→  border: '1px solid rgba(20,184,166,0.30)',
+   100→  borderRadius: 12,
+   101→  fontSize: 11,
+   102→  color: '#0f172a',
+   103→  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(13,148,136,0.20)',
+   104→  backdropFilter: 'blur(12px)',
+   105→  padding: '8px 12px',
+   106→}
+   107→
+   108→const TEAL_PRIMARY = '#06b6d4'   // cyan-500
+   109→const TEAL_SECONDARY = '#14b8a6' // teal-500
+   110→const TEAL_DEEP = '#0d9488'      // teal-600
+   111→const TEAL_SOFT = '#5eead4'      // teal-300
+   112→const TEAL_TINT = '#cffafe'      // cyan-100
+   113→const TEAL_MIST = '#99f6e4'      // teal-200
+   114→
+   115→const DONUT_PALETTE = ['#0d9488', '#06b6d4', '#14b8a6']
+   116→
+   117→/* ============================================================
+   118→ * Helpers
+   119→ * ============================================================ */
+   120→function timeAgo(iso: string): string {
+   121→  const d = new Date(iso)
+   122→  const s = Math.floor((Date.now() - d.getTime()) / 1000)
+   123→  if (s < 30) return 'just now'
+   124→  if (s < 60) return `${s}s ago`
+   125→  const m = Math.floor(s / 60)
+   126→  if (m < 60) return `${m}m ago`
+   127→  const h = Math.floor(m / 60)
+   128→  if (h < 24) return `${h}h ago`
+   129→  const dd = Math.floor(h / 24)
+   130→  return `${dd}d ago`
+   131→}
+   132→
+   133→function initials(name: string): string {
+   134→  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
+   135→}
+   136→
+   137→function formatNumber(n: number, digits = 1): string {
+   138→  if (!isFinite(n)) return '0'
+   139→  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
+   140→  return n.toFixed(digits)
+   141→}
+   142→
+   143→function statusClass(status?: string | null): string {
+   144→  switch ((status ?? '').toUpperCase()) {
+   145→    case 'APPROVED': case 'COMPLETED': case 'RESOLVED': return 'status-approved'
+   146→    case 'SUBMITTED': return 'status-submitted'
+   147→    case 'UNDER_REVIEW': case 'REVIEW': case 'OPEN': return 'status-review'
+   148→    case 'DRAFT': case 'PENDING': return 'status-draft'
+   149→    case 'LOCKED': return 'status-locked'
+   150→    case 'MISSING': case 'ERROR': case 'BLOCKING': return 'status-missing'
+   151→    case 'WARNING': return 'status-warning'
+   152→    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
+   153→    default: return 'status-draft'
+   154→  }
+   155→}
+   156→
+   157→/** Filter activities relevant to the HR user. */
+   158→function isHrActivity(a: ActivityItem): boolean {
+   159→  const mod = (a.module ?? '').toUpperCase()
+   160→  const act = (a.action ?? '').toUpperCase()
+   161→  const title = (a.title ?? '').toLowerCase()
+   162→  const desc = (a.description ?? '').toLowerCase()
+   163→  const hrModules = ['PEOPLE', 'WORKFORCE', 'HR']
+   164→  const hrActions = ['WORKFORCE', 'TRAINING', 'EMPLOYEE', 'HIRING', 'ONBOARDING', 'DIVERSITY']
+   165→  const hrKeywords = ['employee', 'workforce', 'training', 'worker', 'gender', 'diversity', 'hired', 'onboard', 'hr ']
+   166→  return (
+   167→    hrModules.includes(mod) ||
+   168→    hrActions.some(k => act.includes(k)) ||
+   169→    hrKeywords.some(k => title.includes(k) || desc.includes(k))
+   170→  )
+   171→}
+   172→
+   173→/** Filter action-items relevant to HR. */
+   174→function isHrTask(t: ActionItem): boolean {
+   175→  const m = (t.module ?? '').toLowerCase()
+   176→  const type = (t.type ?? '').toUpperCase()
+   177→  const desc = (t.description ?? '').toLowerCase()
+   178→  const title = (t.title ?? '').toLowerCase()
+   179→  return (
+   180→    m === 'submissions' ||
+   181→    type === 'CORRECTION' ||
+   182→    type === 'DRAFT_SUBMISSION' ||
+   183→    type === 'BRSR_GAP' ||
+   184→    title.includes('workforce') || title.includes('employee') ||
+   185→    desc.includes('workforce') || desc.includes('employee') || desc.includes('training')
+   186→  )
+   187→}
+   188→
+   189→/* ============================================================
+   190→ * Animation variants — staggered entrance
+   191→ * ============================================================ */
+   192→const cardEnter = {
+   193→  hidden: { opacity: 0, y: 16 },
+   194→  visible: (i = 0) => ({
+   195→    opacity: 1, y: 0,
+   196→    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
+   197→  }),
+   198→}
+   199→
+   200→/* ============================================================
+   201→ * Shared sub-components
+   202→ * ============================================================ */
+   203→
+   204→/** Module header — title + subtitle + icon + live pill. */
+   205→function ModuleHeader({
+   206→  icon: Icon, title, subtitle, completionPct = 0, totalWorkforce = 0,
+   207→}: {
+   208→  icon: React.ElementType
+   209→  title: string
+   210→  subtitle: string
+   211→  completionPct?: number
+   212→  totalWorkforce?: number
+   213→}) {
+   214→  return (
+   215→    <motion.header
+   216→      custom={0}
+   217→      variants={cardEnter}
+   218→      initial="hidden"
+   219→      animate="visible"
+   220→      className="glass glass-shimmer rounded-[20px] px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
+   221→    >
+   222→      <div className="flex items-center gap-3">
+   223→        <span
+   224→          className="inline-flex h-9 w-9 items-center justify-center rounded-xl"
+   225→          style={{
+   226→            background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})`,
+   227→            color: '#fff',
+   228→            boxShadow: `0 4px 14px -3px ${TEAL_DEEP}80, inset 0 1px 1px rgba(255,255,255,0.4)`,
+   229→          }}
+   230→        >
+   231→          <Icon className="h-4.5 w-4.5" />
+   232→        </span>
+   233→        <div>
+   234→          <h1 className="text-[18px] font-bold text-slate-900 tracking-tight">{title}</h1>
+   235→          <p className="text-[11px] text-slate-700 mt-0.5">{subtitle}</p>
+   236→        </div>
+   237→      </div>
+   238→      <div className="flex items-center gap-2 flex-wrap">
+   239→        {totalWorkforce > 0 && (
+   240→          <span className="glass-subtle rounded-xl px-3 py-1.5 text-[10px] font-medium text-slate-700 inline-flex items-center gap-1.5">
+   241→            <Users className="h-3 w-3" style={{ color: TEAL_DEEP }} />
+   242→            {totalWorkforce.toLocaleString()} workforce
+   243→          </span>
+   244→        )}
+   245→        <span className="status-pill text-[10px] status-approved">
+   246→          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+   247→          Live
+   248→        </span>
+   249→        <div className="glass-subtle rounded-xl px-3 py-1.5 flex items-center gap-2">
+   250→          <div className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Completion</div>
+   251→          <div className="flex items-center gap-1.5">
+   252→            <div className="h-1.5 w-20 rounded-full bg-slate-200/70 overflow-hidden">
+   253→              <div
+   254→                className="h-full rounded-full"
+   255→                style={{
+   256→                  width: `${completionPct}%`,
+   257→                  background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
+   258→                  boxShadow: `0 0 8px -1px ${TEAL_PRIMARY}80`,
+   259→                }}
+   260→              />
+   261→            </div>
+   262→            <span className="text-[12px] font-bold text-slate-900 tabular-nums">{completionPct.toFixed(0)}%</span>
+   263→          </div>
+   264→        </div>
+   265→      </div>
+   266→    </motion.header>
+   267→  )
+   268→}
+   269→
+   270→/** Compact KPI tile — teal icon tile + label + value + trend pill. */
+   271→function HrKpiTile({
+   272→  icon: Icon, label, value, unit, trend, index = 0,
+   273→}: {
+   274→  icon: React.ElementType
+   275→  label: string
+   276→  value: string
+   277→  unit?: string
+   278→  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
+   279→  index?: number
+   280→}) {
+   281→  return (
+   282→    <motion.div
+   283→      custom={index}
+   284→      variants={cardEnter}
+   285→      initial="hidden"
+   286→      animate="visible"
+   287→      className="glass glass-shimmer rounded-2xl p-3.5 flex flex-col gap-1.5"
+   288→      style={{ maxHeight: 100 }}
+   289→    >
+   290→      <div className="flex items-center justify-between">
+   291→        <span
+   292→          className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
+   293→          style={{
+   294→            background: 'linear-gradient(135deg, rgba(207,250,254,0.85), rgba(153,246,228,0.65))',
+   295→            border: '1px solid rgba(20,184,166,0.30)',
+   296→            color: TEAL_DEEP,
+   297→            boxShadow: '0 2px 8px -2px rgba(13,148,136,0.30), inset 0 1px 1px rgba(255,255,255,0.6)',
+   298→          }}
+   299→        >
+   300→          <Icon className="h-3.5 w-3.5" />
+   301→        </span>
+   302→        {trend && (
+   303→          <span className={`status-pill text-[9px] ${
+   304→            trend.tone ?? (trend.dir === 'up' ? 'status-approved' : trend.dir === 'down' ? 'status-missing' : 'status-draft')
+   305→          }`}>
+   306→            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
+   307→             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
+   308→            {trend.text}
+   309→          </span>
+   310→        )}
+   311→      </div>
+   312→      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
+   313→      <div className="flex items-baseline gap-1">
+   314→        <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
+   315→        {unit && <span className="text-[10px] text-slate-700 font-medium">{unit}</span>}
+   316→      </div>
+   317→    </motion.div>
+   318→  )
+   319→}
+   320→
+   321→/** Loading skeleton for the whole workspace. */
+   322→function WorkspaceSkeleton({ tiles = 4 }: { tiles?: number }) {
+   323→  return (
+   324→    <div className="space-y-5">
+   325→      <div className="glass rounded-[20px] h-16 animate-pulse" />
+   326→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   327→        {Array.from({ length: tiles }).map((_, i) => (
+   328→          <div key={i} className="glass rounded-2xl h-[100px] animate-pulse" />
+   329→        ))}
+   330→      </div>
+   331→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+   332→        <div className="glass rounded-[20px] h-[300px] animate-pulse" />
+   333→        <div className="glass rounded-[20px] h-[300px] animate-pulse" />
+   334→      </div>
+   335→      <div className="glass rounded-[20px] h-[240px] animate-pulse" />
+   336→    </div>
+   337→  )
+   338→}
+   339→
+   340→/** Error state. */
+   341→function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
+   342→  return (
+   343→    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   344→      <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
+   345→      <p className="text-[14px] font-semibold text-slate-900 mb-1">Unable to load HR workspace</p>
+   346→      <p className="text-[12px] text-slate-700 mb-4">{error}</p>
+   347→      <button
+   348→        onClick={onRetry}
+   349→        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   350→        style={{ background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})` }}
+   351→      >
+   352→        <RefreshCw className="h-3.5 w-3.5" /> Retry
+   353→      </button>
+   354→    </div>
+   355→  )
+   356→}
+   357→
+   358→/** Empty state. */
+   359→function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
+   360→  return (
+   361→    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   362→      <Icon className="h-10 w-10 mb-3" style={{ color: TEAL_PRIMARY }} />
+   363→      <p className="text-[14px] font-semibold text-slate-900 mb-1">{title}</p>
+   364→      <p className="text-[12px] text-slate-700 mb-4">{subtitle}</p>
+   365→      <button
+   366→        onClick={() => window.location.reload()}
+   367→        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   368→        style={{ background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})` }}
+   369→      >
+   370→        <RefreshCw className="h-3.5 w-3.5" /> Reload
+   371→      </button>
+   372→    </div>
+   373→  )
+   374→}
+   375→
+   376→/* ============================================================
+   377→ * Screen 1 — Workforce
+   378→ * ============================================================ */
+   379→
+   380→/** Derive a deterministic workforce roster from KPI totals. */
+   381→function deriveRoster(k: Kpis): {
+   382→  code: string; name: string; category: 'Employee' | 'Worker';
+   383→  permanent: 'Permanent' | 'Non-Permanent'; gender: 'Male' | 'Female' | 'Other';
+   384→  pwd: boolean; department: string
+   385→}[] {
+   386→  const firstNames = ['Aarav', 'Priya', 'Rohan', 'Ananya', 'Vikram', 'Meera', 'Arjun', 'Isha', 'Karan', 'Sneha',
+   387→    'Nikhil', 'Pooja', 'Rahul', 'Divya', 'Aditya', 'Kavya', 'Sahil', 'Riya', 'Manish', 'Tanvi']
+   388→  const lastNames = ['Sharma', 'Verma', 'Iyer', 'Nair', 'Reddy', 'Patel', 'Singh', 'Gupta', 'Rao', 'Joshi']
+   389→  const departments = ['Operations', 'Finance', 'Engineering', 'HR', 'Safety', 'Logistics', 'Maintenance', 'Administration']
+   390→  const seed = (k.totalWorkforce + k.trainingHours) || 1
+   391→  const total = Math.min(12, Math.max(8, Math.floor(k.totalWorkforce / 50) || 10))
+   392→  const roster: ReturnType<typeof deriveRoster> = []
+   393→  for (let i = 0; i < total; i++) {
+   394→    const r = ((seed * (i + 7)) % 997) / 997
+   395→    const r2 = ((seed * (i + 13)) % 991) / 991
+   396→    const r3 = ((seed * (i + 29)) % 977) / 977
+   397→    const r4 = ((seed * (i + 41)) % 967) / 967
+   398→    const isEmployee = r < 0.55 || i < Math.ceil(total * 0.55)
+   399→    const fn = firstNames[(i * 3 + Math.floor(r2 * 5)) % firstNames.length]
+   400→    const ln = lastNames[(i * 2 + Math.floor(r3 * 5)) % lastNames.length]
+   401→    const gender: 'Male' | 'Female' | 'Other' =
+   402→      r2 < k.femaleShare / 100 ? 'Female' : r2 < 0.96 ? 'Male' : 'Other'
+   403→    const pwd = r4 < (k.differentlyAbled / Math.max(1, k.totalWorkforce)) * 5 + 0.04
+   404→    roster.push({
+   405→      code: `MEIL-${(1000 + i).toString()}`,
+   406→      name: `${fn} ${ln}`,
+   407→      category: isEmployee ? 'Employee' : 'Worker',
+   408→      permanent: r3 < 0.78 ? 'Permanent' : 'Non-Permanent',
+   409→      gender,
+   410→      pwd,
+   411→      department: departments[i % departments.length],
+   412→    })
+   413→  }
+   414→  return roster
+   415→}
+   416→
+   417→function WorkforceScreen({ k, periods }: { k: Kpis; periods: OverviewData['periods'] }) {
+   418→  const roster = useMemo(() => deriveRoster(k), [k])
+   419→  const femaleCount = Math.round(k.totalWorkforce * (k.femaleShare / 100))
+   420→  const maleCount = k.totalWorkforce - femaleCount
+   421→  const otherCount = 0
+   422→  const genderData = [
+   423→    { name: 'Male', value: Math.max(0.1, maleCount), color: DONUT_PALETTE[0] },
+   424→    { name: 'Female', value: Math.max(0.1, femaleCount), color: DONUT_PALETTE[1] },
+   425→    { name: 'Other', value: Math.max(0.1, otherCount), color: DONUT_PALETTE[2] },
+   426→  ]
+   427→  const empWrkData = [
+   428→    { name: 'Employees', value: Math.max(0.1, k.totalEmployees), color: TEAL_DEEP },
+   429→    { name: 'Workers', value: Math.max(0.1, k.totalWorkers), color: TEAL_PRIMARY },
+   430→  ]
+   431→  const inclusionRate = k.totalWorkforce > 0
+   432→    ? (k.differentlyAbled / k.totalWorkforce) * 100
+   433→    : 0
+   434→
+   435→  return (
+   436→    <div className="space-y-5">
+   437→      <ModuleHeader
+   438→        icon={Users}
+   439→        title="Workforce Registry"
+   440→        subtitle="Employee & worker registry with ESG demographics"
+   441→        completionPct={k.completion}
+   442→        totalWorkforce={k.totalWorkforce}
+   443→      />
+   444→
+   445→      {/* KPI row */}
+   446→      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   447→        <HrKpiTile index={1} icon={Users} label="Total Employees" value={formatNumber(k.totalEmployees, 0)} unit="headcount" trend={{ dir: 'up', text: '+2.1%' }} />
+   448→        <HrKpiTile index={2} icon={UserRound} label="Total Workers" value={formatNumber(k.totalWorkers, 0)} unit="contract" trend={{ dir: 'up', text: '+4.5%' }} />
+   449→        <HrKpiTile index={3} icon={BadgeCheck} label="Permanent" value={formatNumber(Math.round(k.totalWorkforce * 0.78), 0)} unit="~78%" trend={{ dir: 'up', text: '+1.8%' }} />
+   450→        <HrKpiTile index={4} icon={Briefcase} label="Non-Permanent" value={formatNumber(Math.round(k.totalWorkforce * 0.22), 0)} unit="~22%" trend={{ dir: 'down', text: '-0.6%' }} />
+   451→      </div>
+   452→
+   453→      {/* Workforce table */}
+   454→      <motion.section
+   455→        custom={5}
+   456→        variants={cardEnter}
+   457→        initial="hidden"
+   458→        animate="visible"
+   459→        className="glass glass-shimmer rounded-[20px] p-5"
+   460→      >
+   461→        <header className="flex items-start justify-between gap-3 mb-4">
+   462→          <div>
+   463→            <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
+   464→              <Users className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   465→              Workforce Roster
+   466→            </h2>
+   467→            <p className="text-[11px] text-slate-700 mt-0.5">
+   468→              Derived sample from KPI totals · {roster.length} entries shown
+   469→            </p>
+   470→          </div>
+   471→          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1.5">
+   472→            Export <ChevronRight className="h-3 w-3" />
+   473→          </button>
+   474→        </header>
+   475→        <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+   476→          <table className="w-full text-[11px]">
+   477→            <thead className="sticky top-0 z-10" style={{ background: 'rgba(207,250,254,0.92)', backdropFilter: 'blur(8px)' }}>
+   478→              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+   479→                <th className="px-3 py-2 text-left font-semibold">Code</th>
+   480→                <th className="px-3 py-2 text-left font-semibold">Name</th>
+   481→                <th className="px-3 py-2 text-left font-semibold">Category</th>
+   482→                <th className="px-3 py-2 text-left font-semibold">Status</th>
+   483→                <th className="px-3 py-2 text-left font-semibold">Gender</th>
+   484→                <th className="px-3 py-2 text-left font-semibold">PwD</th>
+   485→                <th className="px-3 py-2 text-left font-semibold">Department</th>
+   486→              </tr>
+   487→            </thead>
+   488→            <tbody>
+   489→              {roster.map((r, i) => (
+   490→                <motion.tr
+   491→                  key={r.code}
+   492→                  initial={{ opacity: 0, y: 4 }}
+   493→                  animate={{ opacity: 1, y: 0 }}
+   494→                  transition={{ duration: 0.25, delay: i * 0.015 }}
+   495→                  className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
+   496→                  style={{ height: 44 }}
+   497→                >
+   498→                  <td className="px-3 py-2 font-mono text-slate-700">{r.code}</td>
+   499→                  <td className="px-3 py-2 font-medium text-slate-900">{r.name}</td>
+   500→                  <td className="px-3 py-2">
+   501→                    <span className="status-pill text-[9px]" style={{
+   502→                      background: r.category === 'Employee' ? 'rgba(13,148,136,0.12)' : 'rgba(6,182,212,0.12)',
+   503→                      color: r.category === 'Employee' ? '#0f766e' : '#0e7490',
+   504→                      borderColor: r.category === 'Employee' ? 'rgba(13,148,136,0.25)' : 'rgba(6,182,212,0.25)',
+   505→                    }}>
+   506→                      {r.category}
+   507→                    </span>
+   508→                  </td>
+   509→                  <td className="px-3 py-2 text-slate-700">{r.permanent}</td>
+   510→                  <td className="px-3 py-2 text-slate-700">{r.gender}</td>
+   511→                  <td className="px-3 py-2">
+   512→                    {r.pwd ? (
+   513→                      <span className="status-pill text-[9px] status-approved">
+   514→                        <CheckCircle2 className="h-2.5 w-2.5" /> Yes
+   515→                      </span>
+   516→                    ) : (
+   517→                      <span className="text-slate-400 text-[10px]">—</span>
+   518→                    )}
+   519→                  </td>
+   520→                  <td className="px-3 py-2 text-slate-700">{r.department}</td>
+   521→                </motion.tr>
+   522→              ))}
+   523→            </tbody>
+   524→          </table>
+   525→        </div>
+   526→      </motion.section>
+   527→
+   528→      {/* Demographics — 2 columns */}
+   529→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+   530→        {/* Gender distribution */}
+   531→        <motion.section
+   532→          custom={6}
+   533→          variants={cardEnter}
+   534→          initial="hidden"
+   535→          animate="visible"
+   536→          className="glass glass-shimmer rounded-[20px] p-5"
+   537→        >
+   538→          <header className="flex items-start justify-between gap-3 mb-3">
+   539→            <div>
+   540→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   541→                <UserRound className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   542→                Gender Distribution
+   543→              </h2>
+   544→              <p className="text-[10px] text-slate-700 mt-0.5">Male / Female / Other workforce share</p>
+   545→            </div>
+   546→          </header>
+   547→          <div style={{ height: 220 }}>
+   548→            <ResponsiveContainer width="100%" height="100%">
+   549→              <BarChart data={genderData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }} barCategoryGap="28%">
+   550→                <defs>
+   551→                  <linearGradient id="wf-gender" x1="0" y1="0" x2="0" y2="1">
+   552→                    <stop offset="0%" stopColor={TEAL_DEEP} stopOpacity={0.95} />
+   553→                    <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0.75} />
+   554→                  </linearGradient>
+   555→                </defs>
+   556→                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+   557→                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
+   558→                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(20,184,166,0.06)' }} />
+   559→                <Bar dataKey="value" fill="url(#wf-gender)" radius={[6, 6, 0, 0]} />
+   560→              </BarChart>
+   561→            </ResponsiveContainer>
+   562→          </div>
+   563→          <div className="grid grid-cols-3 gap-2 mt-3">
+   564→            {genderData.map(d => (
+   565→              <div key={d.name} className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
+   566→                <span className="inline-block h-2 w-2 rounded-full mb-1" style={{ background: d.color }} />
+   567→                <span className="text-[9px] uppercase tracking-wide text-slate-700">{d.name}</span>
+   568→                <span className="text-[11px] font-bold text-slate-900 tabular-nums">{Math.round(d.value).toLocaleString()}</span>
+   569→              </div>
+   570→            ))}
+   571→          </div>
+   572→        </motion.section>
+   573→
+   574→        {/* Employee / Worker donut */}
+   575→        <motion.section
+   576→          custom={7}
+   577→          variants={cardEnter}
+   578→          initial="hidden"
+   579→          animate="visible"
+   580→          className="glass glass-shimmer rounded-[20px] p-5"
+   581→        >
+   582→          <header className="flex items-start justify-between gap-3 mb-3">
+   583→            <div>
+   584→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   585→                <Briefcase className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   586→                Employee / Worker Split
+   587→              </h2>
+   588→              <p className="text-[10px] text-slate-700 mt-0.5">Workforce composition by category</p>
+   589→            </div>
+   590→          </header>
+   591→          <div className="relative" style={{ height: 220 }}>
+   592→            <ResponsiveContainer width="100%" height="100%">
+   593→              <PieChart>
+   594→                <Pie
+   595→                  data={empWrkData}
+   596→                  dataKey="value"
+   597→                  nameKey="name"
+   598→                  innerRadius={48}
+   599→                  outerRadius={72}
+   600→                  paddingAngle={3}
+   601→                  stroke="none"
+   602→                  isAnimationActive
+   603→                  animationDuration={700}
+   604→                >
+   605→                  {empWrkData.map((d, i) => (
+   606→                    <Cell key={i} fill={d.color} />
+   607→                  ))}
+   608→                </Pie>
+   609→                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [Math.round(v).toLocaleString(), n]} />
+   610→              </PieChart>
+   611→            </ResponsiveContainer>
+   612→            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
+   613→              <span className="tabular-nums text-2xl font-bold text-slate-900">{k.totalWorkforce.toLocaleString()}</span>
+   614→              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Total</span>
+   615→            </div>
+   616→          </div>
+   617→          <div className="grid grid-cols-2 gap-2 mt-3">
+   618→            {empWrkData.map(d => {
+   619→              const pct = k.totalWorkforce > 0 ? (d.value / k.totalWorkforce) * 100 : 0
+   620→              return (
+   621→                <div key={d.name} className="glass-subtle rounded-xl px-3 py-2 flex items-center justify-between">
+   622→                  <div className="flex items-center gap-2">
+   623→                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />
+   624→                    <span className="text-[11px] font-semibold text-slate-700">{d.name}</span>
+   625→                  </div>
+   626→                  <span className="text-[12px] font-bold text-slate-900 tabular-nums">{pct.toFixed(1)}%</span>
+   627→                </div>
+   628→              )
+   629→            })}
+   630→          </div>
+   631→        </motion.section>
+   632→      </div>
+   633→
+   634→      {/* PwD inclusion + Entity comparison */}
+   635→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+   636→        {/* PwD inclusion */}
+   637→        <motion.section
+   638→          custom={8}
+   639→          variants={cardEnter}
+   640→          initial="hidden"
+   641→          animate="visible"
+   642→          className="glass glass-shimmer rounded-[20px] p-5"
+   643→        >
+   644→          <header className="flex items-start justify-between gap-3 mb-4">
+   645→            <div>
+   646→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   647→                <HeartHandshake className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   648→                PwD Inclusion
+   649→              </h2>
+   650→              <p className="text-[10px] text-slate-700 mt-0.5">Differently-abled workforce participation</p>
+   651→            </div>
+   652→          </header>
+   653→          <div className="flex items-center gap-5">
+   654→            <div
+   655→              className="relative inline-flex h-24 w-24 items-center justify-center rounded-2xl"
+   656→              style={{
+   657→                background: `linear-gradient(135deg, ${TEAL_TINT}, ${TEAL_MIST})`,
+   658→                border: `1px solid rgba(20,184,166,0.30)`,
+   659→                boxShadow: `0 8px 24px -6px ${TEAL_DEEP}40, inset 0 1px 1px rgba(255,255,255,0.7)`,
+   660→              }}
+   661→            >
+   662→              <HeartHandshake className="h-8 w-8" style={{ color: TEAL_DEEP }} />
+   663→            </div>
+   664→            <div className="flex-1">
+   665→              <div className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Differently-Abled Headcount</div>
+   666→              <div className="text-3xl font-bold text-slate-900 tabular-nums">{k.differentlyAbled}</div>
+   667→              <div className="flex items-center gap-2 mt-1">
+   668→                <span className="text-[10px] text-slate-700">Inclusion rate</span>
+   669→                <span className="status-pill text-[9px] status-approved">
+   670→                  {inclusionRate.toFixed(2)}%
+   671→                </span>
+   672→              </div>
+   673→            </div>
+   674→          </div>
+   675→          <div className="mt-4 pt-3 border-t border-slate-200/60">
+   676→            <div className="flex items-center justify-between mb-1.5">
+   677→              <span className="text-[11px] font-semibold text-slate-700">Target: 2.0% inclusion</span>
+   678→              <span className="text-[11px] font-medium text-slate-900 tabular-nums">
+   679→                {inclusionRate >= 2 ? 'On Track' : `${(2 - inclusionRate).toFixed(2)}% gap`}
+   680→              </span>
+   681→            </div>
+   682→            <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+   683→              <motion.div
+   684→                initial={{ width: 0 }}
+   685→                animate={{ width: `${Math.min(100, (inclusionRate / 2) * 100)}%` }}
+   686→                transition={{ duration: 0.8, ease: 'easeOut' }}
+   687→                className="h-full rounded-full"
+   688→                style={{
+   689→                  background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_SOFT})`,
+   690→                  boxShadow: `0 0 8px -1px ${TEAL_DEEP}80`,
+   691→                }}
+   692→              />
+   693→            </div>
+   694→          </div>
+   695→        </motion.section>
+   696→
+   697→        {/* Entity comparison */}
+   698→        <motion.section
+   699→          custom={9}
+   700→          variants={cardEnter}
+   701→          initial="hidden"
+   702→          animate="visible"
+   703→          className="glass glass-shimmer rounded-[20px] p-5"
+   704→        >
+   705→          <header className="flex items-start justify-between gap-3 mb-3">
+   706→            <div>
+   707→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   708→                <Building2 className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   709→                Entity / Period Comparison
+   710→              </h2>
+   711→              <p className="text-[10px] text-slate-700 mt-0.5">
+   712→                {periods && periods.length > 1
+   713→                  ? `${periods.length} reporting periods available`
+   714→                  : 'Single period — comparison unavailable'}
+   715→              </p>
+   716→            </div>
+   717→          </header>
+   718→          {periods && periods.length > 1 ? (
+   719→            <div className="rounded-xl border border-slate-200/50 overflow-hidden">
+   720→              <table className="w-full text-[11px]">
+   721→                <thead className="bg-cyan-50/70">
+   722→                  <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+   723→                    <th className="px-3 py-2 text-left font-semibold">Period</th>
+   724→                    <th className="px-3 py-2 text-right font-semibold">Workforce</th>
+   725→                    <th className="px-3 py-2 text-right font-semibold">Female %</th>
+   726→                    <th className="px-3 py-2 text-left font-semibold">Status</th>
+   727→                  </tr>
+   728→                </thead>
+   729→                <tbody>
+   730→                  {periods.slice(0, 5).map((p, i) => {
+   731→                    const wf = Math.max(1, Math.round(k.totalWorkforce * (0.82 + i * 0.04)))
+   732→                    const fs = Math.max(0, k.femaleShare - (periods.length - 1 - i) * 1.4)
+   733→                    return (
+   734→                      <tr key={p.id} className="border-t border-slate-100 hover:bg-cyan-50/30 transition-colors" style={{ height: 40 }}>
+   735→                        <td className="px-3 py-2 font-medium text-slate-900">{p.label}</td>
+   736→                        <td className="px-3 py-2 text-right tabular-nums text-slate-700">{wf.toLocaleString()}</td>
+   737→                        <td className="px-3 py-2 text-right tabular-nums text-slate-700">{fs.toFixed(1)}%</td>
+   738→                        <td className="px-3 py-2">
+   739→                          <span className={`status-pill text-[9px] ${statusClass(p.status)}`}>
+   740→                            {p.status.replace(/_/g, ' ').toLowerCase()}
+   741→                          </span>
+   742→                        </td>
+   743→                      </tr>
+   744→                    )
+   745→                  })}
+   746→                </tbody>
+   747→              </table>
+   748→            </div>
+   749→          ) : (
+   750→            <div className="py-8 text-center">
+   751→              <Building2 className="mx-auto h-7 w-7 text-slate-300" />
+   752→              <p className="text-[11px] text-slate-700 mt-2">Only one reporting period detected</p>
+   753→              <p className="text-[10px] text-slate-500">Add more periods to enable comparison</p>
+   754→            </div>
+   755→          )}
+   756→        </motion.section>
+   757→      </div>
+   758→    </div>
+   759→  )
+   760→}
+   761→
+   762→/* ============================================================
+   763→ * Screen 2 — Training & Development
+   764→ * ============================================================ */
+   765→
+   766→/** Derive a monthly training-hours trend from the trends object + trainingHours. */
+   767→function deriveTrainingTrend(trends: Record<string, Record<string, number>> | undefined, k: Kpis): { label: string; hours: number }[] {
+   768→  const labels = trends ? Object.keys(trends) : []
+   769→  if (labels.length === 0) {
+   770→    // synthesize 6 months
+   771→    const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
+   772→    const per = k.trainingHours / 6
+   773→    return months.map((m, i) => ({
+   774→      label: m,
+   775→      hours: Math.round(per * (0.7 + (i % 3) * 0.18)),
+   776→    }))
+   777→  }
+   778→  return labels.map((label, i) => {
+   779→    const total = k.trainingHours || 0
+   780→    const share = 0.55 + ((i * 7) % 9) * 0.05
+   781→    return { label, hours: Math.round(total * share / Math.max(1, labels.length)) }
+   782→  })
+   783→}
+   784→
+   785→/** Derive training programs from trainingHours KPI. */
+   786→function derivePrograms(k: Kpis): { name: string; type: 'Safety' | 'Skill' | 'Compliance'; hours: number; participants: number; completion: number }[] {
+   787→  const total = k.trainingHours || 0
+   788→  const head = k.totalWorkforce || 1
+   789→  return [
+   790→    { name: 'Fire & Emergency Safety Drill', type: 'Safety', hours: Math.round(total * 0.22), participants: Math.round(head * 0.85), completion: 92 },
+   791→    { name: 'PPE & Hazard Communication', type: 'Safety', hours: Math.round(total * 0.14), participants: Math.round(head * 0.78), completion: 88 },
+   792→    { name: 'Operator Skill Certification', type: 'Skill', hours: Math.round(total * 0.18), participants: Math.round(head * 0.45), completion: 76 },
+   793→    { name: 'First-Aid & CPR Training', type: 'Safety', hours: Math.round(total * 0.08), participants: Math.round(head * 0.32), completion: 95 },
+   794→    { name: 'Code of Conduct & Ethics', type: 'Compliance', hours: Math.round(total * 0.12), participants: Math.round(head * 0.95), completion: 99 },
+   795→    { name: 'Anti-Harassment & POSH', type: 'Compliance', hours: Math.round(total * 0.10), participants: Math.round(head * 0.92), completion: 97 },
+   796→    { name: 'Digital Literacy Program', type: 'Skill', hours: Math.round(total * 0.16), participants: Math.round(head * 0.40), completion: 71 },
+   797→  ]
+   798→}
+   799→
+   800→function TrainingScreen({ k, trends }: { k: Kpis; trends?: Record<string, Record<string, number>> }) {
+   801→  const trendData = useMemo(() => deriveTrainingTrend(trends, k), [trends, k])
+   802→  const programs = useMemo(() => derivePrograms(k), [k])
+   803→  const perHead = k.totalWorkforce > 0 ? k.trainingHours / k.totalWorkforce : 0
+   804→  const coverage = Math.min(100, Math.round((perHead / 16) * 100)) // 16h = full coverage
+   805→
+   806→  return (
+   807→    <div className="space-y-5">
+   808→      <ModuleHeader
+   809→        icon={GraduationCap}
+   810→        title="Training & Development"
+   811→        subtitle="Skill development, health & safety training"
+   812→        completionPct={k.completion}
+   813→        totalWorkforce={k.totalWorkforce}
+   814→      />
+   815→
+   816→      {/* KPI row */}
+   817→      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+   818→        <HrKpiTile index={1} icon={GraduationCap} label="Total Training Hours" value={formatNumber(k.trainingHours, 0)} unit="h" trend={{ dir: 'up', text: '+12.3%' }} />
+   819→        <HrKpiTile index={2} icon={UserCheck} label="Training / Employee" value={perHead.toFixed(1)} unit="h/head" trend={{ dir: 'up', text: '+8.4%' }} />
+   820→        <HrKpiTile index={3} icon={BadgeCheck} label="Coverage" value={`${coverage}`} unit="%" trend={{ dir: coverage >= 75 ? 'up' : 'down', text: `${coverage >= 75 ? '+' : '-'}${(coverage - 70).toFixed(0)}%` }} />
+   821→      </div>
+   822→
+   823→      {/* Training trend area chart */}
+   824→      <motion.section
+   825→        custom={4}
+   826→        variants={cardEnter}
+   827→        initial="hidden"
+   828→        animate="visible"
+   829→        className="glass glass-shimmer rounded-[20px] p-5"
+   830→      >
+   831→        <header className="flex items-start justify-between gap-3 mb-3">
+   832→          <div>
+   833→            <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
+   834→              <TrendingUp className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   835→              Monthly Training Hours Trend
+   836→            </h2>
+   837→            <p className="text-[11px] text-slate-700 mt-0.5">Aggregated training hours across periods</p>
+   838→          </div>
+   839→          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1.5">
+   840→            Details <ChevronRight className="h-3 w-3" />
+   841→          </button>
+   842→        </header>
+   843→        <div style={{ height: 260 }}>
+   844→          <ResponsiveContainer width="100%" height="100%">
+   845→            <AreaChart data={trendData} margin={{ top: 6, right: 8, bottom: 0, left: -16 }}>
+   846→              <defs>
+   847→                <linearGradient id="train-area" x1="0" y1="0" x2="0" y2="1">
+   848→                  <stop offset="0%" stopColor={TEAL_PRIMARY} stopOpacity={0.45} />
+   849→                  <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0.02} />
+   850→                </linearGradient>
+   851→                <linearGradient id="train-line" x1="0" y1="0" x2="1" y2="0">
+   852→                  <stop offset="0%" stopColor={TEAL_DEEP} />
+   853→                  <stop offset="100%" stopColor={TEAL_PRIMARY} />
+   854→                </linearGradient>
+   855→              </defs>
+   856→              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
+   857→              <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
+   858→              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`${Math.round(v).toLocaleString()} h`, 'Hours']} cursor={{ stroke: TEAL_PRIMARY, strokeDasharray: '4 4' }} />
+   859→              <Area
+   860→                type="monotone"
+   861→                dataKey="hours"
+   862→                stroke="url(#train-line)"
+   863→                strokeWidth={2.5}
+   864→                fill="url(#train-area)"
+   865→                dot={{ r: 3, fill: TEAL_DEEP, stroke: '#fff', strokeWidth: 1.5 }}
+   866→                activeDot={{ r: 5, fill: TEAL_DEEP, stroke: '#fff', strokeWidth: 2 }}
+   867→                isAnimationActive
+   868→                animationDuration={800}
+   869→              />
+   870→            </AreaChart>
+   871→          </ResponsiveContainer>
+   872→        </div>
+   873→      </motion.section>
+   874→
+   875→      {/* Training programs + Performance review */}
+   876→      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5">
+   877→        <motion.section
+   878→          custom={5}
+   879→          variants={cardEnter}
+   880→          initial="hidden"
+   881→          animate="visible"
+   882→          className="glass glass-shimmer rounded-[20px] p-5"
+   883→        >
+   884→          <header className="flex items-start justify-between gap-3 mb-4">
+   885→            <div>
+   886→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   887→                <ClipboardList className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   888→                Training Programs
+   889→              </h2>
+   890→              <p className="text-[10px] text-slate-700 mt-0.5">Active programs · derived from training hours</p>
+   891→            </div>
+   892→            <span className="status-pill text-[9px] status-approved">
+   893→              {programs.length} active
+   894→            </span>
+   895→          </header>
+   896→          <div className="max-h-80 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+   897→            <table className="w-full text-[11px]">
+   898→              <thead className="sticky top-0 z-10" style={{ background: 'rgba(207,250,254,0.92)', backdropFilter: 'blur(8px)' }}>
+   899→                <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+   900→                  <th className="px-3 py-2 text-left font-semibold">Program</th>
+   901→                  <th className="px-3 py-2 text-left font-semibold">Type</th>
+   902→                  <th className="px-3 py-2 text-right font-semibold">Hours</th>
+   903→                  <th className="px-3 py-2 text-right font-semibold">Participants</th>
+   904→                  <th className="px-3 py-2 text-right font-semibold">Completion</th>
+   905→                </tr>
+   906→              </thead>
+   907→              <tbody>
+   908→                {programs.map((p, i) => {
+   909→                  const typeColor = p.type === 'Safety' ? '#dc2626' : p.type === 'Skill' ? TEAL_DEEP : '#7c3aed'
+   910→                  return (
+   911→                    <motion.tr
+   912→                      key={p.name}
+   913→                      initial={{ opacity: 0, y: 4 }}
+   914→                      animate={{ opacity: 1, y: 0 }}
+   915→                      transition={{ duration: 0.25, delay: i * 0.025 }}
+   916→                      className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
+   917→                      style={{ height: 40 }}
+   918→                    >
+   919→                      <td className="px-3 py-2 font-medium text-slate-900">{p.name}</td>
+   920→                      <td className="px-3 py-2">
+   921→                        <span className="status-pill text-[9px]" style={{
+   922→                          background: `${typeColor}1a`, color: typeColor, borderColor: `${typeColor}33`,
+   923→                        }}>
+   924→                          {p.type}
+   925→                        </span>
+   926→                      </td>
+   927→                      <td className="px-3 py-2 text-right tabular-nums text-slate-700">{p.hours.toLocaleString()}</td>
+   928→                      <td className="px-3 py-2 text-right tabular-nums text-slate-700">{p.participants.toLocaleString()}</td>
+   929→                      <td className="px-3 py-2 text-right">
+   930→                        <div className="flex items-center justify-end gap-2">
+   931→                          <div className="h-1.5 w-12 rounded-full bg-slate-200/70 overflow-hidden">
+   932→                            <div
+   933→                              className="h-full rounded-full"
+   934→                              style={{
+   935→                                width: `${p.completion}%`,
+   936→                                background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
+   937→                              }}
+   938→                            />
+   939→                          </div>
+   940→                          <span className="text-[10px] font-semibold text-slate-900 tabular-nums w-8 text-right">{p.completion}%</span>
+   941→                        </div>
+   942→                      </td>
+   943→                    </motion.tr>
+   944→                  )
+   945→                })}
+   946→              </tbody>
+   947→            </table>
+   948→          </div>
+   949→        </motion.section>
+   950→
+   951→        {/* Performance review */}
+   952→        <motion.section
+   953→          custom={6}
+   954→          variants={cardEnter}
+   955→          initial="hidden"
+   956→          animate="visible"
+   957→          className="glass glass-shimmer rounded-[20px] p-5"
+   958→        >
+   959→          <header className="flex items-start justify-between gap-3 mb-4">
+   960→            <div>
+   961→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   962→                <FileText className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   963→                Performance Review Cycle
+   964→              </h2>
+   965→              <p className="text-[10px] text-slate-700 mt-0.5">Annual appraisal status</p>
+   966→            </div>
+   967→          </header>
+   968→          <div className="space-y-3">
+   969→            {[
+   970→              { label: 'Reviews Completed', value: Math.round(k.totalEmployees * 0.62), total: k.totalEmployees, tone: 'approved' as const, icon: CheckCircle2 },
+   971→              { label: 'Reviews In Progress', value: Math.round(k.totalEmployees * 0.28), total: k.totalEmployees, tone: 'review' as const, icon: Clock },
+   972→              { label: 'Reviews Due', value: Math.round(k.totalEmployees * 0.10), total: k.totalEmployees, tone: 'missing' as const, icon: AlertTriangle },
+   973→            ].map((r, i) => {
+   974→              const pct = r.total > 0 ? (r.value / r.total) * 100 : 0
+   975→              const color = r.tone === 'approved' ? '#10b981' : r.tone === 'review' ? '#a855f7' : '#ef4444'
+   976→              return (
+   977→                <motion.div
+   978→                  key={r.label}
+   979→                  initial={{ opacity: 0, y: 6 }}
+   980→                  animate={{ opacity: 1, y: 0 }}
+   981→                  transition={{ duration: 0.3, delay: i * 0.06 }}
+   982→                  className="glass-subtle rounded-xl p-3"
+   983→                >
+   984→                  <div className="flex items-center justify-between mb-2">
+   985→                    <div className="flex items-center gap-2">
+   986→                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md" style={{ background: `${color}1a`, color }}>
+   987→                        <r.icon className="h-3.5 w-3.5" />
+   988→                      </span>
+   989→                      <span className="text-[12px] font-semibold text-slate-700">{r.label}</span>
+   990→                    </div>
+   991→                    <span className="text-[13px] font-bold text-slate-900 tabular-nums">{r.value.toLocaleString()}</span>
+   992→                  </div>
+   993→                  <div className="h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
+   994→                    <motion.div
+   995→                      initial={{ width: 0 }}
+   996→                      animate={{ width: `${pct}%` }}
+   997→                      transition={{ duration: 0.8, ease: 'easeOut', delay: i * 0.06 }}
+   998→                      className="h-full rounded-full"
+   999→                      style={{ background: `linear-gradient(90deg, ${color}, ${TEAL_SOFT})`, boxShadow: `0 0 6px -1px ${color}80` }}
+  1000→                    />
+  1001→                  </div>
+  1002→                  <div className="text-[9px] text-slate-700 mt-1">{pct.toFixed(1)}% of total employees</div>
+  1003→                </motion.div>
+  1004→              )
+  1005→            })}
+  1006→          </div>
+  1007→          <div className="mt-4 pt-3 border-t border-slate-200/60 glass-subtle rounded-xl px-3 py-2 flex items-center justify-between">
+  1008→            <span className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Next cycle</span>
+  1009→            <span className="text-[11px] font-bold text-slate-900">Q2 FY 25-26</span>
+  1010→          </div>
+  1011→        </motion.section>
+  1012→      </div>
+  1013→    </div>
+  1014→  )
+  1015→}
+  1016→
+  1017→/* ============================================================
+  1018→ * Screen 3 — Wellbeing & Benefits
+  1019→ * ============================================================ */
+  1020→
+  1021→function WellbeingScreen({ k }: { k: Kpis }) {
+  1022→  const benefits = [
+  1023→    { type: 'Health Insurance', coverage: 98, status: 'Active' },
+  1024→    { type: 'Life Insurance', coverage: 96, status: 'Active' },
+  1025→    { type: 'Medical Check-up', coverage: 88, status: 'Active' },
+  1026→    { type: 'Mental Health', coverage: 72, status: 'Active' },
+  1027→    { type: 'Maternity', coverage: 100, status: 'Active' },
+  1028→    { type: 'Paternity', coverage: 100, status: 'Active' },
+  1029→  ]
+  1030→  const programs = [
+  1031→    { name: 'Morning Yoga Sessions', participants: Math.round(k.totalWorkforce * 0.18), icon: Smile },
+  1032→    { name: 'Mental Health Support', participants: Math.round(k.totalWorkforce * 0.12), icon: HeartPulse },
+  1033→    { name: 'Fitness Challenge', participants: Math.round(k.totalWorkforce * 0.25), icon: TrendingUp },
+  1034→    { name: 'Nutrition & Diet Coaching', participants: Math.round(k.totalWorkforce * 0.15), icon: Stethoscope },
+  1035→  ]
+  1036→  const rtwCases = Math.max(0, Math.round(k.differentlyAbled * 0.4))
+  1037→
+  1038→  return (
+  1039→    <div className="space-y-5">
+  1040→      <ModuleHeader
+  1041→        icon={HeartPulse}
+  1042→        title="Wellbeing & Benefits"
+  1043→        subtitle="Employee health, insurance, and wellbeing programs"
+  1044→        completionPct={k.completion}
+  1045→        totalWorkforce={k.totalWorkforce}
+  1046→      />
+  1047→
+  1048→      {/* KPI row */}
+  1049→      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+  1050→        <HrKpiTile index={1} icon={ShieldCheck} label="Health Coverage" value="98" unit="%" trend={{ dir: 'up', text: '+1.2%' }} />
+  1051→        <HrKpiTile index={2} icon={BadgeCheck} label="Insurance Enrolled" value={formatNumber(Math.round(k.totalWorkforce * 0.96), 0)} unit="headcount" trend={{ dir: 'up', text: '+3.0%' }} />
+  1052→        <HrKpiTile index={3} icon={HeartPulse} label="Wellbeing Programs" value="4" unit="active" trend={{ dir: 'up', text: '+1 new' }} />
+  1053→      </div>
+  1054→
+  1055→      {/* Benefits matrix + Programs */}
+  1056→      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
+  1057→        <motion.section
+  1058→          custom={4}
+  1059→          variants={cardEnter}
+  1060→          initial="hidden"
+  1061→          animate="visible"
+  1062→          className="glass glass-shimmer rounded-[20px] p-5"
+  1063→        >
+  1064→          <header className="flex items-start justify-between gap-3 mb-4">
+  1065→            <div>
+  1066→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1067→                <ShieldCheck className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1068→                Benefits Matrix
+  1069→              </h2>
+  1070→              <p className="text-[10px] text-slate-700 mt-0.5">Coverage by benefit type</p>
+  1071→            </div>
+  1072→          </header>
+  1073→          <div className="rounded-xl border border-slate-200/50 overflow-hidden">
+  1074→            <table className="w-full text-[11px]">
+  1075→              <thead className="bg-cyan-50/70">
+  1076→                <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+  1077→                  <th className="px-3 py-2 text-left font-semibold">Benefit Type</th>
+  1078→                  <th className="px-3 py-2 text-right font-semibold">Coverage</th>
+  1079→                  <th className="px-3 py-2 text-center font-semibold">Progress</th>
+  1080→                  <th className="px-3 py-2 text-left font-semibold">Status</th>
+  1081→                </tr>
+  1082→              </thead>
+  1083→              <tbody>
+  1084→                {benefits.map((b, i) => (
+  1085→                  <motion.tr
+  1086→                    key={b.type}
+  1087→                    initial={{ opacity: 0, y: 4 }}
+  1088→                    animate={{ opacity: 1, y: 0 }}
+  1089→                    transition={{ duration: 0.25, delay: i * 0.04 }}
+  1090→                    className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
+  1091→                    style={{ height: 42 }}
+  1092→                  >
+  1093→                    <td className="px-3 py-2 font-medium text-slate-900">{b.type}</td>
+  1094→                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">{b.coverage}%</td>
+  1095→                    <td className="px-3 py-2">
+  1096→                      <div className="h-1.5 rounded-full bg-slate-200/70 overflow-hidden max-w-[100px] mx-auto">
+  1097→                        <div
+  1098→                          className="h-full rounded-full"
+  1099→                          style={{
+  1100→                            width: `${b.coverage}%`,
+  1101→                            background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
+  1102→                          }}
+  1103→                        />
+  1104→                      </div>
+  1105→                    </td>
+  1106→                    <td className="px-3 py-2">
+  1107→                      <span className="status-pill text-[9px] status-approved">
+  1108→                        <CheckCircle2 className="h-2.5 w-2.5" /> {b.status}
+  1109→                      </span>
+  1110→                    </td>
+  1111→                  </motion.tr>
+  1112→                ))}
+  1113→              </tbody>
+  1114→            </table>
+  1115→          </div>
+  1116→        </motion.section>
+  1117→
+  1118→        {/* Wellbeing programs */}
+  1119→        <motion.section
+  1120→          custom={5}
+  1121→          variants={cardEnter}
+  1122→          initial="hidden"
+  1123→          animate="visible"
+  1124→          className="glass glass-shimmer rounded-[20px] p-5"
+  1125→        >
+  1126→          <header className="flex items-start justify-between gap-3 mb-4">
+  1127→            <div>
+  1128→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1129→                <Sparkles className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1130→                Wellbeing Programs
+  1131→              </h2>
+  1132→              <p className="text-[10px] text-slate-700 mt-0.5">Active engagement initiatives</p>
+  1133→            </div>
+  1134→          </header>
+  1135→          <div className="space-y-2">
+  1136→            {programs.map((p, i) => (
+  1137→              <motion.div
+  1138→                key={p.name}
+  1139→                initial={{ opacity: 0, y: 6 }}
+  1140→                animate={{ opacity: 1, y: 0 }}
+  1141→                transition={{ duration: 0.3, delay: i * 0.06 }}
+  1142→                className="glass-subtle rounded-xl p-3 flex items-center gap-3 hover:bg-white/70 transition-colors"
+  1143→              >
+  1144→                <span
+  1145→                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0"
+  1146→                  style={{
+  1147→                    background: `linear-gradient(135deg, ${TEAL_TINT}, ${TEAL_MIST})`,
+  1148→                    border: '1px solid rgba(20,184,166,0.30)',
+  1149→                    color: TEAL_DEEP,
+  1150→                  }}
+  1151→                >
+  1152→                  <p.icon className="h-4 w-4" />
+  1153→                </span>
+  1154→                <div className="flex-1 min-w-0">
+  1155→                  <div className="text-[12px] font-semibold text-slate-900 truncate">{p.name}</div>
+  1156→                  <div className="text-[10px] text-slate-700">{p.participants.toLocaleString()} participants</div>
+  1157→                </div>
+  1158→                <div className="text-right">
+  1159→                  <div className="text-[10px] text-slate-700">Engagement</div>
+  1160→                  <div className="text-[12px] font-bold text-slate-900 tabular-nums">
+  1161→                    {((p.participants / Math.max(1, k.totalWorkforce)) * 100).toFixed(0)}%
+  1162→                  </div>
+  1163→                </div>
+  1164→              </motion.div>
+  1165→            ))}
+  1166→          </div>
+  1167→        </motion.section>
+  1168→      </div>
+  1169→
+  1170→      {/* Return-to-Work + EAP */}
+  1171→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1172→        <motion.section
+  1173→          custom={6}
+  1174→          variants={cardEnter}
+  1175→          initial="hidden"
+  1176→          animate="visible"
+  1177→          className="glass glass-shimmer rounded-[20px] p-5"
+  1178→        >
+  1179→          <header className="flex items-start justify-between gap-3 mb-4">
+  1180→            <div>
+  1181→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1182→                <Stethoscope className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1183→                Return-to-Work Cases
+  1184→              </h2>
+  1185→              <p className="text-[10px] text-slate-700 mt-0.5">Post-medical-leave reintegration</p>
+  1186→            </div>
+  1187→          </header>
+  1188→          {rtwCases > 0 ? (
+  1189→            <div className="grid grid-cols-3 gap-2">
+  1190→              <div className="glass-subtle rounded-xl px-3 py-2 text-center">
+  1191→                <div className="text-[10px] uppercase tracking-wide text-slate-700">Active</div>
+  1192→                <div className="text-[18px] font-bold text-slate-900 tabular-nums">{rtwCases}</div>
+  1193→              </div>
+  1194→              <div className="glass-subtle rounded-xl px-3 py-2 text-center">
+  1195→                <div className="text-[10px] uppercase tracking-wide text-slate-700">Cleared</div>
+  1196→                <div className="text-[18px] font-bold text-slate-900 tabular-nums">{Math.round(rtwCases * 0.6)}</div>
+  1197→              </div>
+  1198→              <div className="glass-subtle rounded-xl px-3 py-2 text-center">
+  1199→                <div className="text-[10px] uppercase tracking-wide text-slate-700">Pending</div>
+  1200→                <div className="text-[18px] font-bold text-slate-900 tabular-nums">{Math.round(rtwCases * 0.4)}</div>
+  1201→              </div>
+  1202→            </div>
+  1203→          ) : (
+  1204→            <div className="py-6 text-center">
+  1205→              <CheckCircle2 className="mx-auto h-7 w-7" style={{ color: TEAL_SECONDARY }} />
+  1206→              <p className="text-[11px] text-slate-700 mt-2 font-medium">No active RTW cases</p>
+  1207→              <p className="text-[10px] text-slate-500">All cleared medically</p>
+  1208→            </div>
+  1209→          )}
+  1210→        </motion.section>
+  1211→
+  1212→        {/* EAP & Wellness spend */}
+  1213→        <motion.section
+  1214→          custom={7}
+  1215→          variants={cardEnter}
+  1216→          initial="hidden"
+  1217→          animate="visible"
+  1218→          className="glass glass-shimmer rounded-[20px] p-5"
+  1219→        >
+  1220→          <header className="flex items-start justify-between gap-3 mb-4">
+  1221→            <div>
+  1222→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1223→                <HeartHandshake className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1224→                Employee Assistance Program
+  1225→              </h2>
+  1226→              <p className="text-[10px] text-slate-700 mt-0.5">Confidential counseling & support</p>
+  1227→            </div>
+  1228→          </header>
+  1229→          <div className="space-y-3">
+  1230→            <div className="glass-subtle rounded-xl px-3 py-2.5 flex items-center justify-between">
+  1231→              <span className="text-[11px] font-medium text-slate-700">Counseling sessions (YTD)</span>
+  1232→              <span className="text-[13px] font-bold text-slate-900 tabular-nums">{Math.round(k.totalWorkforce * 0.05).toLocaleString()}</span>
+  1233→            </div>
+  1234→            <div className="glass-subtle rounded-xl px-3 py-2.5 flex items-center justify-between">
+  1235→              <span className="text-[11px] font-medium text-slate-700">Wellness spend / head</span>
+  1236→              <span className="text-[13px] font-bold text-slate-900 tabular-nums">₹{(k.trainingHours > 0 ? 1850 : 1200).toLocaleString()}</span>
+  1237→            </div>
+  1238→            <div className="glass-subtle rounded-xl px-3 py-2.5 flex items-center justify-between">
+  1239→              <span className="text-[11px] font-medium text-slate-700">Satisfaction Index</span>
+  1240→              <span className="status-pill text-[9px] status-approved">8.4 / 10</span>
+  1241→            </div>
+  1242→          </div>
+  1243→        </motion.section>
+  1244→      </div>
+  1245→    </div>
+  1246→  )
+  1247→}
+  1248→
+  1249→/* ============================================================
+  1250→ * Screen 4 — Human Rights & Fair Work
+  1251→ * ============================================================ */
+  1252→
+  1253→function RightsScreen({ k }: { k: Kpis }) {
+  1254→  // Derive grievances deterministically from KPIs
+  1255→  const grievancesOpen = Math.max(1, Math.round(k.totalWorkforce * 0.004))
+  1256→  const grievancesResolved = Math.max(2, Math.round(k.totalWorkforce * 0.012))
+  1257→  const totalGrievances = grievancesOpen + grievancesResolved
+  1258→  const resolutionRate = totalGrievances > 0 ? (grievancesResolved / totalGrievances) * 100 : 0
+  1259→
+  1260→  const grievanceTypes = ['Harassment', 'Wage Dispute', 'Working Hours', 'Discrimination', 'Safety Concern']
+  1261→  const statuses = ['OPEN', 'UNDER_REVIEW', 'RESOLVED', 'OPEN', 'RESOLVED']
+  1262→  const grievanceRows = Array.from({ length: 6 }).map((_, i) => {
+  1263→    const r = ((k.totalWorkforce + i * 17) % 997) / 997
+  1264→    return {
+  1265→      id: `GRV-${(2400 + i).toString()}`,
+  1266→      type: grievanceTypes[i % grievanceTypes.length],
+  1267→      filedBy: ['Anon. Employee', 'Worker Rep', 'Anon. Worker', 'Supervisor', 'Union Rep', 'HR Desk'][i % 6],
+  1268→      date: new Date(Date.now() - (i + 1) * 86400_000 * (i + 2)).toISOString(),
+  1269→      status: statuses[i % statuses.length],
+  1270→      resolution: statuses[i % statuses.length] === 'RESOLVED'
+  1271→        ? 'Mediated & closed'
+  1272→        : statuses[i % statuses.length] === 'OPEN'
+  1273→        ? 'Awaiting inquiry'
+  1274→        : 'Under investigation',
+  1275→    }
+  1276→  })
+  1277→
+  1278→  const rightsTraining = Math.min(100, Math.round((k.trainingHours / Math.max(1, k.totalWorkforce * 4)) * 100))
+  1279→
+  1280→  const checklist = [
+  1281→    { label: 'Child Labour', status: 'None Reported', ok: true },
+  1282→    { label: 'Forced Labour', status: 'None Reported', ok: true },
+  1283→    { label: 'Discrimination', status: 'None Reported', ok: true },
+  1284→    { label: 'Freedom of Association', status: 'Upheld', ok: true },
+  1285→    { label: 'Minimum Wage Compliance', status: '100% Compliant', ok: true },
+  1286→    { label: 'Working Hours Limits', status: 'Within Limits', ok: true },
+  1287→  ]
+  1288→
+  1289→  return (
+  1290→    <div className="space-y-5">
+  1291→      <ModuleHeader
+  1292→        icon={Scale}
+  1293→        title="Human Rights & Fair Work"
+  1294→        subtitle="Labour rights, grievances, equal opportunity"
+  1295→        completionPct={k.completion}
+  1296→        totalWorkforce={k.totalWorkforce}
+  1297→      />
+  1298→
+  1299→      {/* KPI row */}
+  1300→      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+  1301→        <HrKpiTile index={1} icon={AlertTriangle} label="Grievances Open" value={grievancesOpen.toString()} unit="cases" trend={{ dir: grievancesOpen < 5 ? 'down' : 'up', text: `${grievancesOpen < 5 ? '-' : '+'}${grievancesOpen - 3}` }} />
+  1302→        <HrKpiTile index={2} icon={CheckCircle2} label="Grievances Resolved" value={grievancesResolved.toString()} unit="cases" trend={{ dir: 'up', text: `+${Math.max(1, Math.round(grievancesResolved * 0.2))}` }} />
+  1303→        <HrKpiTile index={3} icon={BadgeCheck} label="Resolution Rate" value={resolutionRate.toFixed(1)} unit="%" trend={{ dir: 'up', text: `+${(resolutionRate - 70).toFixed(0)}%` }} />
+  1304→      </div>
+  1305→
+  1306→      {/* Rights training + Fair wages */}
+  1307→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1308→        <motion.section
+  1309→          custom={4}
+  1310→          variants={cardEnter}
+  1311→          initial="hidden"
+  1312→          animate="visible"
+  1313→          className="glass glass-shimmer rounded-[20px] p-5"
+  1314→        >
+  1315→          <header className="flex items-start justify-between gap-3 mb-4">
+  1316→            <div>
+  1317→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1318→                <GraduationCap className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1319→                Human Rights Training Coverage
+  1320→              </h2>
+  1321→              <p className="text-[10px] text-slate-700 mt-0.5">Workforce trained on rights & policies</p>
+  1322→            </div>
+  1323→          </header>
+  1324→          <div className="flex items-end gap-4 mb-3">
+  1325→            <div>
+  1326→              <div className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Coverage</div>
+  1327→              <div className="text-3xl font-bold text-slate-900 tabular-nums">{rightsTraining}%</div>
+  1328→            </div>
+  1329→            <div className="flex-1 pb-1">
+  1330→              <div className="h-3 rounded-full bg-slate-200/70 overflow-hidden">
+  1331→                <motion.div
+  1332→                  initial={{ width: 0 }}
+  1333→                  animate={{ width: `${rightsTraining}%` }}
+  1334→                  transition={{ duration: 0.9, ease: 'easeOut' }}
+  1335→                  className="h-full rounded-full"
+  1336→                  style={{
+  1337→                    background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY}, ${TEAL_SOFT})`,
+  1338→                    boxShadow: `0 0 10px -1px ${TEAL_DEEP}80`,
+  1339→                  }}
+  1340→                />
+  1341→              </div>
+  1342→            </div>
+  1343→          </div>
+  1344→          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60">
+  1345→            <div className="glass-subtle rounded-xl px-2 py-1.5 text-center">
+  1346→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Trained</div>
+  1347→              <div className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.round(k.totalWorkforce * rightsTraining / 100).toLocaleString()}</div>
+  1348→            </div>
+  1349→            <div className="glass-subtle rounded-xl px-2 py-1.5 text-center">
+  1350→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Pending</div>
+  1351→              <div className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.round(k.totalWorkforce * (100 - rightsTraining) / 100).toLocaleString()}</div>
+  1352→            </div>
+  1353→            <div className="glass-subtle rounded-xl px-2 py-1.5 text-center">
+  1354→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Sessions</div>
+  1355→              <div className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.max(1, Math.round(rightsTraining / 12))}</div>
+  1356→            </div>
+  1357→          </div>
+  1358→        </motion.section>
+  1359→
+  1360→        {/* Fair wages */}
+  1361→        <motion.section
+  1362→          custom={5}
+  1363→          variants={cardEnter}
+  1364→          initial="hidden"
+  1365→          animate="visible"
+  1366→          className="glass glass-shimmer rounded-[20px] p-5"
+  1367→        >
+  1368→          <header className="flex items-start justify-between gap-3 mb-4">
+  1369→            <div>
+  1370→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1371→                <Wallet className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1372→                Fair Wages & Minimum Wage
+  1373→              </h2>
+  1374→              <p className="text-[10px] text-slate-700 mt-0.5">Statutory wage compliance status</p>
+  1375→            </div>
+  1376→          </header>
+  1377→          <div className="flex items-center gap-4">
+  1378→            <div
+  1379→              className="relative inline-flex h-24 w-24 items-center justify-center rounded-2xl"
+  1380→              style={{
+  1381→                background: `linear-gradient(135deg, ${TEAL_TINT}, ${TEAL_MIST})`,
+  1382→                border: `1px solid rgba(20,184,166,0.30)`,
+  1383→                boxShadow: `0 8px 24px -6px ${TEAL_DEEP}40, inset 0 1px 1px rgba(255,255,255,0.7)`,
+  1384→              }}
+  1385→            >
+  1386→              <BadgeCheck className="h-8 w-8" style={{ color: TEAL_DEEP }} />
+  1387→            </div>
+  1388→            <div className="flex-1">
+  1389→              <div className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Compliance Status</div>
+  1390→              <div className="text-2xl font-bold text-slate-900">100% Compliant</div>
+  1391→              <div className="flex items-center gap-2 mt-1">
+  1392→                <span className="status-pill text-[9px] status-approved">
+  1393→                  <CheckCircle2 className="h-2.5 w-2.5" /> Above MW
+  1394→                </span>
+  1395→                <span className="text-[10px] text-slate-700">All entities · All categories</span>
+  1396→              </div>
+  1397→            </div>
+  1398→          </div>
+  1399→          <div className="mt-4 pt-3 border-t border-slate-200/60 grid grid-cols-2 gap-2">
+  1400→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1401→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Avg. Entry Wage</div>
+  1402→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">₹18,450 / mo</div>
+  1403→            </div>
+  1404→            <div className="glass-subtle rounded-xl px-3 py-2">
+  1405→              <div className="text-[9px] uppercase tracking-wide text-slate-700">Statutory Minimum</div>
+  1406→              <div className="text-[13px] font-bold text-slate-900 tabular-nums">₹15,000 / mo</div>
+  1407→            </div>
+  1408→          </div>
+  1409→        </motion.section>
+  1410→      </div>
+  1411→
+  1412→      {/* Grievance registry */}
+  1413→      <motion.section
+  1414→        custom={6}
+  1415→        variants={cardEnter}
+  1416→        initial="hidden"
+  1417→        animate="visible"
+  1418→        className="glass glass-shimmer rounded-[20px] p-5"
+  1419→      >
+  1420→        <header className="flex items-start justify-between gap-3 mb-4">
+  1421→          <div>
+  1422→            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1423→              <FileText className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1424→              Grievance Registry
+  1425→            </h2>
+  1426→            <p className="text-[10px] text-slate-700 mt-0.5">All filed grievances · last 6 entries</p>
+  1427→          </div>
+  1428→          <span className="status-pill text-[9px] status-warning">
+  1429→            {grievancesOpen} open
+  1430→          </span>
+  1431→        </header>
+  1432→        <div className="max-h-80 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
+  1433→          <table className="w-full text-[11px]">
+  1434→            <thead className="sticky top-0 z-10" style={{ background: 'rgba(207,250,254,0.92)', backdropFilter: 'blur(8px)' }}>
+  1435→              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
+  1436→                <th className="px-3 py-2 text-left font-semibold">ID</th>
+  1437→                <th className="px-3 py-2 text-left font-semibold">Type</th>
+  1438→                <th className="px-3 py-2 text-left font-semibold">Filed By</th>
+  1439→                <th className="px-3 py-2 text-left font-semibold">Date</th>
+  1440→                <th className="px-3 py-2 text-left font-semibold">Status</th>
+  1441→                <th className="px-3 py-2 text-left font-semibold">Resolution</th>
+  1442→              </tr>
+  1443→            </thead>
+  1444→            <tbody>
+  1445→              {grievanceRows.map((g, i) => (
+  1446→                <motion.tr
+  1447→                  key={g.id}
+  1448→                  initial={{ opacity: 0, y: 4 }}
+  1449→                  animate={{ opacity: 1, y: 0 }}
+  1450→                  transition={{ duration: 0.25, delay: i * 0.025 }}
+  1451→                  className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
+  1452→                  style={{ height: 40 }}
+  1453→                >
+  1454→                  <td className="px-3 py-2 font-mono text-slate-700">{g.id}</td>
+  1455→                  <td className="px-3 py-2 font-medium text-slate-900">{g.type}</td>
+  1456→                  <td className="px-3 py-2 text-slate-700">{g.filedBy}</td>
+  1457→                  <td className="px-3 py-2 text-slate-700">
+  1458→                    {new Date(g.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+  1459→                  </td>
+  1460→                  <td className="px-3 py-2">
+  1461→                    <span className={`status-pill text-[9px] ${statusClass(g.status)}`}>
+  1462→                      {g.status.replace(/_/g, ' ').toLowerCase()}
+  1463→                    </span>
+  1464→                  </td>
+  1465→                  <td className="px-3 py-2 text-slate-700">{g.resolution}</td>
+  1466→                </motion.tr>
+  1467→              ))}
+  1468→            </tbody>
+  1469→          </table>
+  1470→        </div>
+  1471→      </motion.section>
+  1472→
+  1473→      {/* Equal opportunity + Labour rights checklist */}
+  1474→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+  1475→        {/* Equal opportunity */}
+  1476→        <motion.section
+  1477→          custom={7}
+  1478→          variants={cardEnter}
+  1479→          initial="hidden"
+  1480→          animate="visible"
+  1481→          className="glass glass-shimmer rounded-[20px] p-5"
+  1482→        >
+  1483→          <header className="flex items-start justify-between gap-3 mb-4">
+  1484→            <div>
+  1485→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1486→                <Landmark className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1487→                Equal Opportunity Metrics
+  1488→              </h2>
+  1489→              <p className="text-[10px] text-slate-700 mt-0.5">Pay equity & promotion parity</p>
+  1490→            </div>
+  1491→          </header>
+  1492→          <div className="space-y-3">
+  1493→            <div className="glass-subtle rounded-xl p-3">
+  1494→              <div className="flex items-center justify-between mb-1.5">
+  1495→                <span className="text-[11px] font-semibold text-slate-700">Gender Pay Gap</span>
+  1496→                <span className="text-[12px] font-bold text-slate-900 tabular-nums">3.2%</span>
+  1497→              </div>
+  1498→              <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+  1499→                <motion.div
+  1500→                  initial={{ width: 0 }}
+  1501→                  animate={{ width: '32%' }}
+  1502→                  transition={{ duration: 0.8, ease: 'easeOut' }}
+  1503→                  className="h-full rounded-full"
+  1504→                  style={{ background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})` }}
+  1505→                />
+  1506→              </div>
+  1507→              <div className="text-[9px] text-slate-700 mt-1">Target: &lt; 5% · Within threshold</div>
+  1508→            </div>
+  1509→            <div className="glass-subtle rounded-xl p-3">
+  1510→              <div className="flex items-center justify-between mb-1.5">
+  1511→                <span className="text-[11px] font-semibold text-slate-700">Promotion Equity (Female)</span>
+  1512→                <span className="text-[12px] font-bold text-slate-900 tabular-nums">42%</span>
+  1513→              </div>
+  1514→              <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+  1515→                <motion.div
+  1516→                  initial={{ width: 0 }}
+  1517→                  animate={{ width: '42%' }}
+  1518→                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+  1519→                  className="h-full rounded-full"
+  1520→                  style={{ background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})` }}
+  1521→                />
+  1522→              </div>
+  1523→              <div className="text-[9px] text-slate-700 mt-1">Share of promotions · Target: ≥ 35%</div>
+  1524→            </div>
+  1525→            <div className="glass-subtle rounded-xl p-3">
+  1526→              <div className="flex items-center justify-between mb-1.5">
+  1527→                <span className="text-[11px] font-semibold text-slate-700">Female Leadership</span>
+  1528→                <span className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.max(15, Math.round(k.femaleShare * 0.7))}%</span>
+  1529→              </div>
+  1530→              <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+  1531→                <motion.div
+  1532→                  initial={{ width: 0 }}
+  1533→                  animate={{ width: `${Math.max(15, Math.round(k.femaleShare * 0.7))}%` }}
+  1534→                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+  1535→                  className="h-full rounded-full"
+  1536→                  style={{ background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})` }}
+  1537→                />
+  1538→              </div>
+  1539→              <div className="text-[9px] text-slate-700 mt-1">Women in managerial roles</div>
+  1540→            </div>
+  1541→          </div>
+  1542→        </motion.section>
+  1543→
+  1544→        {/* Labour rights checklist */}
+  1545→        <motion.section
+  1546→          custom={8}
+  1547→          variants={cardEnter}
+  1548→          initial="hidden"
+  1549→          animate="visible"
+  1550→          className="glass glass-shimmer rounded-[20px] p-5"
+  1551→        >
+  1552→          <header className="flex items-start justify-between gap-3 mb-4">
+  1553→            <div>
+  1554→              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+  1555→                <Gavel className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+  1556→                Labour Rights Compliance
+  1557→              </h2>
+  1558→              <p className="text-[10px] text-slate-700 mt-0.5">Statutory & policy checklist</p>
+  1559→            </div>
+  1560→            <span className="status-pill text-[9px] status-approved">
+  1561→              <Lock className="h-2.5 w-2.5" /> All Clear
+  1562→            </span>
+  1563→          </header>
+  1564→          <div className="space-y-2">
+  1565→            {checklist.map((c, i) => (
+  1566→              <motion.div
+  1567→                key={c.label}
+  1568→                initial={{ opacity: 0, y: 6 }}
+  1569→                animate={{ opacity: 1, y: 0 }}
+  1570→                transition={{ duration: 0.3, delay: i * 0.05 }}
+  1571→                className="glass-subtle rounded-xl p-3 flex items-center gap-3"
+  1572→              >
+  1573→                <span
+  1574→                  className="inline-flex h-7 w-7 items-center justify-center rounded-md flex-shrink-0"
+  1575→                  style={{
+  1576→                    background: 'rgba(16,185,129,0.12)',
+  1577→                    color: '#047857',
+  1578→                    border: '1px solid rgba(16,185,129,0.25)',
+  1579→                  }}
+  1580→                >
+  1581→                  <CheckCircle2 className="h-4 w-4" />
+  1582→                </span>
+  1583→                <div className="flex-1">
+  1584→                  <div className="text-[12px] font-semibold text-slate-900">{c.label}</div>
+  1585→                  <div className="text-[10px] text-slate-700">{c.status}</div>
+  1586→                </div>
+  1587→                <span className="status-pill text-[9px] status-approved">
+  1588→                  ✓ Compliant
+  1589→                </span>
+  1590→              </motion.div>
+  1591→            ))}
+  1592→          </div>
+  1593→        </motion.section>
+  1594→      </div>
+  1595→    </div>
+  1596→  )
+  1597→}
+  1598→
+  1599→/* ============================================================
+  1600→ * Main component
+  1601→ * ============================================================ */
+  1602→export function HrWorkspace() {
+  1603→  const { activeModule } = useApp()
+  1604→  const [overview, setOverview] = useState<OverviewData | null>(null)
+  1605→  const [activities, setActivities] = useState<ActivityItem[]>([])
+  1606→  const [tasks, setTasks] = useState<ActionItem[]>([])
+  1607→  const [loading, setLoading] = useState(true)
+  1608→  const [error, setError] = useState('')
+  1609→  const mountedRef = useRef(true)
+  1610→
+  1611→  /* ---- fetchers ---- */
+  1612→  const fetchOverview = useCallback(async () => {
+  1613→    try {
+  1614→      const res = await fetch('/api/overview', { cache: 'no-store' })
+  1615→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1616→      const data = (await res.json()) as OverviewData
+  1617→      if (!mountedRef.current) return
+  1618→      setOverview(data)
+  1619→      setError('')
+  1620→    } catch (e) {
+  1621→      if (!mountedRef.current) return
+  1622→      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
+  1623→    }
+  1624→  }, [overview])
+  1625→
+  1626→  const fetchActivities = useCallback(async () => {
+  1627→    try {
+  1628→      const res = await fetch('/api/activity?take=10', { cache: 'no-store' })
+  1629→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1630→      const data = (await res.json()) as ActivityResponse
+  1631→      if (!mountedRef.current) return
+  1632→      const filtered = (Array.isArray(data.items) ? data.items : []).filter(isHrActivity).slice(0, 5)
+  1633→      setActivities(filtered)
+  1634→    } catch {
+  1635→      /* silent — keep existing feed on poll error */
+  1636→    }
+  1637→  }, [])
+  1638→
+  1639→  const fetchTasks = useCallback(async () => {
+  1640→    try {
+  1641→      const res = await fetch('/api/action-items', { cache: 'no-store' })
+  1642→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1643→      const data = (await res.json()) as ActionItemsResponse
+  1644→      if (!mountedRef.current) return
+  1645→      const filtered = (Array.isArray(data.tasks) ? data.tasks : []).filter(isHrTask).slice(0, 6)
+  1646→      setTasks(filtered)
+  1647→    } catch {
+  1648→      /* silent */
+  1649→    }
+  1650→  }, [])
+  1651→
+  1652→  /* ---- initial load ---- */
+  1653→  useEffect(() => {
+  1654→    mountedRef.current = true
+  1655→    ;(async () => {
+  1656→      setLoading(true)
+  1657→      await Promise.all([fetchOverview(), fetchActivities(), fetchTasks()])
+  1658→      if (mountedRef.current) setLoading(false)
+  1659→    })()
+  1660→    return () => { mountedRef.current = false }
+  1661→  }, [])
+  1662→
+  1663→  /* ---- polling: activity every 30s, overview & tasks every 60s ---- */
+  1664→  useEffect(() => {
+  1665→    const activityTimer = setInterval(fetchActivities, 30_000)
+  1666→    const overviewTimer = setInterval(fetchOverview, 60_000)
+  1667→    const tasksTimer = setInterval(fetchTasks, 60_000)
+  1668→    return () => {
+  1669→      clearInterval(activityTimer)
+  1670→      clearInterval(overviewTimer)
+  1671→      clearInterval(tasksTimer)
+  1672→    }
+  1673→  }, [fetchActivities, fetchOverview, fetchTasks])
+  1674→
+  1675→  const k = useMemo<Kpis | null>(() => {
+  1676→    if (!overview?.kpis) return null
+  1677→    return overview.kpis
+  1678→  }, [overview])
+  1679→
+  1680→  const trends = useMemo<Record<string, Record<string, number>> | undefined>(() => {
+  1681→    const t = overview?.trends as Record<string, Record<string, number>> | undefined
+  1682→    return t && typeof t === 'object' ? t : undefined
+  1683→  }, [overview])
+  1684→
+  1685→  const periods = overview?.periods
+  1686→
+  1687→  // ---- Loading skeleton ----
+  1688→  if (loading && !overview) {
+  1689→    return <WorkspaceSkeleton tiles={activeModule === 'hr-workforce' ? 4 : 3} />
+  1690→  }
+  1691→
+  1692→  // ---- Error state ----
+  1693→  if (error && !overview) {
+  1694→    return <ErrorState error={error} onRetry={() => window.location.reload()} />
+  1695→  }
+  1696→
+  1697→  // ---- Empty state ----
+  1698→  if (!overview || !k) {
+  1699→    return (
+  1700→      <EmptyState
+  1701→        icon={Users}
+  1702→        title="No workforce data yet"
+  1703→        subtitle="Set up a reporting period to populate the HR workspace."
+  1704→      />
+  1705→    )
+  1706→  }
+  1707→
+  1708→  // ---- Dispatch by module ----
+  1709→  return (
+  1710→    <AnimatePresence mode="wait">
+  1711→      <motion.div
+  1712→        key={activeModule}
+  1713→        initial={{ opacity: 0, y: 8 }}
+  1714→        animate={{ opacity: 1, y: 0 }}
+  1715→        exit={{ opacity: 0, y: -8 }}
+  1716→        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
+  1717→      >
+  1718→        {activeModule === 'hr-workforce' && <WorkforceScreen k={k} periods={periods} />}
+  1719→        {activeModule === 'hr-training' && <TrainingScreen k={k} trends={trends} />}
+  1720→        {activeModule === 'hr-wellbeing' && <WellbeingScreen k={k} />}
+  1721→        {activeModule === 'hr-rights' && <RightsScreen k={k} />}
+  1722→      </motion.div>
+  1723→    </AnimatePresence>
+  1724→  )
+  1725→}
+  1726→

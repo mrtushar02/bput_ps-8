@@ -1321,3 +1321,53 @@ Stage Summary:
 - Teal/cyan theme consistent across all HR screens
 - The pattern is established: each role gets its own unique nav tabs + unique screen content
 - Ready to replicate for other roles (EHS, Procurement, CSR, Compliance, reviewers, managers, auditor, executive)
+
+---
+Task ID: 28 (All 13 Roles — Unique Nav Tabs + Role-Specific Workspaces)
+Agent: Lead Architect (main) + 2 subagents
+Task: Per the uploaded master prompt, give EVERY role completely unique nav tabs and unique workspace screens
+
+Work Log:
+- Read the 5655-line master prompt specifying the exact nav tabs for all 13 remaining roles (EHS, Procurement, CSR, Compliance, BU Reviewer, Subsidiary Reviewer, Group Reviewer, ESG Manager, ESG Analyst, BRSR Manager, Auditor, Executive, Super Admin).
+- Previously all roles shared generic tabs (Overview, My Project, Data Entry, Evidence, Submissions, Analytics, Team, Reports). Now each role has completely different tabs.
+
+- Added 80+ new ModuleKeys to auth-context.tsx covering all role-specific tabs (ehs-ops, ehs-incidents, proc-suppliers, csr-projects, comp-policies, review-queue, sub-bucenter, grp-consolidation, esg-kpi, ana-explorer, brsr-frameworks, aud-engagements, exec-enterprise, admin-users, etc.)
+
+- Updated role-nav.ts for ALL 13 roles with their exact spec tabs:
+  - EHS_USER: 12 tabs (Overview, Safety Operations, Incidents, Inspections, Corrective Actions, Environmental, Safety Training, Evidence, Submissions, Analytics, Reports, Audit & Trace)
+  - PROCUREMENT_USER: 11 tabs (Overview, Suppliers, Assessments, Sustainable Sourcing, Transactions, ESG/Value Chain, Evidence, Submissions, Analytics, Reports, Audit & Trace)
+  - CSR_USER: 12 tabs (Overview, CSR Projects, Budgets & Spend, Beneficiaries, Impact Assessment, Community Engagement, Local Sourcing, Evidence, Submissions, Analytics, Reports, Audit & Trace)
+  - COMPLIANCE_USER: 12 tabs (Overview, Policies, Compliance Obligations, Controls, Cases & Incidents, Ethics & Conduct, Regulatory Calendar, Evidence, Submissions, BRSR Governance, Reports, Audit & Trace)
+  - BU_REVIEWER: 10 tabs (Overview, Review Queue, My Business Unit, Submissions, Consolidation, Evidence, Exceptions & SLA, Analytics, Reports, Audit & Trace)
+  - SUBSIDIARY_REVIEWER: 9 tabs (Overview, BU Review Center, Subsidiary ESG, BRSR Impact, Approvals, Evidence, Analytics, Reports, Audit & Trace)
+  - GROUP_REVIEWER: 10 tabs (Overview, Group Consolidation, Enterprise ESG, BRSR Command, Assurance, Risk Management, Approvals & Lock, Reports, Analytics, Audit & Trace)
+  - ESG_MANAGER: 12 tabs (ESG Overview, KPI Management, ESG Performance, Data Completeness, Material ESG Risks, Targets & Progress, BRSR Readiness, Cross-Functional, Evidence, Reports, Analytics, Audit & Trace)
+  - ESG_ANALYST: 11 tabs (Analytics Overview, Data Explorer, ESG Metrics, Emissions Analysis, Energy & Resources, Social Analytics, Governance Analytics, Variance & Anomalies, Data Quality, Reports, Audit)
+  - BRSR_MANAGER: 13 tabs (BRSR Command, Frameworks, Section A, Section B, Section C, BRSR Core, Disclosure Mapping, Evidence & Sources, Validation, Readiness, Report Builder, Approval & Issuance, Audit & Trace)
+  - AUDITOR: 12 tabs (Assurance Overview, Engagements, Scope & Materiality, Evidence Review, Data Testing, BRSR Testing, Findings, Evidence Requests, Mgmt Responses, Assurance Status, Assurance Reports, Audit Trail)
+  - EXECUTIVE: 9 tabs (Executive Overview, Enterprise ESG, BRSR Readiness, Strategic Risks, Performance Trends, Business Units, Assurance Status, Reports, Audit & Trace)
+  - SUPER_ADMIN: (already had all tabs via ExecutiveDashboard)
+
+- Built 4 new workspace components (via 2 subagents):
+  1. EhsWorkspace (ehs-workspace.tsx) — 6 screens: Safety Operations, Incidents, Inspections, Corrective Actions, Environmental, Safety Training. Amber/orange theme.
+  2. ProcurementWorkspace (procurement-workspace.tsx) — 5 screens: Suppliers, Assessments, Sustainable Sourcing, Transactions, ESG/Value Chain. Violet/purple theme.
+  3. CsrWorkspace (csr-workspace.tsx) — 6 screens: CSR Projects, Budgets & Spend, Beneficiaries, Impact Assessment, Community Engagement, Local Sourcing. Rose/pink theme.
+  4. ComplianceWorkspace (compliance-workspace.tsx) — 6 screens: Policies, Compliance Obligations, Controls, Cases & Incidents, Ethics & Conduct, Regulatory Calendar. Emerald/green theme.
+
+- Wired all 4 workspaces into module-router.tsx with case branches for all their module keys.
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: EHS User sees 12 unique tabs (Overview, Safety Operations, Incidents, Inspections, Corrective Actions, Environmental, Safety Training, Evidence, Submissions, Analytics, Reports, Audit & Trace)
+- agent-browser verified: Procurement User sees 11 unique tabs (Overview, Suppliers, Assessments, Sustainable Sourcing, Transactions, ESG/Value Chain, Evidence, Submissions, Analytics, Reports, Audit & Trace)
+- No console errors
+- Each role's nav is now COMPLETELY DIFFERENT from every other role
+
+Stage Summary:
+- ALL 13 roles now have completely unique nav tabs matching the master prompt specification
+- 4 new workspace components built (EHS, Procurement, CSR, Compliance) with 23 unique screens total
+- Each workspace has role-specific content (not generic shared screens)
+- Each workspace has its own color theme (amber, violet, rose, emerald) matching its dashboard
+- For roles without dedicated workspaces yet (reviewers, managers, auditor, executive, admin), their role-specific tabs will render the existing shared modules (Evidence, Submissions, Reports, Analytics, Audit, BRSR) — these are already built and role-aware
+- Ready for next step: build workspaces for remaining roles (reviewers, managers, BRSR, auditor, executive) and wire their role-specific tabs

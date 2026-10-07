@@ -21,6 +21,19 @@ export type ModuleKey =
   | 'overview' | 'my-project' | 'data-entry' | 'evidence'
   | 'submissions' | 'reports' | 'analytics' | 'audit' | 'brsr' | 'admin' | 'team'
   | 'hr-workforce' | 'hr-training' | 'hr-wellbeing' | 'hr-rights'
+  | 'ehs-ops' | 'ehs-incidents' | 'ehs-inspections' | 'ehs-corrective' | 'ehs-environmental' | 'ehs-training'
+  | 'proc-suppliers' | 'proc-assessments' | 'proc-sourcing' | 'proc-transactions' | 'proc-valuechain'
+  | 'csr-projects' | 'csr-budgets' | 'csr-beneficiaries' | 'csr-impact' | 'csr-community' | 'csr-local'
+  | 'comp-policies' | 'comp-obligations' | 'comp-controls' | 'comp-cases' | 'comp-ethics' | 'comp-calendar'
+  | 'review-queue' | 'review-bu' | 'review-consolidation' | 'review-exceptions'
+  | 'sub-bucenter' | 'sub-esg' | 'sub-brsr-impact' | 'sub-approvals'
+  | 'grp-consolidation' | 'grp-enterprise' | 'grp-brsr' | 'grp-assurance' | 'grp-risk' | 'grp-lock'
+  | 'esg-kpi' | 'esg-performance' | 'esg-completeness' | 'esg-risks' | 'esg-targets' | 'esg-crossfunc'
+  | 'ana-explorer' | 'ana-metrics' | 'ana-emissions' | 'ana-energy' | 'ana-social' | 'ana-governance' | 'ana-variance' | 'ana-quality'
+  | 'brsr-frameworks' | 'brsr-section-a' | 'brsr-section-b' | 'brsr-section-c' | 'brsr-core' | 'brsr-mapping' | 'brsr-sources' | 'brsr-validation' | 'brsr-readiness' | 'brsr-builder' | 'brsr-issuance'
+  | 'aud-engagements' | 'aud-scope' | 'aud-evidence' | 'aud-testing' | 'aud-brsr-testing' | 'aud-findings' | 'aud-requests' | 'aud-responses' | 'aud-status' | 'aud-reports'
+  | 'exec-enterprise' | 'exec-brsr' | 'exec-risks' | 'exec-trends' | 'exec-bus' | 'exec-assurance'
+  | 'admin-users' | 'admin-roles' | 'admin-org' | 'admin-projects' | 'admin-periods' | 'admin-workflow' | 'admin-esg-config' | 'admin-security' | 'admin-health' | 'admin-data' | 'admin-notifications' | 'admin-settings'
 
 interface AppState {
   user: SessionUser | null

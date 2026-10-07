@@ -1,0 +1,5656 @@
+====================================================================
+PROJECT
+====================================================================
+
+MEIL ESG / BRSR ENTERPRISE REPORTING PLATFORM
+
+BPUT HACKATHON 2026 — PS08
+
+MASTER TASK:
+
+Build and implement complete dedicated workspaces for ALL remaining
+MEIL ESG/BRSR roles except:
+
+1. PROJECT / SITE USER
+2. HR USER
+
+The remaining roles are:
+
+PHASE 1
+3. EHS / SAFETY USER
+4. PROCUREMENT / SUPPLY CHAIN USER
+5. CSR / COMMUNITY USER
+6. GOVERNANCE / COMPLIANCE USER
+
+PHASE 2
+7. BUSINESS UNIT REVIEWER / COORDINATOR
+8. SUBSIDIARY ESG REVIEWER / HEAD
+9. GROUP / HQ ESG REVIEWER / CSO
+
+PHASE 3
+10. ESG / SUSTAINABILITY MANAGER
+11. ESG ANALYST
+12. BRSR MANAGER
+13. AUDITOR / ASSURANCE USER
+14. MANAGEMENT / EXECUTIVE USER
+
+SYSTEM
+15. SUPER ADMINISTRATOR
+
+TOTAL REMAINING ROLES:
+13
+
+Do NOT create a new workspace for Site User or HR User.
+Do NOT duplicate their existing modules.
+
+====================================================================
+1. PRIMARY OBJECTIVE
+====================================================================
+
+Create a complete enterprise role-based ESG/BRSR platform in which
+EVERY role has:
+
+- dedicated dashboard
+- dedicated navigation
+- role-specific screens
+- role-specific components
+- role-specific actions
+- role-specific KPIs
+- correct organization scope
+- correct permissions
+- backend integration
+- real data
+- real synchronization
+- workflow integration
+- evidence integration
+- audit integration
+- proper loading states
+- proper empty states
+- proper error states
+- responsive behavior
+- automated tests
+
+The final application must feel like ONE COHESIVE ENTERPRISE
+PLATFORM, not 13 disconnected mini-applications.
+
+====================================================================
+2. SOURCE / ARCHITECTURE PRINCIPLE
+====================================================================
+
+Use the supplied project source materials as the functional authority.
+
+Important source concepts include:
+
+GROUP
+↓
+SUBSIDIARY
+↓
+BUSINESS UNIT
+↓
+PROJECT / SITE
+
+BRSR is cross-functional.
+
+Relevant source functions include:
+
+HR
+Operations / EHS
+Procurement / Supply Chain
+Legal / Compliance
+Finance
+CSR / Community
+ESG / Sustainability
+BRSR / Reporting
+Assurance
+Management
+
+The supplied architecture separates operational data capture,
+review/consolidation, ESG/BRSR management, assurance, executive
+visibility and system administration.
+
+Do not silently invent regulatory requirements.
+
+Where a feature is an engineering/platform requirement rather
+than a source requirement, treat it as an implementation decision.
+
+====================================================================
+3. GLOBAL VISUAL DESIGN
+====================================================================
+
+ALL 13 workspaces must belong to the same MEIL ESG design system.
+
+Visual direction:
+
+PREMIUM
+ENTERPRISE
+LIGHT
+CORPORATE
+DATA-DRIVEN
+GLASSMORPHIC
+CALM
+TRUSTWORTHY
+
+Use the supplied approved reference design as the primary visual
+benchmark.
+
+====================================================================
+4. COLOR PALETTE — HARD LOCK
+====================================================================
+
+DO NOT CHANGE THE EXISTING APPROVED PALETTE.
+
+Primary base:
+
+WHITE / OFF-WHITE
+
+Atmosphere:
+
+VERY FAINT MUTED SKY BLUE
+
+Ambient illumination:
+
+SOFT BLUE
+
+Primary accent:
+
+EXISTING MEIL BLUE
+
+Secondary:
+
+EXISTING PURPLE
+
+Semantic:
+
+existing restrained
+success
+warning
+error
+info
+
+DO NOT introduce:
+
+- neon
+- cyberpunk
+- black glass
+- dark dashboards
+- orange-heavy palette
+- unrelated gradient systems
+- rainbow charts
+
+The visual identity must remain consistent across every role.
+
+====================================================================
+5. MATERIAL / GLASS SYSTEM
+====================================================================
+
+Major cards:
+
+frosted white glass
+
+very subtle blue tint
+
+thin cool-blue/gray border
+
+soft diffused shadow
+
+large rounded corners
+
+Recommended radius:
+
+20–28px
+
+Small controls:
+
+10–16px
+
+Use subtle translucency.
+
+Do not make text difficult to read.
+
+====================================================================
+6. GLOBAL APPLICATION SHELL
+====================================================================
+
+Preserve the common MEIL application shell.
+
+HEADER:
+
+LEFT:
+MEIL logo
+MEIL ESG
+ESG & BRSR Reporting Platform
+
+CENTER:
+Global search
+
+RIGHT:
+Notifications
+Help
+Profile
+
+Profile must clearly indicate current role.
+
+Below header:
+
+ROLE-SPECIFIC NAVIGATION
+
+The shell remains visually consistent,
+but the workspace content and navigation change by role.
+
+====================================================================
+7. COMMON EXPERIENCE RULE
+====================================================================
+
+Every role must answer:
+
+WHAT IS MY RESPONSIBILITY?
+
+WHAT NEEDS MY ATTENTION?
+
+WHAT DATA CAN I ACCESS?
+
+WHAT CAN I CHANGE?
+
+WHAT CAN I APPROVE?
+
+WHAT EVIDENCE DO I NEED?
+
+WHAT IS MY ORGANIZATION SCOPE?
+
+WHAT IS THE CURRENT REPORTING STATUS?
+
+WHAT IS THE NEXT ACTION?
+
+The user should never land on a generic dashboard that does not
+reflect their role.
+
+====================================================================
+8. ROLE 3 — EHS / SAFETY USER
+====================================================================
+
+ROLE CODE:
+EHS_OFFICER
+
+PURPOSE:
+
+Manage health, safety and environment operational information,
+incidents, inspections, corrective actions, environmental records,
+training evidence and safety-related ESG/BRSR inputs.
+
+====================================================================
+EHS NAVIGATION
+====================================================================
+
+1. Overview
+2. Safety Operations
+3. Incidents
+4. Inspections
+5. Corrective Actions
+6. Environmental
+7. Safety Training
+8. Evidence
+9. Submissions
+10. Analytics
+11. Reports
+12. Audit & Traceability
+13. More
+
+====================================================================
+EHS SCREEN 1 — OVERVIEW
+====================================================================
+
+Title:
+
+EHS & SAFETY COMMAND CENTER
+
+Hero:
+
+Safety + Environment performance overview
+
+KPIs:
+
+- Safety events
+- Lost time injuries
+- Fatalities
+- Near misses
+- LTIFR
+- Open corrective actions
+- Inspection completion
+- Environmental compliance
+
+Main areas:
+
+Safety Performance
+
+Environment Performance
+
+Open Risks
+
+Upcoming Inspections
+
+Critical Actions
+
+Recent Activity
+
+Charts:
+
+incident trend
+
+LTIFR trend
+
+inspection completion
+
+corrective action closure
+
+====================================================================
+EHS SCREEN 2 — SAFETY OPERATIONS
+====================================================================
+
+Purpose:
+
+Operational safety management.
+
+Sections:
+
+Safety Status
+
+Active Controls
+
+Open Risks
+
+Permit / Safety Activities where supported
+
+Emergency / Incident Readiness where supported
+
+Show:
+
+Status
+
+Owner
+
+Due Date
+
+Severity
+
+Evidence
+
+Audit
+
+====================================================================
+EHS SCREEN 3 — INCIDENTS
+====================================================================
+
+Header:
+
+Safety Incident Register
+
+Filters:
+
+Period
+Project
+Severity
+Incident Type
+Status
+
+KPI:
+
+Total Incidents
+Open
+Under Investigation
+Closed
+Critical
+
+Table:
+
+Incident ID
+Project
+Date
+Category
+Severity
+Description
+Owner
+Status
+Evidence
+Action
+
+Detail drawer:
+
+Incident information
+
+Investigation
+
+Root cause
+
+Corrective action
+
+Evidence
+
+Timeline
+
+Audit
+
+====================================================================
+EHS SCREEN 4 — INSPECTIONS
+====================================================================
+
+Inspection dashboard.
+
+Show:
+
+Scheduled
+
+Completed
+
+Overdue
+
+Failed
+
+Passed
+
+Table:
+
+Inspection
+Project
+Type
+Date
+Inspector
+Score
+Findings
+Status
+
+Detail:
+
+Checklist
+
+Findings
+
+Evidence
+
+Actions
+
+Sign-off
+
+====================================================================
+EHS SCREEN 5 — CORRECTIVE ACTIONS
+====================================================================
+
+Show:
+
+Open CAPA
+
+Overdue
+
+Due Soon
+
+Completed
+
+Critical
+
+Table:
+
+Action ID
+Source
+Project
+Finding
+Severity
+Owner
+Due Date
+Status
+
+Drawer:
+
+Finding
+
+Root Cause
+
+Action Plan
+
+Evidence
+
+Owner
+
+Timeline
+
+Closure Approval
+
+====================================================================
+EHS SCREEN 6 — ENVIRONMENTAL
+====================================================================
+
+Show EHS environmental operational data relevant to the platform.
+
+Sections:
+
+Water
+
+Waste
+
+Emissions
+
+Energy
+
+Environmental incidents
+
+Compliance observations
+
+Charts:
+
+Water trend
+
+Waste trend
+
+Emission trend
+
+Energy trend
+
+Data must be backend-driven.
+
+====================================================================
+EHS SCREEN 7 — SAFETY TRAINING
+====================================================================
+
+Show:
+
+Training programs
+
+Target groups
+
+Completion
+
+Pending
+
+Certification status
+
+Table:
+
+Training
+
+Audience
+
+Date
+
+Participants
+
+Completion
+
+Evidence
+
+Status
+
+====================================================================
+EHS SCREEN 8 — EVIDENCE
+====================================================================
+
+EHS Evidence Center.
+
+Categories:
+
+Incident
+
+Inspection
+
+CAPA
+
+Training
+
+Environmental
+
+Compliance
+
+Use:
+
+upload
+
+preview
+
+verify
+
+link
+
+SHA-256
+
+audit history
+
+====================================================================
+EHS SCREEN 9 — SUBMISSIONS
+====================================================================
+
+Show safety/environment submissions.
+
+Statuses:
+
+Draft
+
+Submitted
+
+Reviewed
+
+Correction
+
+Approved
+
+Show:
+
+Period
+
+Project
+
+Type
+
+Status
+
+Evidence
+
+Validation
+
+Audit
+
+====================================================================
+EHS SCREEN 10 — ANALYTICS
+====================================================================
+
+Charts:
+
+Incident trend
+
+Severity distribution
+
+LTIFR
+
+Fatality / injury trends
+
+Inspection completion
+
+CAPA closure
+
+Training completion
+
+Environmental performance
+
+====================================================================
+EHS SCREEN 11 — REPORTS
+====================================================================
+
+Reports:
+
+Safety Summary
+
+Incident Register
+
+Inspection Report
+
+CAPA Report
+
+Training Report
+
+Environmental Summary
+
+BRSR EHS Contribution
+
+====================================================================
+EHS SCREEN 12 — AUDIT
+====================================================================
+
+Timeline:
+
+Data
+
+Evidence
+
+Validation
+
+Submission
+
+Action
+
+Approval
+
+Audit
+
+====================================================================
+9. ROLE 4 — PROCUREMENT / SUPPLY CHAIN
+====================================================================
+
+ROLE CODE:
+PROCUREMENT_OFFICER
+
+PURPOSE:
+
+Manage supplier ESG information, responsible sourcing, supplier
+assessments, procurement-related ESG disclosures and evidence.
+
+The supplied source material connects Procurement/Supply Chain to
+sustainable sourcing, supply-chain management, responsible sourcing,
+community/local sourcing and value-chain-related information.
+
+====================================================================
+PROCUREMENT NAVIGATION
+====================================================================
+
+1. Overview
+2. Suppliers
+3. Supplier Assessments
+4. Sustainable Sourcing
+5. Procurement Transactions
+6. ESG / Value Chain
+7. Evidence
+8. Submissions
+9. Analytics
+10. Reports
+11. Audit & Traceability
+12. More
+
+====================================================================
+PROCUREMENT SCREEN 1 — OVERVIEW
+====================================================================
+
+KPIs:
+
+Active Suppliers
+
+ESG-Assessed Suppliers
+
+High-Risk Suppliers
+
+Assessment Completion
+
+Responsible Sourcing Coverage
+
+Open Findings
+
+Main:
+
+Supplier Health
+
+Assessment Status
+
+Risk Distribution
+
+Recent Supplier Activity
+
+====================================================================
+SCREEN 2 — SUPPLIERS
+====================================================================
+
+Table:
+
+Supplier
+Category
+Entity
+Location
+ESG Status
+Risk
+Assessment
+Status
+Action
+
+Detail:
+
+Company
+
+Category
+
+ESG Profile
+
+Certifications
+
+Assessment
+
+Risk
+
+Evidence
+
+History
+
+====================================================================
+SCREEN 3 — SUPPLIER ASSESSMENTS
+====================================================================
+
+Show:
+
+Assessment queue
+
+Pending
+
+Completed
+
+High Risk
+
+Rejected
+
+Table:
+
+Supplier
+
+Assessment Type
+
+Score
+
+Risk
+
+Evidence
+
+Reviewer
+
+Status
+
+====================================================================
+SCREEN 4 — SUSTAINABLE SOURCING
+====================================================================
+
+Show:
+
+Responsible sourcing
+
+ESG supplier coverage
+
+Sustainable procurement categories
+
+Value-chain indicators
+
+Use trend / matrix view.
+
+====================================================================
+SCREEN 5 — PROCUREMENT TRANSACTIONS
+====================================================================
+
+Show authorized procurement transaction information relevant to ESG.
+
+Filters:
+
+Supplier
+
+Period
+
+Category
+
+Project
+
+Status
+
+Do not expose data outside scope.
+
+====================================================================
+SCREEN 6 — ESG / VALUE CHAIN
+====================================================================
+
+Show:
+
+Supplier ESG contribution
+
+Assessment coverage
+
+Risk exposure
+
+BRSR value-chain linkage
+
+Trace:
+
+Supplier
+→ assessment
+→ evidence
+→ ESG indicator
+→ BRSR disclosure
+
+====================================================================
+SCREEN 7 — EVIDENCE
+====================================================================
+
+Supplier certificates
+
+ESG declarations
+
+Assessment evidence
+
+Responsible sourcing documents
+
+Integrity verification
+
+====================================================================
+SCREEN 8 — SUBMISSIONS
+====================================================================
+
+Procurement ESG submission registry.
+
+====================================================================
+SCREEN 9 — ANALYTICS
+====================================================================
+
+Charts:
+
+supplier assessment trend
+
+ESG coverage
+
+supplier risk
+
+sustainable sourcing
+
+value-chain coverage
+
+====================================================================
+SCREEN 10 — REPORTS
+====================================================================
+
+Supplier ESG report
+
+Sustainable sourcing report
+
+Value-chain report
+
+Procurement BRSR contribution
+
+====================================================================
+SCREEN 11 — AUDIT
+====================================================================
+
+Track:
+
+Supplier creation
+
+Assessment
+
+Risk classification
+
+Evidence
+
+Changes
+
+Approvals
+
+====================================================================
+10. ROLE 5 — CSR / COMMUNITY USER
+====================================================================
+
+ROLE CODE:
+CSR_OFFICER
+
+PURPOSE:
+
+Manage CSR projects, expenditure, beneficiaries, community outcomes,
+local sourcing and social impact information relevant to ESG/BRSR.
+
+====================================================================
+CSR NAVIGATION
+====================================================================
+
+1. Overview
+2. CSR Projects
+3. Budgets & Spend
+4. Beneficiaries
+5. Impact Assessment
+6. Community Engagement
+7. Local Sourcing
+8. Evidence
+9. Submissions
+10. Analytics
+11. Reports
+12. Audit & Traceability
+13. More
+
+====================================================================
+CSR SCREEN 1 — OVERVIEW
+====================================================================
+
+KPIs:
+
+Active CSR Projects
+
+Budget Utilization
+
+Beneficiaries
+
+Impact Coverage
+
+Projects Completed
+
+Pending Documentation
+
+Main:
+
+CSR Portfolio
+
+Spend Trend
+
+Community Reach
+
+Open Actions
+
+====================================================================
+SCREEN 2 — CSR PROJECTS
+====================================================================
+
+Table:
+
+Project
+
+Location
+
+Theme
+
+Budget
+
+Spend
+
+Beneficiaries
+
+Status
+
+Evidence
+
+Detail:
+
+Project
+
+Objectives
+
+Budget
+
+Spend
+
+Beneficiaries
+
+Timeline
+
+Impact
+
+Evidence
+
+Approval
+
+====================================================================
+SCREEN 3 — BUDGETS & SPEND
+====================================================================
+
+Show:
+
+Allocated
+
+Committed
+
+Spent
+
+Remaining
+
+By project/category.
+
+Charts:
+
+Budget vs spend
+
+Monthly spend
+
+Project distribution
+
+====================================================================
+SCREEN 4 — BENEFICIARIES
+====================================================================
+
+Show:
+
+Beneficiary groups
+
+Count
+
+Location
+
+Program
+
+Coverage
+
+Evidence
+
+Use privacy-conscious presentation.
+
+====================================================================
+SCREEN 5 — IMPACT ASSESSMENT
+====================================================================
+
+Show:
+
+Project
+
+Expected impact
+
+Assessment
+
+Outcome
+
+Evidence
+
+Status
+
+Impact timeline
+
+====================================================================
+SCREEN 6 — COMMUNITY ENGAGEMENT
+====================================================================
+
+Show:
+
+Stakeholder group
+
+Engagement type
+
+Date
+
+Outcome
+
+Follow-up
+
+Status
+
+====================================================================
+SCREEN 7 — LOCAL SOURCING
+====================================================================
+
+Show locally sourced procurement/community contribution where
+supported by data model.
+
+====================================================================
+SCREEN 8 — EVIDENCE
+====================================================================
+
+CSR invoices
+
+Project records
+
+Impact assessment
+
+Beneficiary evidence
+
+Community records
+
+====================================================================
+SCREEN 9 — SUBMISSIONS
+====================================================================
+
+CSR/BRSR disclosure submissions.
+
+====================================================================
+SCREEN 10 — ANALYTICS
+====================================================================
+
+Charts:
+
+CSR spend
+
+project performance
+
+beneficiary reach
+
+impact trend
+
+local sourcing
+
+====================================================================
+SCREEN 11 — REPORTS
+====================================================================
+
+CSR portfolio
+
+CSR expenditure
+
+Community impact
+
+BRSR contribution
+
+====================================================================
+SCREEN 12 — AUDIT
+====================================================================
+
+Full CSR action history.
+
+====================================================================
+11. ROLE 6 — GOVERNANCE / COMPLIANCE USER
+====================================================================
+
+ROLE CODE:
+COMPLIANCE_OFFICER
+
+PURPOSE:
+
+Manage governance policies, compliance obligations, controls,
+ethical governance information, cases and governance-related BRSR
+inputs.
+
+Source material places legal/compliance functions against
+anti-corruption controls, public policy, complaints/cases,
+fines/penalties, governance policies and related disclosures.
+
+====================================================================
+GOVERNANCE NAVIGATION
+====================================================================
+
+1. Overview
+2. Policies
+3. Compliance Obligations
+4. Controls
+5. Cases & Incidents
+6. Ethics & Conduct
+7. Regulatory Calendar
+8. Evidence
+9. Submissions
+10. BRSR Governance
+11. Reports
+12. Audit & Traceability
+13. More
+
+====================================================================
+SCREEN 1 — OVERVIEW
+====================================================================
+
+KPIs:
+
+Policy Coverage
+
+Compliance Coverage
+
+Open Obligations
+
+Open Cases
+
+Overdue Actions
+
+BRSR Governance Readiness
+
+Main:
+
+Compliance Health
+
+Open Obligations
+
+Policy Status
+
+Risk
+
+Recent Activity
+
+====================================================================
+SCREEN 2 — POLICIES
+====================================================================
+
+Table:
+
+Policy
+
+Category
+
+Owner
+
+Version
+
+Approval
+
+Effective Date
+
+Review Date
+
+Status
+
+Detail:
+
+Policy content metadata
+
+Approver
+
+Version history
+
+Evidence
+
+Audit
+
+====================================================================
+SCREEN 3 — COMPLIANCE OBLIGATIONS
+====================================================================
+
+Table:
+
+Obligation
+
+Authority
+
+Due Date
+
+Owner
+
+Status
+
+Risk
+
+Evidence
+
+Action
+
+Show:
+
+Due today
+
+Due soon
+
+Overdue
+
+Closed
+
+====================================================================
+SCREEN 4 — CONTROLS
+====================================================================
+
+Show:
+
+Control
+
+Risk
+
+Owner
+
+Frequency
+
+Last Test
+
+Result
+
+Evidence
+
+Status
+
+====================================================================
+SCREEN 5 — CASES & INCIDENTS
+====================================================================
+
+Show authorized governance/compliance cases.
+
+Fields:
+
+Case ID
+
+Type
+
+Severity
+
+Date
+
+Owner
+
+Status
+
+Resolution
+
+Evidence
+
+Audit
+
+====================================================================
+SCREEN 6 — ETHICS & CONDUCT
+====================================================================
+
+Sections:
+
+Code of Conduct
+
+Anti-Bribery
+
+Anti-Corruption
+
+Conflict of Interest
+
+Whistleblower / grievance mechanisms
+where supported.
+
+====================================================================
+SCREEN 7 — REGULATORY CALENDAR
+====================================================================
+
+Calendar-style interface:
+
+Requirement
+
+Due Date
+
+Owner
+
+Status
+
+Risk
+
+Evidence
+
+====================================================================
+SCREEN 8 — EVIDENCE
+====================================================================
+
+Policy documents
+
+Certificates
+
+Approvals
+
+Cases
+
+Compliance evidence
+
+====================================================================
+SCREEN 9 — SUBMISSIONS
+====================================================================
+
+Governance/BRSR submissions.
+
+====================================================================
+SCREEN 10 — BRSR GOVERNANCE
+====================================================================
+
+Map governance records to relevant BRSR indicators.
+
+Trace:
+
+Control
+
+→ Evidence
+
+→ Validation
+
+→ Indicator
+
+→ Disclosure
+
+====================================================================
+SCREEN 11 — REPORTS
+====================================================================
+
+Governance summary
+
+Compliance report
+
+Policy report
+
+Open obligations
+
+BRSR governance report
+
+====================================================================
+SCREEN 12 — AUDIT
+====================================================================
+
+Immutable activity history.
+
+====================================================================
+12. ROLE 7 — BUSINESS UNIT REVIEWER / COORDINATOR
+====================================================================
+
+ROLE CODE:
+BU_COORDINATOR
+
+PURPOSE:
+
+Level-1 reviewer for project/site submissions within authorized BU
+scope.
+
+====================================================================
+BU NAVIGATION
+====================================================================
+
+1. Overview
+2. Review Queue
+3. My Business Unit
+4. Submissions
+5. Data & Validation
+6. Evidence
+7. Consolidation
+8. Exceptions & SLA
+9. Analytics
+10. Reports
+11. Audit & Traceability
+12. More
+
+====================================================================
+BU SCREEN 1 — OVERVIEW
+====================================================================
+
+Business Unit Review Center.
+
+KPIs:
+
+Pending Review
+
+Approved
+
+Correction Required
+
+SLA Risk
+
+Evidence Coverage
+
+Validation Pass Rate
+
+Main:
+
+Review Queue
+
+BU Health
+
+Recent Activity
+
+Open Exceptions
+
+Project Performance
+
+====================================================================
+SCREEN 2 — REVIEW QUEUE
+====================================================================
+
+Table:
+
+Submission
+
+Project
+
+Period
+
+Completeness
+
+Validation
+
+Evidence
+
+Risk
+
+SLA
+
+Status
+
+Action
+
+====================================================================
+SCREEN 3 — SUBMISSION REVIEW
+====================================================================
+
+Split layout:
+
+LEFT:
+ESG data
+
+RIGHT:
+Evidence
+
+Below:
+
+Quality Gate
+
+Validation
+
+Calculation
+
+Reviewer Notes
+
+Actions:
+
+Request Correction
+
+Approve BU Submission
+
+====================================================================
+SCREEN 4 — MY BUSINESS UNIT
+====================================================================
+
+Hierarchy:
+
+BU
+
+→ projects
+
+Show:
+
+Project status
+
+Submission
+
+ESG readiness
+
+Evidence
+
+Risk
+
+====================================================================
+SCREEN 5 — DATA & VALIDATION
+====================================================================
+
+Show:
+
+Missing values
+
+Unit errors
+
+Calculation issues
+
+Evidence gaps
+
+Business rules
+
+====================================================================
+SCREEN 6 — EVIDENCE
+====================================================================
+
+Review project/site evidence.
+
+====================================================================
+SCREEN 7 — CONSOLIDATION
+====================================================================
+
+Project contribution matrix.
+
+Environmental
+
+Social
+
+Governance
+
+BU performance.
+
+====================================================================
+SCREEN 8 — EXCEPTIONS & SLA
+====================================================================
+
+Critical
+
+High
+
+Medium
+
+Evidence
+
+Validation
+
+Calculation
+
+SLA
+
+====================================================================
+SCREEN 9 — ANALYTICS
+====================================================================
+
+BU trends and project comparison.
+
+====================================================================
+SCREEN 10 — REPORTS
+====================================================================
+
+BU ESG
+
+Consolidation
+
+Evidence
+
+Validation
+
+Approval
+
+====================================================================
+SCREEN 11 — AUDIT
+====================================================================
+
+Submission traceability.
+
+====================================================================
+13. ROLE 8 — SUBSIDIARY ESG REVIEWER / HEAD
+====================================================================
+
+ROLE CODE:
+SUBSIDIARY_HEAD
+
+PURPOSE:
+
+Level-2 review of BU packages within authorized subsidiary scope.
+
+====================================================================
+NAVIGATION
+====================================================================
+
+1. Overview
+2. BU Review Center
+3. Subsidiary ESG
+4. BRSR Impact
+5. Approvals
+6. Evidence
+7. Exceptions
+8. Analytics
+9. Reports
+10. Audit & Traceability
+11. More
+
+====================================================================
+SCREEN 1 — OVERVIEW
+====================================================================
+
+KPIs:
+
+BUs
+
+Projects
+
+Pending BU Reviews
+
+Approved Packages
+
+Correction Packages
+
+ESG Readiness
+
+Evidence Coverage
+
+====================================================================
+SCREEN 2 — BU REVIEW CENTER
+====================================================================
+
+Show all authorized BU packages.
+
+Cards/table:
+
+BU
+
+Projects
+
+Readiness
+
+Evidence
+
+Risk
+
+Status
+
+====================================================================
+SCREEN 3 — BU PACKAGE DETAIL
+====================================================================
+
+Show:
+
+Scope 1
+
+Scope 2
+
+Scope 3
+
+Energy
+
+Water
+
+Waste
+
+Safety
+
+Social
+
+Governance
+
+Evidence
+
+BRSR impact
+
+Validation
+
+Actions:
+
+Request Correction
+
+Approve Subsidiary Package
+
+====================================================================
+SCREEN 4 — SUBSIDIARY ESG
+====================================================================
+
+Tabs:
+
+Environmental
+
+Social
+
+Governance
+
+Show current vs previous year where actual data exists.
+
+====================================================================
+SCREEN 5 — BRSR IMPACT
+====================================================================
+
+Show:
+
+BRSR indicator
+
+Current value
+
+Previous value
+
+BU/project contributors
+
+Evidence
+
+Validation
+
+Approval
+
+====================================================================
+SCREEN 6 — APPROVALS
+====================================================================
+
+Approval center.
+
+Show:
+
+BU packages
+
+status
+
+reviewer
+
+SLA
+
+actions
+
+====================================================================
+SCREEN 7 — EVIDENCE
+====================================================================
+
+Subsidiary-level evidence review.
+
+====================================================================
+SCREEN 8 — EXCEPTIONS
+====================================================================
+
+Risk and data quality center.
+
+====================================================================
+SCREEN 9 — ANALYTICS
+====================================================================
+
+Subsidiary trend analysis.
+
+====================================================================
+SCREEN 10 — REPORTS
+====================================================================
+
+Subsidiary ESG
+
+BRSR
+
+Consolidation
+
+Evidence
+
+Approval
+
+====================================================================
+SCREEN 11 — AUDIT
+====================================================================
+
+Approval and traceability history.
+
+====================================================================
+14. ROLE 9 — GROUP / HQ ESG REVIEWER / CSO
+====================================================================
+
+ROLE CODE:
+GROUP_CSO
+
+PURPOSE:
+
+Group-level ESG consolidation, BRSR readiness, assurance oversight
+and final group locking.
+
+====================================================================
+NAVIGATION
+====================================================================
+
+1. Overview
+2. Group Consolidation
+3. Enterprise ESG
+4. BRSR Command Center
+5. Assurance
+6. Risk Management
+7. Approvals & Lock
+8. Reports
+9. Analytics
+10. Audit & Traceability
+11. More
+
+====================================================================
+SCREEN 1 — GROUP COMMAND CENTER
+====================================================================
+
+Show:
+
+Subsidiaries
+
+BUs
+
+Projects
+
+Submission coverage
+
+ESG readiness
+
+BRSR readiness
+
+Evidence
+
+High-risk issues
+
+====================================================================
+SCREEN 2 — GROUP CONSOLIDATION
+====================================================================
+
+Hierarchy:
+
+Group
+→ Subsidiary
+→ BU
+→ Project
+
+Metrics aggregate upward.
+
+====================================================================
+SCREEN 3 — ENTERPRISE ESG
+====================================================================
+
+Environmental
+
+Social
+
+Governance
+
+Current FY
+
+Previous FY
+
+Delta
+
+Trend
+
+====================================================================
+SCREEN 4 — BRSR COMMAND CENTER
+====================================================================
+
+Show:
+
+Overall readiness
+
+Essential indicators
+
+Leadership
+
+BRSR Core
+
+Evidence
+
+Validation
+
+Assurance
+
+Principle P1–P9
+
+====================================================================
+SCREEN 5 — ASSURANCE
+====================================================================
+
+Flow:
+
+GROUP APPROVED
+↓
+ASSURANCE REVIEW
+↓
+GROUP AUDITED
+↓
+FINAL LOCK
+
+Show:
+
+Evidence reviewed
+
+Findings
+
+Critical findings
+
+Open actions
+
+Assurance progress
+
+====================================================================
+SCREEN 6 — RISK MANAGEMENT
+====================================================================
+
+Show:
+
+Critical
+
+High
+
+Medium
+
+Data
+
+Evidence
+
+Compliance
+
+BRSR
+
+Operational
+
+====================================================================
+SCREEN 7 — APPROVALS & LOCK
+====================================================================
+
+Pre-lock checklist.
+
+Conditions:
+
+all subsidiaries approved
+
+all required packages complete
+
+BRSR validated
+
+evidence complete
+
+assurance complete
+
+audit chain verified
+
+critical exceptions resolved
+
+Then:
+
+LOCK REPORTING PERIOD
+
+Lock must be backend-authorized.
+
+====================================================================
+SCREEN 8 — REPORTS
+====================================================================
+
+BRSR PDF
+
+BRSR XLSX
+
+ESG Executive
+
+Assurance Package
+
+Audit
+
+Group Summary
+
+====================================================================
+SCREEN 9 — ANALYTICS
+====================================================================
+
+Enterprise ESG trends.
+
+====================================================================
+SCREEN 10 — AUDIT
+====================================================================
+
+Group-wide traceability.
+
+====================================================================
+15. ROLE 10 — ESG / SUSTAINABILITY MANAGER
+====================================================================
+
+ROLE CODE:
+ESG_MANAGER
+
+PURPOSE:
+
+Central ESG management, KPI oversight, performance monitoring,
+enterprise ESG governance and cross-functional remediation.
+
+The role should connect operational data to enterprise ESG outcomes.
+
+====================================================================
+ESG MANAGER NAVIGATION
+====================================================================
+
+1. ESG Overview
+2. KPI Management
+3. ESG Performance
+4. Data Completeness
+5. Material ESG Risks
+6. Targets & Progress
+7. BRSR Readiness
+8. Cross-Functional Review
+9. Evidence
+10. Reports
+11. Analytics
+12. Audit & Traceability
+13. More
+
+====================================================================
+SCREEN 1 — ESG OVERVIEW
+====================================================================
+
+KPIs:
+
+ESG Readiness
+
+Data Completion
+
+Evidence Coverage
+
+BRSR Readiness
+
+Open Risks
+
+Pending Reviews
+
+Hero:
+
+Enterprise ESG Performance.
+
+====================================================================
+SCREEN 2 — KPI MANAGEMENT
+====================================================================
+
+Show KPI registry.
+
+Fields:
+
+KPI
+
+Category
+
+Unit
+
+Current
+
+Previous
+
+Target
+
+Variance
+
+Source
+
+Evidence
+
+Status
+
+====================================================================
+SCREEN 3 — ESG PERFORMANCE
+====================================================================
+
+Environmental
+
+Social
+
+Governance
+
+Show:
+
+Current
+
+Previous
+
+Trend
+
+Variance
+
+Source
+
+====================================================================
+SCREEN 4 — DATA COMPLETENESS
+====================================================================
+
+Show:
+
+Missing data
+
+Incomplete projects
+
+Missing evidence
+
+Pending validation
+
+Pending review
+
+====================================================================
+SCREEN 5 — MATERIAL ESG RISKS
+====================================================================
+
+Show:
+
+Risk
+
+Category
+
+Scope
+
+Impact
+
+Likelihood
+
+Owner
+
+Mitigation
+
+Status
+
+====================================================================
+SCREEN 6 — TARGETS & PROGRESS
+====================================================================
+
+Where supported:
+
+Target
+
+Baseline
+
+Current
+
+Progress
+
+Deadline
+
+Owner
+
+Status
+
+Do not invent unsupported targets.
+
+====================================================================
+SCREEN 7 — BRSR READINESS
+====================================================================
+
+Map:
+
+data
+
+evidence
+
+validation
+
+review
+
+approval
+
+disclosure
+
+====================================================================
+SCREEN 8 — CROSS-FUNCTIONAL REVIEW
+====================================================================
+
+Show contribution from:
+
+EHS
+
+HR
+
+Procurement
+
+CSR
+
+Governance
+
+Operations
+
+Each function:
+
+Data
+
+Coverage
+
+Gaps
+
+Status
+
+====================================================================
+SCREEN 9 — EVIDENCE
+====================================================================
+
+Enterprise ESG evidence overview.
+
+====================================================================
+SCREEN 10 — REPORTS
+====================================================================
+
+ESG Management Report
+
+KPI Report
+
+BRSR Readiness
+
+Risk Report
+
+ESG Performance
+
+====================================================================
+SCREEN 11 — ANALYTICS
+====================================================================
+
+Enterprise ESG trends.
+
+====================================================================
+SCREEN 12 — AUDIT
+====================================================================
+
+Track ESG KPI changes and decisions.
+
+====================================================================
+16. ROLE 11 — ESG ANALYST
+====================================================================
+
+ROLE CODE:
+ESG_ANALYST
+
+PURPOSE:
+
+Quantitative ESG analysis, data exploration, trends, variance
+analysis, calculations and evidence-based analytical insights.
+
+====================================================================
+ESG ANALYST NAVIGATION
+====================================================================
+
+1. Analytics Overview
+2. Data Explorer
+3. ESG Metrics
+4. Emissions Analysis
+5. Energy & Resource Analysis
+6. Social Analytics
+7. Governance Analytics
+8. Variance & Anomalies
+9. Data Quality
+10. Evidence & Provenance
+11. Reports
+12. Audit
+13. More
+
+====================================================================
+SCREEN 1 — ANALYTICS OVERVIEW
+====================================================================
+
+High-level analytical dashboard.
+
+KPIs:
+
+Data points
+
+Validated records
+
+Open anomalies
+
+Evidence coverage
+
+Calculation coverage
+
+====================================================================
+SCREEN 2 — DATA EXPLORER
+====================================================================
+
+Search/filter:
+
+Entity
+
+Project
+
+Period
+
+Module
+
+Metric
+
+Indicator
+
+Use real backend data.
+
+====================================================================
+SCREEN 3 — ESG METRICS
+====================================================================
+
+Metric matrix:
+
+Current
+
+Previous
+
+Delta
+
+Trend
+
+Source
+
+====================================================================
+SCREEN 4 — EMISSIONS
+====================================================================
+
+Show:
+
+Scope 1
+
+Scope 2
+
+Scope 3
+
+Intensity
+
+Factor provenance
+
+Trend
+
+====================================================================
+SCREEN 5 — ENERGY & RESOURCES
+====================================================================
+
+Energy
+
+Renewables
+
+Water
+
+Waste
+
+Charts.
+
+====================================================================
+SCREEN 6 — SOCIAL ANALYTICS
+====================================================================
+
+Workforce
+
+Diversity
+
+Safety
+
+Training
+
+Human rights
+
+Where authorized.
+
+====================================================================
+SCREEN 7 — GOVERNANCE ANALYTICS
+====================================================================
+
+Policies
+
+Compliance
+
+Cases
+
+Audit
+
+BRSR readiness
+
+====================================================================
+SCREEN 8 — VARIANCE & ANOMALIES
+====================================================================
+
+Detect:
+
+unexpected changes
+
+incomplete datasets
+
+inconsistent values
+
+calculation mismatch
+
+evidence gaps
+
+Do not classify a value as wrong without a defined rule/threshold.
+
+====================================================================
+SCREEN 9 — DATA QUALITY
+====================================================================
+
+Quality:
+
+complete
+
+warning
+
+blocked
+
+unverified
+
+====================================================================
+SCREEN 10 — EVIDENCE & PROVENANCE
+====================================================================
+
+Show:
+
+metric
+
+source record
+
+calculation
+
+factor
+
+evidence
+
+indicator
+
+====================================================================
+SCREEN 11 — REPORTS
+====================================================================
+
+Analytical report
+
+Variance report
+
+ESG metrics
+
+Data quality
+
+====================================================================
+SCREEN 12 — AUDIT
+====================================================================
+
+Analytical data access history.
+
+====================================================================
+17. ROLE 12 — BRSR MANAGER
+====================================================================
+
+ROLE CODE:
+BRSR_MANAGER
+
+PURPOSE:
+
+Manage BRSR reporting, disclosure readiness, indicator mapping,
+evidence traceability, framework/version management and report
+preparation.
+
+====================================================================
+BRSR NAVIGATION
+====================================================================
+
+1. BRSR Command Center
+2. Frameworks
+3. Section A — General Disclosures
+4. Section B — Management & Process
+5. Section C — Principle-wise Performance
+6. BRSR Core
+7. Disclosure Mapping
+8. Evidence & Sources
+9. Validation
+10. Readiness
+11. Report Builder
+12. Approval & Issuance
+13. Audit & Traceability
+14. More
+
+====================================================================
+SCREEN 1 — BRSR COMMAND CENTER
+====================================================================
+
+Show:
+
+Overall readiness
+
+Required disclosures
+
+Completed
+
+Pending
+
+Blocked
+
+Evidence
+
+Validated
+
+Approved
+
+Assurance
+
+====================================================================
+SCREEN 2 — FRAMEWORKS
+====================================================================
+
+Show:
+
+Framework
+
+Version
+
+Effective period
+
+Status
+
+Reference
+
+Indicator count
+
+Core configuration
+
+Do not silently change active framework.
+
+====================================================================
+SCREEN 3 — SECTION A
+====================================================================
+
+General disclosures.
+
+Organize according to the project's official BRSR mapping:
+
+Listed entity information
+
+Products/services
+
+Operations
+
+Employees
+
+Subsidiaries/associates/JVs
+
+CSR
+
+Transparency/disclosures
+
+The project source specifically identifies these Section A parts. 
+Use source-aligned labels and structure.
+
+====================================================================
+SCREEN 4 — SECTION B
+====================================================================
+
+Management and process disclosures.
+
+Show:
+
+Policy
+
+management approach
+
+responsibility
+
+stakeholder
+
+assessment
+
+governance/process
+
+====================================================================
+SCREEN 5 — SECTION C
+====================================================================
+
+Principle-wise performance.
+
+Show:
+
+P1
+
+P2
+
+P3
+
+P4
+
+P5
+
+P6
+
+P7
+
+P8
+
+P9
+
+Each principle:
+
+Essential
+
+Leadership
+
+status
+
+evidence
+
+validation
+
+approval
+
+====================================================================
+SCREEN 6 — BRSR CORE
+====================================================================
+
+Show Core attributes.
+
+For every attribute:
+
+Current FY
+
+Previous FY
+
+Value
+
+Unit
+
+Evidence
+
+Validation
+
+Assurance
+
+Status
+
+Do not fabricate comparative values.
+
+====================================================================
+SCREEN 7 — DISCLOSURE MAPPING
+====================================================================
+
+Trace:
+
+Source Function
+
+→ Data
+
+→ Calculation
+
+→ Evidence
+
+→ Indicator
+
+→ BRSR Disclosure
+
+Show cross-functional contributors:
+
+HR
+
+EHS
+
+Procurement
+
+CSR
+
+Governance
+
+Operations
+
+Finance
+
+====================================================================
+SCREEN 8 — EVIDENCE & SOURCES
+====================================================================
+
+Show:
+
+Indicator
+
+Source
+
+Evidence
+
+Linked Record
+
+Uploaded By
+
+Verification
+
+Hash
+
+====================================================================
+SCREEN 9 — VALIDATION
+====================================================================
+
+Show:
+
+Passed
+
+Warnings
+
+Blocked
+
+Missing
+
+Reconciliation failures
+
+====================================================================
+SCREEN 10 — READINESS
+====================================================================
+
+Show:
+
+Data
+
+Evidence
+
+Validation
+
+Review
+
+Approval
+
+Assurance
+
+Readiness
+
+====================================================================
+SCREEN 11 — REPORT BUILDER
+====================================================================
+
+Build:
+
+BRSR PDF
+
+BRSR XLSX
+
+Supporting disclosures
+
+Management summary
+
+Ensure report uses persisted data.
+
+====================================================================
+SCREEN 12 — APPROVAL & ISSUANCE
+====================================================================
+
+Show:
+
+Draft
+
+Validated
+
+Reviewed
+
+Approved
+
+Assurance
+
+Issued
+
+Version
+
+Hash
+
+====================================================================
+SCREEN 13 — AUDIT
+====================================================================
+
+Complete BRSR traceability.
+
+====================================================================
+18. ROLE 13 — AUDITOR / ASSURANCE USER
+====================================================================
+
+ROLE CODE:
+ASSURANCE_AUDITOR
+
+PURPOSE:
+
+Independent assurance/review workspace.
+
+The role must be intentionally READ-HEAVY and ACTION-LIMITED.
+
+The auditor should inspect evidence, test data, record findings,
+request clarification and complete assurance steps without
+modifying source operational records directly.
+
+====================================================================
+AUDITOR NAVIGATION
+====================================================================
+
+1. Assurance Overview
+2. Assigned Engagements
+3. Scope & Materiality
+4. Evidence Review
+5. Data Testing
+6. BRSR Testing
+7. Findings
+8. Evidence Requests
+9. Management Responses
+10. Assurance Status
+11. Assurance Reports
+12. Audit Trail
+13. More
+
+====================================================================
+SCREEN 1 — ASSURANCE OVERVIEW
+====================================================================
+
+KPIs:
+
+Engagements
+
+Evidence Reviewed
+
+Testing Complete
+
+Open Findings
+
+Critical Findings
+
+Pending Requests
+
+Assurance Progress
+
+====================================================================
+SCREEN 2 — ASSIGNED ENGAGEMENTS
+====================================================================
+
+Table:
+
+Engagement
+
+Entity
+
+Period
+
+Scope
+
+Progress
+
+Findings
+
+Status
+
+====================================================================
+SCREEN 3 — SCOPE & MATERIALITY
+====================================================================
+
+Show:
+
+Entity
+
+Reporting Period
+
+Review Scope
+
+Relevant BRSR areas
+
+Material issues
+
+Testing status
+
+====================================================================
+SCREEN 4 — EVIDENCE REVIEW
+====================================================================
+
+Show:
+
+Document
+
+Source Record
+
+Indicator
+
+Hash
+
+Verification
+
+Reviewer Result
+
+Comments
+
+Actions:
+
+Accept
+
+Question
+
+Request Evidence
+
+====================================================================
+SCREEN 5 — DATA TESTING
+====================================================================
+
+Show:
+
+Source value
+
+Calculated value
+
+Expected
+
+Difference
+
+Evidence
+
+Test result
+
+Do not permit direct source-data mutation.
+
+====================================================================
+SCREEN 6 — BRSR TESTING
+====================================================================
+
+Show indicator-level testing.
+
+Fields:
+
+Indicator
+
+Disclosure
+
+Source
+
+Calculation
+
+Evidence
+
+Result
+
+Comment
+
+====================================================================
+SCREEN 7 — FINDINGS
+====================================================================
+
+Table:
+
+Finding
+
+Severity
+
+Entity
+
+Area
+
+Evidence
+
+Owner
+
+Status
+
+Due
+
+====================================================================
+SCREEN 8 — EVIDENCE REQUESTS
+====================================================================
+
+Show:
+
+Request
+
+Entity
+
+Record
+
+Required evidence
+
+Requested
+
+Due
+
+Status
+
+====================================================================
+SCREEN 9 — MANAGEMENT RESPONSES
+====================================================================
+
+Show:
+
+Finding
+
+Management Response
+
+Evidence
+
+Status
+
+Reviewer Comment
+
+====================================================================
+SCREEN 10 — ASSURANCE STATUS
+====================================================================
+
+Show:
+
+Testing
+
+Evidence
+
+Findings
+
+Responses
+
+Completion
+
+Overall status
+
+====================================================================
+SCREEN 11 — ASSURANCE REPORTS
+====================================================================
+
+Assurance working papers
+
+Finding report
+
+Evidence index
+
+BRSR assurance package
+
+====================================================================
+SCREEN 12 — AUDIT TRAIL
+====================================================================
+
+Auditor actions:
+
+Evidence opened
+
+Test performed
+
+Finding created
+
+Request created
+
+Response reviewed
+
+Conclusion updated
+
+All actions must be auditable.
+
+====================================================================
+19. ROLE 14 — MANAGEMENT / EXECUTIVE USER
+====================================================================
+
+ROLE CODE:
+EXECUTIVE
+
+PURPOSE:
+
+Executive/board-level read-only ESG and BRSR oversight.
+
+This must NOT look like an operational data-entry dashboard.
+
+It should feel like an EXECUTIVE BUSINESS INTELLIGENCE CENTER.
+
+====================================================================
+EXECUTIVE NAVIGATION
+====================================================================
+
+1. Executive Overview
+2. Enterprise ESG
+3. BRSR Readiness
+4. Strategic Risks
+5. Performance Trends
+6. Business Units
+7. Assurance Status
+8. Reports
+9. Audit & Traceability
+10. More
+
+====================================================================
+SCREEN 1 — EXECUTIVE OVERVIEW
+====================================================================
+
+Hero:
+
+ENTERPRISE ESG EXECUTIVE SUMMARY
+
+KPIs:
+
+ESG Readiness
+
+BRSR Readiness
+
+BRSR Core
+
+Environmental
+
+Social
+
+Governance
+
+Critical Risks
+
+====================================================================
+SCREEN 2 — ENTERPRISE ESG
+====================================================================
+
+Three pillars:
+
+Environmental
+
+Social
+
+Governance
+
+Show:
+
+Current FY
+
+Previous FY
+
+Delta
+
+Trend
+
+====================================================================
+SCREEN 3 — BRSR READINESS
+====================================================================
+
+Show:
+
+Essential
+
+Leadership
+
+Core
+
+Evidence
+
+Validation
+
+Assurance
+
+Overall readiness
+
+====================================================================
+SCREEN 4 — STRATEGIC RISKS
+====================================================================
+
+Show:
+
+Critical
+
+High
+
+Emerging
+
+Owner
+
+Mitigation
+
+Status
+
+====================================================================
+SCREEN 5 — PERFORMANCE TRENDS
+====================================================================
+
+High-level:
+
+GHG
+
+Energy
+
+Water
+
+Waste
+
+Workforce
+
+Safety
+
+Governance
+
+====================================================================
+SCREEN 6 — BUSINESS UNITS
+====================================================================
+
+Show comparative BU performance.
+
+The executive can drill down only to authorized/read-only levels.
+
+====================================================================
+SCREEN 7 — ASSURANCE
+====================================================================
+
+Show:
+
+Assurance progress
+
+Open findings
+
+Critical findings
+
+Evidence status
+
+====================================================================
+SCREEN 8 — REPORTS
+====================================================================
+
+Executive ESG Summary
+
+BRSR Report
+
+ESG Performance
+
+Risk Report
+
+Assurance Summary
+
+====================================================================
+SCREEN 9 — AUDIT
+====================================================================
+
+Read-only executive traceability.
+
+NO operational editing.
+
+====================================================================
+20. ROLE 15 — SUPER ADMINISTRATOR
+====================================================================
+
+ROLE CODE:
+SUPER_ADMIN
+
+PURPOSE:
+
+Entire platform administration and control.
+
+This workspace is NOT an ESG operational dashboard.
+
+It is the:
+
+ENTERPRISE CONTROL CENTER
+
+====================================================================
+SUPER ADMIN NAVIGATION
+====================================================================
+
+1. Overview
+2. Users
+3. Roles & Permissions
+4. Organization
+5. Projects
+6. Reporting Periods
+7. Workflow Configuration
+8. ESG / BRSR Configuration
+9. Security Center
+10. System Health
+11. Audit & Traceability
+12. Reports & Exports
+13. Data & Storage
+14. Notifications
+15. System Settings
+16. More
+
+====================================================================
+SCREEN 1 — ADMIN OVERVIEW
+====================================================================
+
+Show:
+
+Platform Health
+
+Active Users
+
+Active Roles
+
+Projects
+
+Organization Nodes
+
+Open Alerts
+
+Audit Integrity
+
+System activity
+
+Security status
+
+====================================================================
+SCREEN 2 — USERS
+====================================================================
+
+User management:
+
+Search
+
+Create
+
+Edit
+
+Role
+
+Scope
+
+Status
+
+Last Login
+
+Sessions
+
+====================================================================
+SCREEN 3 — ROLES & PERMISSIONS
+====================================================================
+
+Show all canonical roles.
+
+Permission matrix.
+
+Resource:
+
+READ
+
+CREATE
+
+UPDATE
+
+DELETE
+
+APPROVE
+
+EXPORT
+
+====================================================================
+SCREEN 4 — ORGANIZATION
+====================================================================
+
+Hierarchy:
+
+Group
+
+Subsidiary
+
+BU
+
+Project
+
+Interactive tree.
+
+====================================================================
+SCREEN 5 — PROJECTS
+====================================================================
+
+Project directory.
+
+Manage assignments/scopes according to permission.
+
+====================================================================
+SCREEN 6 — REPORTING PERIODS
+====================================================================
+
+Create
+
+Activate
+
+Deactivate
+
+Lock
+
+Unlock
+
+View status.
+
+====================================================================
+SCREEN 7 — WORKFLOW CONFIGURATION
+====================================================================
+
+Visual state machine.
+
+Show:
+
+State
+
+Transition
+
+Role
+
+Permission
+
+SLA
+
+Audit
+
+====================================================================
+SCREEN 8 — ESG / BRSR CONFIGURATION
+====================================================================
+
+Tabs:
+
+Frameworks
+
+Indicators
+
+Factors
+
+Validation
+
+Mappings
+
+Units
+
+====================================================================
+SCREEN 9 — SECURITY CENTER
+====================================================================
+
+Show:
+
+Active Sessions
+
+Revoked Sessions
+
+Failed Logins
+
+Locked Accounts
+
+Security Events
+
+Rate Limits
+
+====================================================================
+SCREEN 10 — SYSTEM HEALTH
+====================================================================
+
+Show:
+
+API
+
+Database
+
+Storage
+
+Audit
+
+Workflow
+
+Calculation
+
+Reporting
+
+BRSR
+
+====================================================================
+SCREEN 11 — AUDIT
+====================================================================
+
+Show:
+
+All authorized system events.
+
+Canonical payload
+
+Stored hash
+
+Recomputed hash
+
+Chain
+
+Integrity
+
+====================================================================
+SCREEN 12 — REPORTS
+====================================================================
+
+Administrative reports.
+
+====================================================================
+SCREEN 13 — DATA & STORAGE
+====================================================================
+
+Show:
+
+Evidence storage
+
+Report storage
+
+Audit archive
+
+Storage usage
+
+Integrity
+
+Failures
+
+====================================================================
+SCREEN 14 — NOTIFICATIONS
+====================================================================
+
+System/workflow/security alerts.
+
+====================================================================
+SCREEN 15 — SETTINGS
+====================================================================
+
+Application
+
+Security
+
+Workflow
+
+BRSR
+
+Reporting
+
+Storage
+
+Notifications
+
+Do not reveal secrets.
+
+====================================================================
+21. COMMON ROLE WORKSPACE COMPONENTS
+====================================================================
+
+Create reusable enterprise components.
+
+CORE:
+
+GlassCard
+
+GlassCardHeader
+
+MetricCard
+
+TrendCard
+
+SectionHeader
+
+FilterBar
+
+SearchBar
+
+StatusBadge
+
+RiskBadge
+
+ScopeBadge
+
+PeriodSelector
+
+DataTable
+
+ChartCard
+
+Timeline
+
+ActivityFeed
+
+DetailDrawer
+
+SideDrawer
+
+ConfirmationModal
+
+DangerModal
+
+ApprovalModal
+
+CorrectionModal
+
+EvidencePreview
+
+EvidenceCard
+
+QualityGate
+
+ValidationResult
+
+AuditTimeline
+
+AuditDetail
+
+EmptyState
+
+ErrorState
+
+LoadingState
+
+Skeleton
+
+ExportButton
+
+RefreshButton
+
+====================================================================
+22. COMMON BUSINESS COMPONENTS
+====================================================================
+
+HierarchyTree
+
+OrganizationBreadcrumb
+
+SubmissionStatus
+
+ApprovalStatus
+
+SLAIndicator
+
+KPIProgress
+
+DataCompleteness
+
+EvidenceCoverage
+
+BRSRReadiness
+
+WorkflowStepper
+
+RecordHistory
+
+VersionBadge
+
+HashVerification
+
+SourceTraceability
+
+====================================================================
+23. DESIGN SYSTEM
+====================================================================
+
+ALL role workspaces must share:
+
+same typography
+
+same spacing
+
+same card radius
+
+same glass effect
+
+same border system
+
+same shadow system
+
+same button language
+
+same status language
+
+same navigation style
+
+same modal style
+
+same table language
+
+same chart style
+
+Only the INFORMATION ARCHITECTURE and ROLE-SPECIFIC CONTENT
+should change.
+
+====================================================================
+24. ROLE DIFFERENTIATION
+====================================================================
+
+DO NOT build the same dashboard 13 times.
+
+Every role must have a distinct purpose.
+
+EHS:
+OPERATIONS + SAFETY
+
+PROCUREMENT:
+SUPPLIERS + VALUE CHAIN
+
+CSR:
+COMMUNITY + IMPACT
+
+GOVERNANCE:
+POLICIES + COMPLIANCE
+
+BU:
+PROJECT REVIEW + BU APPROVAL
+
+SUBSIDIARY:
+BU CONSOLIDATION + SUBSIDIARY APPROVAL
+
+GROUP CSO:
+GROUP CONSOLIDATION + BRSR + FINAL LOCK
+
+ESG MANAGER:
+ENTERPRISE ESG MANAGEMENT
+
+ESG ANALYST:
+QUANTITATIVE ANALYSIS
+
+BRSR MANAGER:
+DISCLOSURE + REPORTING CONTROL
+
+AUDITOR:
+INDEPENDENT ASSURANCE
+
+EXECUTIVE:
+READ-ONLY STRATEGIC OVERSIGHT
+
+SUPER ADMIN:
+PLATFORM CONTROL
+
+====================================================================
+25. ROLE WORKFLOW HIERARCHY
+====================================================================
+
+Operational:
+
+EHS
+Procurement
+CSR
+Governance
++
+Site/HR already implemented
+
+        ↓
+
+BU REVIEW
+
+        ↓
+
+SUBSIDIARY REVIEW
+
+        ↓
+
+GROUP / HQ REVIEW
+
+        ↓
+
+BRSR MANAGEMENT
+
+        ↓
+
+ASSURANCE
+
+        ↓
+
+EXECUTIVE VISIBILITY
+
+        ↓
+
+FINAL LOCK / SYSTEM CONTROL
+
+Do not allow users to bypass workflow using frontend controls.
+
+====================================================================
+26. GLOBAL REPORTING PERIOD CONTROL
+====================================================================
+
+Every role workspace must have a consistent reporting-period
+selection mechanism where appropriate.
+
+When reporting period changes:
+
+refresh:
+
+KPIs
+
+tables
+
+charts
+
+records
+
+evidence
+
+submissions
+
+BRSR mapping
+
+readiness
+
+activity
+
+Never mix periods silently.
+
+====================================================================
+27. REAL DATA REQUIREMENT
+====================================================================
+
+ALL authoritative displayed business data must come from backend.
+
+Never create:
+
+mock values
+
+fake charts
+
+fake users
+
+fake submissions
+
+fake approvals
+
+fake audit events
+
+fake evidence
+
+fake system health
+
+fake KPI numbers
+
+fake BRSR values
+
+fake comparative values
+
+fake notification records
+
+Never use:
+
+Date.now()
+
+Math.random()
+
+demo-
+
+local-
+
+mock-
+
+as production business data.
+
+====================================================================
+28. EXISTING FALLBACK CLEANUP
+====================================================================
+
+Before implementing each workspace:
+
+inspect existing role module.
+
+Search:
+
+mock
+
+demo
+
+fallback
+
+fake
+
+hardcoded
+
+synthetic
+
+localStorage
+
+placeholder
+
+Date.now
+
+Math.random
+
+silent catch
+
+Replace inappropriate business-data fallbacks with:
+
+real backend data
+
+loading
+
+empty
+
+error
+
+retry
+
+The platform must fail honestly.
+
+====================================================================
+29. FRONTEND → BACKEND ARCHITECTURE
+====================================================================
+
+Every screen must follow:
+
+UI
+↓
+API SERVICE
+↓
+FASTAPI
+↓
+AUTHENTICATION
+↓
+RBAC
+↓
+ORGANIZATION SCOPE
+↓
+BUSINESS LOGIC
+↓
+DATABASE
+↓
+RESPONSE
+↓
+UI
+
+Never allow the frontend to become the security boundary.
+
+====================================================================
+30. API REUSE
+====================================================================
+
+Before creating an API:
+
+INSPECT EXISTING BACKEND.
+
+Reuse existing routes if possible.
+
+If missing:
+
+create:
+
+schema
+
+route
+
+authorization
+
+scope validation
+
+business logic
+
+audit
+
+tests
+
+frontend API method
+
+Never create duplicate endpoints for the same business function.
+
+====================================================================
+31. ORGANIZATION SCOPE
+====================================================================
+
+All role workspaces must respect:
+
+GROUP
+↓
+SUBSIDIARY
+↓
+BUSINESS UNIT
+↓
+PROJECT
+
+EHS:
+
+authorized operational scope
+
+Procurement:
+
+authorized procurement scope
+
+CSR:
+
+authorized community/business scope
+
+Governance:
+
+authorized governance scope
+
+BU:
+
+authorized BU/project scope
+
+Subsidiary:
+
+authorized subsidiary/BU scope
+
+CSO:
+
+group scope
+
+ESG Manager:
+
+configured enterprise ESG scope
+
+ESG Analyst:
+
+authorized analytics scope
+
+BRSR Manager:
+
+authorized reporting scope
+
+Auditor:
+
+assigned assurance scope
+
+Executive:
+
+read-only executive scope
+
+Super Admin:
+
+enterprise administrative scope
+
+====================================================================
+32. BACKEND AUTHORIZATION
+====================================================================
+
+Frontend hiding a button is NOT authorization.
+
+Backend must enforce:
+
+authentication
+
+permission
+
+role
+
+organization scope
+
+workflow state
+
+record ownership
+
+reporting period
+
+approval rules
+
+====================================================================
+33. APPROVAL RULE
+====================================================================
+
+Only roles explicitly authorized by workflow rules can approve.
+
+Do not allow:
+
+EHS → BU approval unless authorized
+
+HR → BU approval unless authorized
+
+BU → subsidiary approval
+
+Subsidiary → group lock
+
+Auditor → operational mutation
+
+Executive → mutation
+
+BRSR Manager → unauthorized operational changes
+
+Super Admin must still use backend-authorized administrative routes.
+
+====================================================================
+34. EVIDENCE SYSTEM
+====================================================================
+
+All role evidence workflows must use the central evidence system.
+
+Support where applicable:
+
+Upload
+
+Preview
+
+Link
+
+Verify
+
+SHA-256
+
+Metadata
+
+Version
+
+Audit
+
+No evidence should become detached from its source record.
+
+====================================================================
+35. AUDIT SYSTEM
+====================================================================
+
+Important actions must create audit records.
+
+Examples:
+
+Create
+
+Update
+
+Review
+
+Correction
+
+Approve
+
+Reject
+
+Evidence verification
+
+Configuration
+
+Assignment
+
+Scope change
+
+Role change
+
+Lock
+
+Unlock
+
+Report issuance
+
+Every audit event:
+
+actor
+
+role
+
+timestamp
+
+entity
+
+action
+
+scope
+
+details
+
+hash
+
+previous hash
+
+====================================================================
+36. VALIDATION
+====================================================================
+
+All data-entry/review roles must respect validation.
+
+Possible status:
+
+PASS
+
+WARNING
+
+BLOCKED
+
+Validation should consider:
+
+completeness
+
+units
+
+cross-field consistency
+
+calculation consistency
+
+evidence
+
+reporting period
+
+organization scope
+
+required disclosures
+
+Do not silently convert invalid values.
+
+====================================================================
+37. CALCULATION PROVENANCE
+====================================================================
+
+Where a role views calculated ESG metrics, display where appropriate:
+
+Input
+
+Factor
+
+Factor version
+
+Calculation
+
+Output
+
+Evidence
+
+Source
+
+Do not show a calculation without provenance where provenance is
+available.
+
+====================================================================
+38. BRSR TRACEABILITY
+====================================================================
+
+Create a consistent visual traceability pattern:
+
+SOURCE
+↓
+DATA
+↓
+CALCULATION
+↓
+EVIDENCE
+↓
+VALIDATION
+↓
+REVIEW
+↓
+APPROVAL
+↓
+BRSR DISCLOSURE
+↓
+REPORT
+↓
+AUDIT
+
+This should be visible especially to:
+
+ESG Manager
+
+BRSR Manager
+
+Group CSO
+
+Auditor
+
+Executive
+
+====================================================================
+39. CURRENT VS PREVIOUS YEAR
+====================================================================
+
+Where source/data model supports comparative reporting, use:
+
+CURRENT FY
+
+PREVIOUS FY
+
+DELTA
+
+Do not create synthetic previous-year values.
+
+====================================================================
+40. ERROR HANDLING
+====================================================================
+
+Every screen:
+
+LOADING
+EMPTY
+ERROR
+SUCCESS
+
+If backend fails:
+
+show genuine error
+
+show retry
+
+do not display fake business data.
+
+If mutation fails:
+
+do not show success.
+
+If state changed on server:
+
+refresh and reconcile.
+
+====================================================================
+41. DATA SYNC
+====================================================================
+
+After mutations, automatically synchronize all relevant screens.
+
+Examples:
+
+EHS incident created
+→ incident count
+→ risk
+→ activity
+→ submission
+
+Supplier assessment updated
+→ supplier score
+→ risk
+→ analytics
+→ BRSR
+
+CSR project updated
+→ budget
+→ impact
+→ reports
+
+BU approval
+→ review queue
+→ consolidation
+→ activity
+→ audit
+
+Subsidiary approval
+→ group consolidation
+
+Group approval
+→ assurance
+
+Auditor finding
+→ assurance status
+→ exceptions
+
+BRSR update
+→ readiness
+→ reports
+
+Admin user update
+→ users
+→ role
+→ scope
+→ audit
+
+====================================================================
+42. CACHE / STATE ISOLATION
+====================================================================
+
+Never leak one role's data into another role.
+
+On role switch:
+
+invalidate role-specific data.
+
+On scope switch:
+
+invalidate scope-specific data.
+
+On period switch:
+
+invalidate period-specific data.
+
+Do not retain stale sensitive data.
+
+====================================================================
+43. SEARCH
+====================================================================
+
+Search must be backend-driven where possible.
+
+Role-specific search:
+
+EHS:
+incidents, inspections, actions
+
+Procurement:
+suppliers, assessments
+
+CSR:
+projects, beneficiaries
+
+Governance:
+policies, obligations, cases
+
+BU:
+projects, submissions, evidence
+
+Subsidiary:
+BUs, packages, indicators
+
+CSO:
+entities, BRSR, risks, reports
+
+ESG Manager:
+metrics, risks, indicators
+
+Analyst:
+data, metrics, records
+
+BRSR Manager:
+indicators, disclosures, evidence
+
+Auditor:
+engagements, evidence, findings
+
+Executive:
+enterprise data
+
+Super Admin:
+users, roles, organizations, projects, reports, audit
+
+====================================================================
+44. COMMON FILTERS
+====================================================================
+
+Where relevant:
+
+Reporting Period
+
+Financial Year
+
+Organization
+
+Subsidiary
+
+Business Unit
+
+Project
+
+Status
+
+Risk
+
+Evidence
+
+Verification
+
+Owner
+
+Date
+
+====================================================================
+45. BUSINESS-STYLE UX
+====================================================================
+
+The interface must feel like a premium professional business
+platform.
+
+Use:
+
+wide layouts
+
+asymmetric compositions
+
+large hero panels
+
+wide data tables
+
+small KPI cards
+
+right-side detail drawers
+
+split review workspaces
+
+business-style action bars
+
+clean charts
+
+compact status pills
+
+Do NOT make every page:
+
+3 equal cards
+3 equal columns
+3 generic charts
+
+Every workspace should have intentional information hierarchy.
+
+====================================================================
+46. RESPONSIVE
+====================================================================
+
+Primary:
+
+1280
+
+1440
+
+1600
+
+1920
+
+At smaller widths:
+
+stack cards
+
+collapse columns
+
+horizontal-scroll tables
+
+convert drawers to full width
+
+preserve readability
+
+No clipping.
+
+No overlapping UI.
+
+====================================================================
+47. ACCESSIBILITY
+====================================================================
+
+Implement:
+
+keyboard navigation
+
+focus state
+
+ARIA labels
+
+semantic headings
+
+accessible dialogs
+
+Escape handling
+
+accessible tables
+
+sufficient contrast
+
+====================================================================
+48. PERFORMANCE
+====================================================================
+
+Use:
+
+pagination
+
+debounced search
+
+request deduplication
+
+lazy loading where appropriate
+
+efficient queries
+
+scoped API requests
+
+controlled refresh
+
+Do not load enterprise-wide datasets for restricted users.
+
+====================================================================
+49. SECURITY VERIFICATION
+====================================================================
+
+For every role test:
+
+Unauthenticated → protected endpoint = 401
+
+Unauthorized role → restricted endpoint = 403
+
+Wrong organization → 403
+
+Wrong project → 403
+
+Wrong workflow transition → rejected
+
+Unauthorized export → 403
+
+Unauthorized mutation → 403
+
+Auditor → operational mutation = 403
+
+Executive → mutation = 403
+
+BU → group lock = 403
+
+Subsidiary → group lock = 403
+
+Only authorized CSO/Admin route may execute group lock according
+to workflow configuration.
+
+====================================================================
+50. E2E ROLE VERIFICATION
+====================================================================
+
+Run actual role credentials, NOT Super Admin impersonation.
+
+For each role:
+
+LOGIN
+↓
+AUTH /ME
+↓
+ROLE
+↓
+PERMISSIONS
+↓
+SCOPE
+↓
+WORKSPACE
+↓
+API
+↓
+DATA
+↓
+MUTATION
+↓
+AUDIT
+↓
+LOGOUT
+
+Use actual role identity.
+
+Do not fake role testing through admin headers.
+
+====================================================================
+51. FRONTEND BUILD
+====================================================================
+
+Run:
+
+npm run build
+
+Verify:
+
+0 compilation errors
+
+0 broken imports
+
+0 route errors
+
+0 missing components
+
+0 obvious runtime errors
+
+0 stale role mappings
+
+====================================================================
+52. BACKEND TESTING
+====================================================================
+
+Add/update integration tests for:
+
+EHS
+
+Procurement
+
+CSR
+
+Governance
+
+BU
+
+Subsidiary
+
+CSO
+
+ESG Manager
+
+ESG Analyst
+
+BRSR Manager
+
+Auditor
+
+Executive
+
+Super Admin
+
+Test:
+
+auth
+
+permissions
+
+scope
+
+CRUD
+
+review
+
+workflow
+
+evidence
+
+audit
+
+reports
+
+sync
+
+====================================================================
+53. ROLE-SPECIFIC TESTING MATRIX
+====================================================================
+
+EHS:
+
+incident
+
+inspection
+
+CAPA
+
+evidence
+
+submission
+
+scope
+
+audit
+
+Procurement:
+
+supplier
+
+assessment
+
+risk
+
+evidence
+
+scope
+
+audit
+
+CSR:
+
+project
+
+budget
+
+beneficiary
+
+impact
+
+evidence
+
+scope
+
+audit
+
+Governance:
+
+policy
+
+obligation
+
+control
+
+case
+
+evidence
+
+scope
+
+audit
+
+BU:
+
+review
+
+correction
+
+approval
+
+consolidation
+
+scope
+
+audit
+
+Subsidiary:
+
+BU package
+
+correction
+
+approval
+
+consolidation
+
+scope
+
+audit
+
+CSO:
+
+group consolidation
+
+BRSR readiness
+
+assurance
+
+lock
+
+audit
+
+ESG Manager:
+
+KPI
+
+risk
+
+performance
+
+readiness
+
+audit
+
+Analyst:
+
+analytics
+
+data explorer
+
+variance
+
+provenance
+
+audit
+
+BRSR Manager:
+
+framework
+
+indicator
+
+mapping
+
+validation
+
+report
+
+issuance
+
+audit
+
+Auditor:
+
+engagement
+
+evidence
+
+test
+
+finding
+
+request
+
+assurance
+
+audit
+
+Executive:
+
+read-only access
+
+enterprise metrics
+
+BRSR
+
+reports
+
+scope
+
+Super Admin:
+
+users
+
+roles
+
+permissions
+
+organization
+
+projects
+
+periods
+
+workflow
+
+configuration
+
+security
+
+audit
+
+====================================================================
+54. FINAL VISUAL QA
+====================================================================
+
+After coding:
+
+Open EVERY major screen.
+
+Review as:
+
+Senior Product Designer
++
+Enterprise UX Architect
++
+ESG Product Specialist
+
+Check:
+
+alignment
+
+spacing
+
+card proportions
+
+text wrapping
+
+table density
+
+button placement
+
+navigation
+
+glass consistency
+
+shadow consistency
+
+typography
+
+charts
+
+responsive behavior
+
+modal behavior
+
+drawer behavior
+
+loading state
+
+empty state
+
+error state
+
+Do NOT leave placeholder UI.
+
+====================================================================
+55. FINAL REPOSITORY SEARCH
+====================================================================
+
+Search all newly modified code for:
+
+mock
+
+demo
+
+fake
+
+fallback
+
+hardcoded
+
+synthetic
+
+localStorage
+
+Date.now
+
+Math.random
+
+placeholder
+
+TODO
+
+FIXME
+
+silent catch
+
+admin bypass
+
+role bypass
+
+scope bypass
+
+test-only production behavior
+
+Fix inappropriate occurrences.
+
+====================================================================
+56. FINAL ROLE NAVIGATION MAP
+====================================================================
+
+EHS / SAFETY USER
+-----------------
+Overview
+Safety Operations
+Incidents
+Inspections
+Corrective Actions
+Environmental
+Safety Training
+Evidence
+Submissions
+Analytics
+Reports
+Audit & Traceability
+More
+
+PROCUREMENT / SUPPLY CHAIN
+--------------------------
+Overview
+Suppliers
+Supplier Assessments
+Sustainable Sourcing
+Procurement Transactions
+ESG / Value Chain
+Evidence
+Submissions
+Analytics
+Reports
+Audit & Traceability
+More
+
+CSR / COMMUNITY
+---------------
+Overview
+CSR Projects
+Budgets & Spend
+Beneficiaries
+Impact Assessment
+Community Engagement
+Local Sourcing
+Evidence
+Submissions
+Analytics
+Reports
+Audit & Traceability
+More
+
+GOVERNANCE / COMPLIANCE
+-----------------------
+Overview
+Policies
+Compliance Obligations
+Controls
+Cases & Incidents
+Ethics & Conduct
+Regulatory Calendar
+Evidence
+Submissions
+BRSR Governance
+Reports
+Audit & Traceability
+More
+
+BUSINESS UNIT REVIEWER / COORDINATOR
+------------------------------------
+Overview
+Review Queue
+My Business Unit
+Submissions
+Data & Validation
+Evidence
+Consolidation
+Exceptions & SLA
+Analytics
+Reports
+Audit & Traceability
+More
+
+SUBSIDIARY HEAD
+---------------
+Overview
+BU Review Center
+Subsidiary ESG
+BRSR Impact
+Approvals
+Evidence
+Exceptions
+Analytics
+Reports
+Audit & Traceability
+More
+
+GROUP / HQ CSO
+--------------
+Overview
+Group Consolidation
+Enterprise ESG
+BRSR Command Center
+Assurance
+Risk Management
+Approvals & Lock
+Reports
+Analytics
+Audit & Traceability
+More
+
+ESG / SUSTAINABILITY MANAGER
+----------------------------
+ESG Overview
+KPI Management
+ESG Performance
+Data Completeness
+Material ESG Risks
+Targets & Progress
+BRSR Readiness
+Cross-Functional Review
+Evidence
+Reports
+Analytics
+Audit & Traceability
+More
+
+ESG ANALYST
+-----------
+Analytics Overview
+Data Explorer
+ESG Metrics
+Emissions Analysis
+Energy & Resource Analysis
+Social Analytics
+Governance Analytics
+Variance & Anomalies
+Data Quality
+Evidence & Provenance
+Reports
+Audit
+More
+
+BRSR MANAGER
+------------
+BRSR Command Center
+Frameworks
+Section A — General Disclosures
+Section B — Management & Process
+Section C — Principle-wise Performance
+BRSR Core
+Disclosure Mapping
+Evidence & Sources
+Validation
+Readiness
+Report Builder
+Approval & Issuance
+Audit & Traceability
+More
+
+AUDITOR / ASSURANCE
+-------------------
+Assurance Overview
+Assigned Engagements
+Scope & Materiality
+Evidence Review
+Data Testing
+BRSR Testing
+Findings
+Evidence Requests
+Management Responses
+Assurance Status
+Assurance Reports
+Audit Trail
+More
+
+MANAGEMENT / EXECUTIVE
+---------------------
+Executive Overview
+Enterprise ESG
+BRSR Readiness
+Strategic Risks
+Performance Trends
+Business Units
+Assurance Status
+Reports
+Audit & Traceability
+More
+
+SUPER ADMINISTRATOR
+-------------------
+Overview
+Users
+Roles & Permissions
+Organization
+Projects
+Reporting Periods
+Workflow Configuration
+ESG / BRSR Configuration
+Security Center
+System Health
+Audit & Traceability
+Reports & Exports
+Data & Storage
+Notifications
+System Settings
+More
+
+====================================================================
+57. GLOBAL ROLE HIERARCHY
+====================================================================
+
+                    SUPER ADMIN
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+      PLATFORM CONTROL          ENTERPRISE ESG
+                                      │
+                         ┌────────────┼────────────┐
+                         │            │            │
+                    ESG MANAGER   BRSR MANAGER   EXECUTIVE
+                         │            │
+                         │            └───────┐
+                         │                    │
+                    ESG ANALYST          ASSURANCE
+                         │                    │
+                         │                AUDITOR
+                         │
+              ┌──────────┼──────────┐
+              │          │          │
+             EHS      PROCUREMENT   CSR
+              │          │          │
+              └──────────┼──────────┘
+                         │
+                    GOVERNANCE
+                         │
+                         ↓
+                 BU COORDINATOR
+                         ↓
+                 SUBSIDIARY HEAD
+                         ↓
+                    GROUP CSO
+                         ↓
+                    ASSURANCE
+                         ↓
+                      LOCK
+
+Do not interpret this hierarchy as a literal employee reporting
+chart unless the source explicitly establishes it.
+
+It is the APPLICATION RESPONSIBILITY / WORKFLOW MODEL.
+
+====================================================================
+58. FINAL COMPONENT ARCHITECTURE
+====================================================================
+
+Recommended:
+
+frontend/src/features/roles/
+
+ehs/
+procurement/
+csr/
+governance/
+reviewers/
+esg-manager/
+esg-analyst/
+brsr-manager/
+auditor/
+executive/
+admin/
+
+Shared:
+
+frontend/src/components/enterprise/
+
+GlassCard
+MetricCard
+DataTable
+FilterBar
+StatusBadge
+RiskBadge
+ScopeBadge
+Timeline
+ActivityFeed
+EvidencePanel
+EvidencePreview
+QualityGate
+ApprovalBar
+ApprovalModal
+CorrectionModal
+AuditTimeline
+TraceabilityTree
+HierarchyTree
+PeriodSelector
+SearchBar
+ChartCard
+DetailDrawer
+EmptyState
+ErrorState
+LoadingState
+Skeleton
+
+====================================================================
+59. DO NOT DUPLICATE EXISTING SITE USER / HR
+====================================================================
+
+IMPORTANT:
+
+Site User already has its own workspace.
+
+HR User already has its own dedicated 7-screen HR workspace.
+
+Do not modify their information architecture unless required for
+shared-system integration.
+
+Do not duplicate:
+
+HR Workforce
+
+HR Training
+
+HR Wellbeing
+
+HR Human Rights
+
+Site Data Entry
+
+Site Evidence
+
+Site Submission
+
+instead integrate shared backend data where appropriate.
+
+====================================================================
+60. CROSS-FUNCTIONAL DATA FLOW
+====================================================================
+
+The platform must support:
+
+EHS
++
+HR
++
+Procurement
++
+CSR
++
+Governance
++
+Operations
++
+Finance
+        ↓
+ESG DATA
+        ↓
+VALIDATION
+        ↓
+CONSOLIDATION
+        ↓
+BRSR
+        ↓
+ASSURANCE
+        ↓
+REPORTING
+
+The supplied source materials emphasize that BRSR data is
+cross-functional and must be consolidated from multiple
+departments. Do not isolate every role as a disconnected system.
+
+====================================================================
+61. FINAL BUSINESS EXPERIENCE
+====================================================================
+
+Operational user:
+
+"Main apna ESG data manage karta hoon."
+
+Reviewer:
+
+"Main data verify aur approve karta hoon."
+
+ESG Manager:
+
+"Main enterprise ESG performance manage karta hoon."
+
+Analyst:
+
+"Main data ko analyze karta hoon."
+
+BRSR Manager:
+
+"Main disclosure aur BRSR reporting control karta hoon."
+
+Auditor:
+
+"Main evidence aur assurance test karta hoon."
+
+Executive:
+
+"Main strategic ESG position dekhta hoon."
+
+Super Admin:
+
+"Main poora platform control karta hoon."
+
+This distinction must be obvious in the UI.
+
+====================================================================
+62. FINAL QUALITY REQUIREMENT
+====================================================================
+
+Do NOT build 13 copies of one dashboard.
+
+Build 13 DISTINCT WORKSPACES
+inside ONE CONSISTENT ENTERPRISE DESIGN SYSTEM.
+
+Every workspace must have:
+
+ROLE-SPECIFIC NAVIGATION
++
+ROLE-SPECIFIC INFORMATION ARCHITECTURE
++
+ROLE-SPECIFIC ACTIONS
++
+ROLE-SPECIFIC DATA
++
+ROLE-SPECIFIC SECURITY
++
+ROLE-SPECIFIC WORKFLOW
++
+ROLE-SPECIFIC REPORTING
+
+====================================================================
+63. FINAL TEST REPORT
+====================================================================
+
+Create:
+
+MEIL_PS08_ALL_REMAINING_ROLES_VERIFICATION.md
+
+Include:
+
+Role
+
+Screens
+
+Navigation
+
+Components
+
+APIs
+
+Database models
+
+Permissions
+
+Scope
+
+Workflow
+
+Evidence
+
+Audit
+
+Tests
+
+Build
+
+E2E
+
+Known issues
+
+Exact tested commit SHA
+
+====================================================================
+64. FINAL SUCCESS CRITERIA
+====================================================================
+
+Do NOT say "COMPLETE" simply because:
+
+the pages render
+
+the build passes
+
+or the API responds.
+
+The workspace is complete only when:
+
+DESIGN
++
+ROUTING
++
+UI
++
+UX
++
+API
++
+DATABASE
++
+RBAC
++
+SCOPE
++
+WORKFLOW
++
+EVIDENCE
++
+VALIDATION
++
+AUDIT
++
+REPORTING
++
+SYNC
++
+TESTING
+
+all work together.
+
+====================================================================
+65. START EXECUTION
+====================================================================
+
+FIRST:
+
+Audit the existing repository.
+
+SECOND:
+
+Map all existing role modules.
+
+THIRD:
+
+Identify duplicate/generic screens.
+
+FOURTH:
+
+Identify missing screens.
+
+FIFTH:
+
+Map every screen to actual backend APIs/models.
+
+SIXTH:
+
+Create a role-by-role implementation plan.
+
+SEVENTH:
+
+Implement shared enterprise components first.
+
+EIGHTH:
+
+Implement each role workspace.
+
+NINTH:
+
+Connect real backend data.
+
+TENTH:
+
+Implement state synchronization.
+
+ELEVENTH:
+
+Implement RBAC and scope verification.
+
+TWELFTH:
+
+Implement workflow/evidence/audit integration.
+
+THIRTEENTH:
+
+Run automated tests.
+
+FOURTEENTH:
+
+Run E2E tests with real role identities.
+
+FIFTEENTH:
+
+Run frontend production build.
+
+SIXTEENTH:
+
+Perform visual QA.
+
+SEVENTEENTH:
+
+Perform repository-wide hidden issue search.
+
+EIGHTEENTH:
+
+Fix all discovered issues.
+
+NINETEENTH:
+
+Run final regression.
+
+TWENTIETH:
+
+Generate final verification report.
+
+Do not stop after creating UI.
+Do not stop after connecting APIs.
+Do not stop after tests.
+Complete the entire role experience.
