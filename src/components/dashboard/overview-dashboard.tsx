@@ -14,6 +14,8 @@ import {
 } from 'recharts'
 import { PipelineTracker } from '@/components/dashboard/pipeline-tracker'
 import { TargetsWidget } from '@/components/dashboard/targets-widget'
+import { AiInsightsPanel } from '@/components/dashboard/ai-insights-panel'
+import { ActionItemsWidget } from '@/components/dashboard/action-items-widget'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
 
 interface OverviewData {
@@ -224,6 +226,12 @@ export function OverviewDashboard() {
 
       {/* SUSTAINABILITY TARGETS vs ACTUALS */}
       <TargetsWidget />
+
+      {/* AI INSIGHTS + MY ACTION ITEMS — premium executive features */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <AiInsightsPanel />
+        <ActionItemsWidget />
+      </div>
 
       {/* DATA QUALITY + ACTIVITY */}
       <div className="grid gap-4 lg:grid-cols-3">

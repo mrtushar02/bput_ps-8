@@ -669,3 +669,37 @@ Stage Summary:
 - All values computed from real DB data — ESG score from 8 real KPI dimensions, drill-down stats from trends data, alerts from real KPI thresholds
 - Premium glassmorphism design language preserved throughout (glass-strong modals, radial gauge, gradient severity icons)
 - Ready for next round: could add role-specific dashboard variants, real-time WebSocket notifications, BRSR framework comparison views, data quality heatmap, or mobile-responsive refinements
+
+---
+Task ID: 13 (QA + Features round 4)
+Agent: Lead Architect (main) — autonomous webDevReview round 4
+Task: AI Insights panel, My Action Items widget, nav coverage fix
+
+Work Log:
+- Reviewed worklog (3 prior rounds). Platform was stable with all 9 modules passing.
+- Performed fresh QA via agent-browser: logged in as Super Admin, tested all modules, used VLM to identify highest-impact gaps: (1) no AI-generated insights / "So What?" factor, (2) no role-aware task management, (3) nav buttons covered by content when scrolled.
+
+- Added 2 NEW FEATURES + 1 BUG FIX:
+  1. **AI Insights Panel** (`src/components/dashboard/ai-insights-panel.tsx` + `src/app/api/insights/route.ts`) — LLM-generated narrative insights from real ESG KPI data using the z-ai-web-dev-sdk (LLM skill). The API fetches real KPIs (emissions, energy, water, waste, workforce, safety, BRSR readiness, trends), builds a structured data context, and sends it to the LLM with a system prompt asking for 3-4 executive insights with title/severity/category/insight/action. The panel renders insights with severity-colored icons (positive=emerald, warning=amber, critical=rose), category icons, and a "recommended action" callout. Includes a Refresh button to re-generate. Verified: generated 4 insights including "Emissions Spike in June" (detected the 75% increase from May to June), "Low Renewable Energy Adoption" (critical), "Gender Diversity Gap", and "BRSR Compliance Incomplete" — all from real data.
+  2. **My Action Items Widget** (`src/components/dashboard/action-items-widget.tsx` + `src/app/api/action-items/route.ts`) — role-aware task list showing pending submissions, corrections, approvals, evidence gaps, and BRSR missing items for the current user's role. The API checks the user's role and returns relevant tasks: PROJECT_USER sees draft submissions + open corrections; BU/SUBSIDIARY/GROUP reviewers see pending reviews + evidence verification; ESG_MANAGER/BRSR_MANAGER see BRSR gaps + validation exceptions. Tasks are sorted by severity (critical > warning > info). The widget includes severity filter chips (All/Critical/Warning/Info with counts), clickable task rows that navigate to the relevant module, due dates, and a Refresh button. Verified: Super Admin sees 5 tasks (BRSR gaps: CIN, entity names, net turnover, CSR spend, cybersecurity incidents).
+  3. **Nav Coverage Fix** — the sticky header's nav buttons were being covered by content elements when scrolled (agent-browser reported "covered by <div.border-b>"). Fixed by adding `isolate` to the sticky header (creates a proper stacking context for the backdrop-filter) + `relative z-10` to the nav container div. Verified: all 9 nav buttons are now clickable even when scrolled down on a module.
+
+- Placed the AI Insights + My Action Items in a 2-column grid on the overview dashboard, between the Sustainability Targets and the Data Quality Center.
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- VLM-verified AI Insights panel: 4 LLM-generated insights with severity badges + recommended actions
+- VLM-verified My Action Items panel: 5 role-aware tasks with severity chips + clickable navigation
+- DOM-verified AI insights content: "Emissions Spike in June" warning, "Low Renewable Energy Adoption" critical
+- Verified nav coverage fix: all nav buttons clickable after scrolling
+
+Stage Summary:
+- 2 new features (AI Insights panel with LLM, My Action Items role-aware widget)
+- 1 bug fix (nav coverage / z-index stacking)
+- 2 new API endpoints (/api/insights with LLM integration, /api/action-items with role-aware logic)
+- 2 new component files (ai-insights-panel.tsx, action-items-widget.tsx)
+- All values computed from real DB data — insights from real KPIs + trends, action items from real submissions/corrections/exceptions/BRSR gaps
+- Premium glassmorphism design language preserved (violet gradient for AI, blue gradient for action items)
+- Ready for next round: could add dashboard PDF export, real-time WebSocket notifications, BRSR framework comparison, data quality heatmap, or mobile-responsive refinements

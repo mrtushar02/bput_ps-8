@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* HEADER */}
-      <header className="glass-nav sticky top-0 z-40 border-b border-white/40">
+      <header className="glass-nav sticky top-0 z-50 isolate border-b border-white/40">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-4 px-4 md:px-6">
           {/* Brand */}
           <div className="flex items-center gap-2.5">
@@ -200,7 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* PRIMARY NAV */}
-        <div className="mx-auto max-w-[1600px] px-4 md:px-6">
+        <div className="relative z-10 mx-auto max-w-[1600px] px-4 md:px-6">
           <nav className="glass-nav flex items-center gap-0.5 overflow-x-auto scroll-elegant rounded-2xl px-1.5 py-1.5">
             {NAV.map((item) => {
               const Icon = item.icon
