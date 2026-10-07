@@ -18,6 +18,7 @@ import { AiInsightsPanel } from '@/components/dashboard/ai-insights-panel'
 import { ActionItemsWidget } from '@/components/dashboard/action-items-widget'
 import { GlossaryTooltip } from '@/components/dashboard/glossary-tooltip'
 import { ScenarioCalculator } from '@/components/dashboard/scenario-calculator'
+import { ExecutiveSummaryView } from '@/components/dashboard/executive-summary-view'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
 
 interface OverviewData {
@@ -47,6 +48,13 @@ export function OverviewDashboard() {
   const [drillDown, setDrillDown] = useState<null | 'emissions' | 'energy' | 'water' | 'waste'>(null)
   const [exporting, setExporting] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
+  const [isCompact, setIsCompact] = useState(false)
+  useEffect(() => {
+    const check = () => setIsCompact(window.innerWidth < 1024)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
   // Compute ESG composite score (0-100) from real KPIs — no hardcoded values
   const esgScore = useMemo(() => {
     if (!data) return 0
@@ -88,6 +96,10 @@ export function OverviewDashboard() {
   return (
     <div className="space-y-5">
       {/* Page header */}
+      {/* Executive Summary for compact/mobile view */}
+      {isCompact && <ExecutiveSummaryView data={data} esgScore={esgScore} />}
+      {/* Full dashboard — hidden on compact view */}
+      <div className={isCompact ? 'hidden' : 'space-y-5'}>
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -356,6 +368,7 @@ export function OverviewDashboard() {
 
       {/* KPI Drill-down modal */}
       <KpiDrillDownModal type={drillDown} data={data} onClose={() => setDrillDown(null)} />
+      </div>{/* end full dashboard */}
     </div>
   )
 }
