@@ -932,3 +932,63 @@ Stage Summary:
 - Premium glassmorphism design language preserved (glass-strong score gauge, glass KPI cards, radial SVG gauge)
 - The platform now passes the "Elevator Test": C-suite executives can grasp ESG health in <5 seconds on a tablet
 - Ready for next round: could add inline task creation from AI insights, data quality heatmap, real-time WebSocket updates, or multi-row data entry
+
+---
+Task ID: 20 (Major UI/UX Rework — Role-Aware Nav + Premium Sidebar + Liquid Glass)
+Agent: Lead Architect (main)
+Task: Role-aware navigation, premium sidebar with user profile, enhanced glassmorphism, fix "all users same nav" issue
+
+Work Log:
+- User reported: (1) all users see the same nav bar with same details, (2) UI too simple/static, (3) need iOS liquid glass glassmorphism on all sections, (4) backend/data flow issues.
+- Analyzed reference design images via VLM — identified the need for a left vertical sidebar with user profile card, role-specific navigation, and premium business theme.
+
+- MAJOR REWORK — 3 key changes:
+
+  1. **Role-Aware Navigation** (`src/lib/role-nav.ts`) — new module that maps each of the 15 roles to a specific set of nav items:
+     - SUPER_ADMIN: all 10 items (Overview, My Project, Data Entry, Evidence, Submissions, Reports, Analytics, Audit & Trace, BRSR, Admin)
+     - PROJECT_USER: 6 items (Overview, My Project, Data Entry, Evidence, Submissions, Reports) — no Analytics/Audit/BRSR/Admin
+     - HR_USER: 5 items (Overview, Workforce, Data Entry, Evidence, Submissions)
+     - EHS_USER: 5 items (Overview, My Project, Data Entry [Shield icon], Evidence, Submissions)
+     - BU_REVIEWER: 6 items (Overview, Projects, Evidence, Review Queue, Reports, Audit) — labeled "Review Queue" not "Submissions"
+     - SUBSIDIARY_REVIEWER: 6 items (Overview, Business Units, Evidence, Approvals, Reports, Audit) — labeled "Approvals"
+     - GROUP_REVIEWER: 6 items (Overview, Organization, Final Review, Reports, BRSR, Audit) — labeled "Final Review"
+     - ESG_MANAGER: 5 items (Overview, Analytics, Reports, Audit, BRSR)
+     - ESG_ANALYST: 3 items (Overview, Analytics, Reports)
+     - BRSR_MANAGER: 4 items (Overview, BRSR, Reports, Audit)
+     - AUDITOR: 5 items (Overview, Evidence, Reports, Audit & Trace, BRSR) — no Data Entry/Submissions
+     - EXECUTIVE: 4 items (Overview, Reports, Analytics, BRSR)
+     Verified: Project User sees 6 items, Auditor sees 5 different items, Super Admin sees all 10. Each role's nav is distinct.
+
+  2. **Premium Left Sidebar with User Profile Card** — rewrote `src/components/shell/app-shell.tsx`:
+     - Replaced the horizontal nav pill bar with a vertical left sidebar (collapsible)
+     - User profile card at the top: avatar with role-specific gradient tint, name, role name, "Demo account" badge
+     - Role-tinted active nav items: the active module button uses a gradient background matching the role's color (e.g. Super Admin = slate, Project User = blue, EHS = amber, Auditor = gray, Executive = amber/gold)
+     - Dynamic badge counts from real notifications (not hardcoded "12" and "3")
+     - Collapse toggle at the bottom
+     - Mobile drawer (hamburger menu) for <768px viewports
+     - Profile dropdown now only shows "Admin / Settings" for SUPER_ADMIN role
+
+  3. **Enhanced iOS Liquid Glass Glassmorphism** (`src/app/globals.css`):
+     - `.glass`: now uses linear-gradient background (135deg white→ice-blue) + deeper blur(20px) saturate(180%) + blue-tinted outer ring shadow
+     - `.glass-strong`: linear-gradient + blur(24px) saturate(200%) + enhanced shadows
+     - `.glass-subtle`: linear-gradient + blur(14px) saturate(150%)
+     - `.glass-nav`: vertical gradient + blur(22px) saturate(180%)
+     - New `.glass-gradient-border` class: premium gradient border effect using mask-composite for highlighted cards
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified no console errors
+- VLM-verified Super Admin sidebar: premium profile card + 10 nav items + glassmorphism
+- VLM-verified Auditor sidebar: profile card (KS / Karthik Subramaniam / Auditor) + 5 role-specific items (Overview, Evidence, Reports, Audit & Trace, BRSR)
+- DOM-verified Project User nav: "Overview | My Project | Data Entry | Evidence | Submissions1 | Reports" (6 items, no Analytics/Audit/BRSR)
+- DOM-verified Auditor nav: "Overview | Evidence | Reports | Audit & Trace | BRSR" (5 items, no Data Entry/Submissions)
+- DOM-verified Super Admin nav: "Overview | My Project | Data Entry | Evidence | Submissions | Reports | Analytics | Audit & Trace | BRSR | Admin" (10 items)
+
+Stage Summary:
+- Fixed the core issue: all users no longer see the same nav bar. Each of the 15 roles now sees a role-specific set of nav items with role-specific labels.
+- Added a premium left vertical sidebar with user profile card (avatar, name, role, demo badge) — matching the reference design's layout.
+- Enhanced all glassmorphism classes with linear-gradient backgrounds, deeper blur, and richer shadows for a premium iOS liquid glass feel.
+- 2 new files: `src/lib/role-nav.ts` (role→nav mapping), fully rewritten `src/components/shell/app-shell.tsx`.
+- Dynamic badge counts from real notifications instead of hardcoded "12"/"3".
+- Mobile-responsive: sidebar collapses to a drawer on <768px viewports.

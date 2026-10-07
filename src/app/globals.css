@@ -128,45 +128,72 @@
    ============================================================ */
 
 @layer components {
-  /* Frosted glass surface — primary card style */
+  /* Frosted glass surface — primary card style (enhanced liquid glass) */
   .glass {
-    background: rgba(255, 255, 255, 0.72);
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.75);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 248, 255, 0.68) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
-      0 8px 32px -8px rgba(30, 58, 138, 0.12),
-      0 2px 8px -2px rgba(30, 58, 138, 0.06);
+      0 1px 0 0 rgba(255, 255, 255, 0.95) inset,
+      0 0 0 1px rgba(59, 130, 246, 0.04),
+      0 8px 32px -8px rgba(30, 58, 138, 0.14),
+      0 2px 8px -2px rgba(30, 58, 138, 0.08);
   }
 
   .glass-strong {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(22px) saturate(180%);
-    -webkit-backdrop-filter: blur(22px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.85);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.92) 0%, rgba(240, 248, 255, 0.85) 100%);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.95) inset,
-      0 12px 40px -10px rgba(30, 58, 138, 0.16),
-      0 4px 12px -3px rgba(30, 58, 138, 0.08);
+      0 1px 0 0 rgba(255, 255, 255, 1) inset,
+      0 0 0 1px rgba(59, 130, 246, 0.06),
+      0 12px 40px -10px rgba(30, 58, 138, 0.18),
+      0 4px 12px -3px rgba(30, 58, 138, 0.1);
   }
 
   .glass-subtle {
-    background: rgba(255, 255, 255, 0.55);
-    backdrop-filter: blur(12px) saturate(140%);
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    box-shadow: 0 4px 20px -8px rgba(30, 58, 138, 0.1);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(240, 248, 255, 0.5) 100%);
+    backdrop-filter: blur(14px) saturate(150%);
+    -webkit-backdrop-filter: blur(14px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 4px 20px -8px rgba(30, 58, 138, 0.12);
   }
 
   .glass-nav {
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(20px) saturate(170%);
-    -webkit-backdrop-filter: blur(20px) saturate(170%);
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(248, 250, 252, 0.78) 100%);
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.75);
     box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.9) inset,
-      0 4px 24px -6px rgba(30, 58, 138, 0.1);
+      0 1px 0 0 rgba(255, 255, 255, 0.95) inset,
+      0 4px 24px -6px rgba(30, 58, 138, 0.12);
+  }
+
+  /* Premium gradient border for highlighted cards */
+  .glass-gradient-border {
+    position: relative;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(240, 248, 255, 0.68) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    box-shadow:
+      0 1px 0 0 rgba(255, 255, 255, 0.95) inset,
+      0 8px 32px -8px rgba(30, 58, 138, 0.14);
+  }
+  .glass-gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(6, 182, 212, 0.15), transparent);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
   }
 
   /* Soft floating orbs for welcome / hero backgrounds */
