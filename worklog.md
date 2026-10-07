@@ -860,3 +860,38 @@ Stage Summary:
 - Premium glassmorphism design language preserved (violet gradient for scenario, blue gradient for benchmark bar)
 - The platform now supports strategic decision-making: executives can model reduction scenarios and see the score impact before committing to targets
 - Ready for next round: could add BRSR dimension progress bars, data quality heatmap, mobile-responsive refinements, or CSV/PDF export of scenarios
+
+---
+Task ID: 18 (QA + Features round 9)
+Agent: Lead Architect (main) — autonomous webDevReview round 9
+Task: Submissions bulk actions, sortable columns, pagination
+
+Work Log:
+- Reviewed worklog (8 prior rounds). Platform was stable with all 9 modules passing.
+- Performed fresh QA via agent-browser: logged in as Super Admin, tested all 9 modules (all OK), used VLM to identify highest-impact gaps: (1) submissions table lacks bulk actions/selection, (2) no sortable columns, (3) no pagination controls.
+
+- Added 3 NEW FEATURES to the Submissions module:
+  1. **Row Selection + Bulk Actions** — each table row now has a checkbox for selection. A "select all" checkbox in the header selects/deselects all rows on the current page. When rows are selected, a bulk action bar appears at the top of the table showing "N selected" + "Export selected" (CSV) + "Clear" buttons. The CSV export generates a proper CSV file with Project, Period, Module, Status, Completion, Evidence, Submitted columns and triggers a browser download + toast notification. Selected rows get a blue-tinted background. Verified: clicked a row checkbox → bulk bar appeared showing "1 selected" + "Export selected" + "Clear" buttons.
+  2. **Sortable Columns** — 5 columns are now sortable: Project/Title, Period, Completion, Submitted, Status. Clicking a column header toggles between ascending/descending sort. A sort indicator icon (ArrowUpDown for unsorted, ArrowUp for ascending, ArrowDown for descending) appears next to each sortable header. The sort is client-side using useMemo for performance. Verified: VLM confirmed sort indicator icons on all 5 sortable column headers.
+  3. **Pagination Controls** — a pagination bar at the bottom of the table shows "Showing X–Y of Z" + a page size selector (10/20/50 per page) + Prev/Next buttons + page number buttons (with smart windowing for >5 pages). The active page is highlighted in blue. Changing page size resets to page 1. Verified: VLM confirmed pagination bar showing "Showing 1–1 of 1" + "10 / page" selector + page number "1".
+
+- Fixed a lint error (react-hooks/static-components) by extracting the SortIcon component into a renderSortIcon function.
+- Fixed a duplicate import error (ChevronRight was imported twice).
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- VLM-verified checkbox columns for row selection (header select-all + per-row)
+- VLM-verified sort indicator icons on 5 sortable column headers
+- VLM-verified pagination bar with "Showing 1–1 of 1" + page size selector + page numbers
+- DOM-verified bulk action bar: "1 selected" + "Export selected" + "Clear" when a row is selected
+- Tested CSV export: export function executes without errors (Blob download)
+
+Stage Summary:
+- 3 new features (row selection + bulk actions, sortable columns, pagination controls) all in the Submissions module
+- Updated SubmissionsTable component with 13 new props for selection/sort/pagination
+- All sorting/pagination computed client-side — no API changes needed
+- CSV export generates proper quoted CSV with all submission fields
+- Premium glassmorphism design language preserved (blue-tinted selected rows, blue bulk action bar, blue active page)
+- Ready for next round: could add inline action resolution from overview, data quality heatmap, mobile-responsive refinements, or real-time WebSocket notifications
