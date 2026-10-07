@@ -3,6 +3,7 @@ import { AppProvider, useApp } from '@/lib/auth-context'
 import { WelcomeScreen } from '@/components/welcome/welcome-screen'
 import { AppShell } from '@/components/shell/app-shell'
 import { OverviewDashboard } from '@/components/dashboard/overview-dashboard'
+import { SiteUserOverview } from '@/components/dashboard/site-user-overview'
 import { ModuleRouter } from '@/components/modules/module-router'
 import { ErrorBoundary } from '@/components/error-boundary'
 
@@ -25,10 +26,15 @@ function Root() {
 
   if (!user) return <WelcomeScreen />
 
+  const roleKey = user?.roles?.[0]?.key ?? ''
+  const isSiteUser = ['PROJECT_USER', 'HR_USER', 'EHS_USER', 'PROCUREMENT_USER', 'CSR_USER', 'COMPLIANCE_USER'].includes(roleKey)
+
   return (
     <AppShell>
       <ErrorBoundary label={activeModule}>
-        {activeModule === 'overview' ? <OverviewDashboard /> : <ModuleRouter />}
+        {activeModule === 'overview'
+          ? (isSiteUser ? <SiteUserOverview /> : <OverviewDashboard />)
+          : <ModuleRouter />}
       </ErrorBoundary>
     </AppShell>
   )

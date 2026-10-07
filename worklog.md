@@ -1045,3 +1045,39 @@ Stage Summary:
 - Glassmorphism maximized: blur up to 30px, saturate up to 220%, inner highlight shadows, 3-stop gradients
 - Sky-blue color scheme applied throughout (background, cards, shadows, accents, search)
 - All changes in 3 files: globals.css (glass + colors), app-shell.tsx (search wiring), command-palette.tsx (external open support)
+
+---
+Task ID: 22 (Site User Dashboard — Reference Replica + Real-Time)
+Agent: Lead Architect (main) + subagent
+Task: Build site user overview matching reference design exactly, with real-time data
+
+Work Log:
+- User requested: replicate the uploaded reference dashboard design exactly (3-column asymmetric layout, KPI cards with sparklines, active submissions table, recent activities feed, analytics mini-charts, form builder, data connections) for all site user roles, with real-time data components.
+- Analyzed the reference image via VLM → extracted exact layout spec: 3-column grid (58%/25%/17%), card styling (16px radius, blur(12px), white/70 bg), KPI card anatomy (label + value + trend pill + sparkline), color scheme (sky-blue #E8F4FC background, #3B82F6 accents).
+
+- Dispatched subagent to build `src/components/dashboard/site-user-overview.tsx` (~1,218 lines):
+  - **3-column asymmetric layout**: `xl:grid-cols-[1fr_400px_280px]` collapsing to single column on mobile
+  - **Left column (58%)**: 3 KPI cards (Emissions/Energy/Water) with real MoM trends + sparkline area charts (recharts, 60px, blue stroke #3B82F6), Active Submissions table (Project/Title, Period, Status pill, Completion progress bar, "View All" button), Data Entry Status bar (5 module tiles with progress)
+  - **Center column (25%)**: Recent Activities feed (scrollable, avatar circles with actor initials, status pills, timestamps, Live pulse indicator + 30s auto-refresh polling), Team Submissions (15 seeded team member cards with avatars + roles)
+  - **Right column (17%)**: Analytics mini-charts (donut for emissions by source + bar for monthly energy, h-32), Custom Form Builder (10 draggable element chips: HSD Fuel, Grid kWh, Water m³, etc.), Data Connections (6 data sources with status pills + three-dot menus)
+  - **Real-time polling**: setInterval re-fetches /api/activity every 30s + /api/overview every 60s with mountedRef guard
+  - Loading skeleton + error state + empty state
+
+- Wired into `src/app/page.tsx`: Site users (PROJECT_USER, HR_USER, EHS_USER, PROCUREMENT_USER, CSR_USER, COMPLIANCE_USER) now see the new `SiteUserOverview` dashboard; reviewers/managers/executives still see the `OverviewDashboard` (command center). Role-based dashboard routing.
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: logged in as Project User (Rohit Kumar) → new dashboard renders with all 8 sections: Site Overview, Active Submissions, Data Entry Status, Recent Activities, Team Submissions, Analytics, Form Builder, Data Connections
+- VLM-verified: 3-column asymmetric layout, KPI cards with sparklines, Active Submissions table, Recent Activities feed with avatars, right sidebar with mini charts + form builder + data connections, premium glassmorphism with sky-blue tints
+- Real-time verified: "Live" indicator + "Last sync: 1:24:54 PM · auto-refresh 30s" + /api/activity + /api/overview being polled successfully (200 responses)
+- Real data verified: activities show "Submitted: Gayatri Solar Plant — ENERGY June 2026" with SUBMITTED status
+
+Stage Summary:
+- 1 new dashboard component (site-user-overview.tsx, ~1,218 lines) — exact replica of reference design
+- 3-column asymmetric layout with 8 distinct sections
+- Real-time data: 30s activity polling + 60s KPI polling with Live indicator
+- All data from real APIs (/api/overview, /api/activity, /api/submissions) — no hardcoded values
+- Role-based dashboard routing: site users see the new 3-column dashboard; reviewers/executives see the command center
+- Premium glassmorphism + sky-blue color scheme preserved
+- Ready for next step: apply the same reference design to other role dashboards (reviewer, executive, etc.)
