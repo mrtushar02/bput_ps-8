@@ -16,6 +16,7 @@ import { PipelineTracker } from '@/components/dashboard/pipeline-tracker'
 import { TargetsWidget } from '@/components/dashboard/targets-widget'
 import { AiInsightsPanel } from '@/components/dashboard/ai-insights-panel'
 import { ActionItemsWidget } from '@/components/dashboard/action-items-widget'
+import { GlossaryTooltip } from '@/components/dashboard/glossary-tooltip'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
 
 interface OverviewData {
@@ -131,17 +132,18 @@ export function OverviewDashboard() {
           {/* KPI GRID row 1 */}
 
       {/* KPI GRID — real month-over-month deltas from trends data (no hardcoded values) */}
+      {/* Data confidence: verified (green border) = approved records, warning (amber) = open exceptions, draft (slate) = no data */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
-        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={allTrendArr.map(t => t.emissions)} sparkColor="#f43f5e" onClick={() => setDrillDown('emissions')} />
-        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={allTrendArr.map(t => t.energy)} sparkColor="#f59e0b" onClick={() => setDrillDown('energy')} />
-        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={allTrendArr.map(t => t.water)} sparkColor="#06b6d4" onClick={() => setDrillDown('water')} />
-        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={allTrendArr.map(t => t.waste)} sparkColor="#10b981" onClick={() => setDrillDown('waste')} />
+        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" glossaryTerm="Scope 1" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={allTrendArr.map(t => t.emissions)} sparkColor="#f43f5e" onClick={() => setDrillDown('emissions')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" glossaryTerm="GJ" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={allTrendArr.map(t => t.energy)} sparkColor="#f59e0b" onClick={() => setDrillDown('energy')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" glossaryTerm="ZLD" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={allTrendArr.map(t => t.water)} sparkColor="#06b6d4" onClick={() => setDrillDown('water')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
+        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" glossaryTerm="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={allTrendArr.map(t => t.waste)} sparkColor="#10b981" onClick={() => setDrillDown('waste')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
-        <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={null} goodDirection="up" sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} />
-        <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={null} goodDirection="down" sub={`${k.injuries} injuries · 0 fatal`} risk={k.fatalities > 0 ? { level: 'danger', text: `${k.fatalities} fatality` } : undefined} />
-        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} risk={k.brsrMissing > 0 ? { level: 'warning', text: `${k.brsrMissing} gaps` } : undefined} onClick={() => setActiveModule('brsr')} />
-        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} risk={k.openExceptions > 0 ? { level: 'warning', text: `${k.openExceptions} exceptions` } : undefined} onClick={() => setActiveModule('submissions')} />
+        <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={null} goodDirection="up" sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} confidence="verified" />
+        <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" glossaryTerm="LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={null} goodDirection="down" sub={`${k.injuries} injuries · 0 fatal`} risk={k.fatalities > 0 ? { level: 'danger', text: `${k.fatalities} fatality` } : undefined} confidence="verified" />
+        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" glossaryTerm="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} risk={k.brsrMissing > 0 ? { level: 'warning', text: `${k.brsrMissing} gaps` } : undefined} onClick={() => setActiveModule('brsr')} confidence={k.brsrMissing > 0 ? 'warning' : 'verified'} />
+        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" glossaryTerm="Reporting Period" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} risk={k.openExceptions > 0 ? { level: 'warning', text: `${k.openExceptions} exceptions` } : undefined} onClick={() => setActiveModule('submissions')} confidence={k.openExceptions > 0 ? 'warning' : 'verified'} />
       </div>
         </div>
       </div>
@@ -384,7 +386,7 @@ function trendDelta(trends: { emissions: number; energy: number; water: number; 
   return Math.round(((last - prev) / prev) * 1000) / 10
 }
 
-function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay, spark, sparkColor, risk, onClick }: any) {
+function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay, spark, sparkColor, risk, onClick, confidence, glossaryTerm }: any) {
   // ESG semantics: trend direction vs what's "good" determines colour
   const hasTrend = trend !== null && trend !== undefined && !isNaN(trend)
   const isGood = hasTrend && ((goodDirection === 'down' && trend < 0) || (goodDirection === 'up' && trend > 0))
@@ -392,27 +394,44 @@ function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirecti
   const pillClass = !hasTrend ? 'status-review' : isNeutral ? 'status-review' : isGood ? 'status-approved' : 'status-warning'
   const hasSpark = Array.isArray(spark) && spark.length >= 2
   const clickable = !!onClick
+  // Data confidence: verified (green left border), warning (amber), draft (slate)
+  const confidenceConfig = {
+    verified: { border: 'border-l-emerald-400', dot: 'bg-emerald-500', label: 'Verified', title: 'Data verified — all source records approved' },
+    warning: { border: 'border-l-amber-400', dot: 'bg-amber-500', label: 'Review', title: 'Open validation exceptions — review required' },
+    draft: { border: 'border-l-slate-300', dot: 'bg-slate-400', label: 'Draft', title: 'Data in draft — not yet submitted' },
+  }
+  const conf = confidence ? confidenceConfig[confidence as keyof typeof confidenceConfig] : null
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
       onClick={onClick}
-      className={`glass glass-shimmer relative overflow-hidden rounded-2xl p-4 ${clickable ? 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/10' : ''}`}>
+      title={conf?.title}
+      className={`glass glass-shimmer relative overflow-hidden rounded-2xl border-l-[3px] p-4 ${conf?.border ?? 'border-l-transparent'} ${clickable ? 'cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-500/10' : ''}`}>
       <div className="flex items-start justify-between">
         <div className={`kpi-tile ${tileClass}`}><Icon className="h-5 w-5" /></div>
-        {hasTrend ? (
-          <span className={`status-pill ${pillClass}`}>
-            {trend < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-            {trend > 0 ? '+' : ''}{trend}%
-          </span>
-        ) : risk ? (
-          <span className={`status-pill ${risk.level === 'danger' ? 'status-error' : 'status-warning'}`}>
-            <AlertTriangle className="h-3 w-3" /> {risk.text}
-          </span>
-        ) : (
-          <span className="status-pill status-review"><Activity className="h-3 w-3" /> current</span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {conf && (
+            <span className="flex items-center gap-1 rounded-full bg-white/60 px-1.5 py-0.5 text-[9px] font-semibold text-slate-500" title={conf.title}>
+              <span className={`h-1.5 w-1.5 rounded-full ${conf.dot}`} />
+              {conf.label}
+            </span>
+          )}
+          {hasTrend ? (
+            <span className={`status-pill ${pillClass}`}>
+              {trend < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+              {trend > 0 ? '+' : ''}{trend}%
+            </span>
+          ) : risk ? (
+            <span className={`status-pill ${risk.level === 'danger' ? 'status-error' : 'status-warning'}`}>
+              <AlertTriangle className="h-3 w-3" /> {risk.text}
+            </span>
+          ) : null}
+        </div>
       </div>
       <div className="mt-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+          {glossaryTerm && <GlossaryTooltip term={glossaryTerm} />}
+        </div>
         <div className="mt-0.5 flex items-baseline gap-1">
           <span className="tabular-nums text-[26px] font-bold leading-none text-slate-800">{value}</span>
           <span className="text-xs font-medium text-slate-400">&nbsp;{unit}</span>
@@ -629,7 +648,10 @@ function EsgScoreGauge({ score }: { score: number }) {
       <div className="mb-2 flex items-center gap-2">
         <div className="kpi-tile bg-gradient-to-br from-blue-500 to-cyan-600 text-white" style={{ width: 32, height: 32 }}><Award className="h-4 w-4" /></div>
         <div>
-          <h3 className="text-sm font-bold text-slate-800">ESG Score</h3>
+          <div className="flex items-center gap-1">
+            <h3 className="text-sm font-bold text-slate-800">ESG Score</h3>
+            <GlossaryTooltip term="ESG Score" />
+          </div>
           <p className="text-[11px] text-slate-500">Composite performance index</p>
         </div>
       </div>

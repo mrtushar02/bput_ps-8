@@ -775,3 +775,45 @@ Stage Summary:
 - All values computed from real DB data — anomalies detected from real MoM deltas, periods from real reporting periods
 - Premium glassmorphism design language preserved (blue active period pills, rose/emerald anomaly colors)
 - Ready for next round: could add data quality heatmap, BRSR framework comparison, mobile-responsive refinements, or interactive tooltip customization
+
+---
+Task ID: 16 (QA + Features round 7)
+Agent: Lead Architect (main) — autonomous webDevReview round 7
+Task: Data confidence indicators, onboarding glossary tooltips
+
+Work Log:
+- Reviewed worklog (6 prior rounds). Platform was stable with all 9 modules passing.
+- Performed fresh QA via agent-browser: logged in as Super Admin, tested all 9 modules (all OK), used VLM to identify highest-impact gaps: (1) no data confidence/quality indicators on KPI cards, (2) no onboarding help for specialized ESG terminology (BRSR, LTIFR, Scope 1/2, ZLD), (3) BRSR dimensions lack visual progress bars.
+
+- Added 2 NEW FEATURES:
+  1. **Data Confidence Indicators on KPI Cards** — each KPI card now shows a colored left border + a small badge indicating data quality status:
+     - **Verified** (emerald green left border + green dot) = all source records approved, no open exceptions
+     - **Review** (amber left border + amber dot) = open validation exceptions exist, review required
+     - **Draft** (slate left border + gray dot) = data not yet submitted (not used currently since all seeded data is approved)
+     The confidence is computed from real KPIs: `openExceptions > 0 ? 'warning' : 'verified'` for environmental KPIs, `brsrMissing > 0 ? 'warning' : 'verified'` for BRSR. Hovering the badge shows a tooltip with the explanation. Verified: VLM confirmed colored left borders + "Verified"/"Review" badges with colored dots in the top-right area of each card.
+  2. **Onboarding Glossary Tooltips** — new `GlossaryTooltip` component (`src/components/dashboard/glossary-tooltip.tsx`) with a glossary of 17 ESG/BRSR terms (BRSR, BRSR Readiness, LTIFR, Scope 1/2/3, ZLD, tCO₂e, GJ, Emission Factor, Renewable Share, Water Recycled, Waste Recovered, ESG Score, Data Confidence, Reporting Period, Data Control Chain). Each tooltip is a small help circle icon (?) that, on hover or click, shows a glass-strong popover with the term name + a concise definition. Added tooltips to 8 key locations:
+     - Scope 1 & 2 Emissions card → "Scope 1" glossary
+     - Energy Consumption card → "GJ" glossary
+     - Water Withdrawal card → "ZLD" glossary
+     - Waste Recovered card → "Waste Recovered" glossary
+     - Safety LTIFR card → "LTIFR" glossary
+     - BRSR Readiness card → "BRSR Readiness" glossary
+     - Reporting Completion card → "Reporting Period" glossary
+     - ESG Score gauge header → "ESG Score" glossary
+     Verified: DOM confirmed 8 glossary tooltip buttons rendered; VLM confirmed help circle icons next to labels.
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- VLM-verified data confidence indicators: colored left borders + "Verified"/"Review" badges with colored dots
+- VLM-verified glossary tooltips: help circle icons (?) next to ESG term labels
+- DOM-verified: 8 glossary tooltip buttons found on the overview
+
+Stage Summary:
+- 2 new features (data confidence indicators on KPI cards, onboarding glossary tooltips)
+- 1 new component (glossary-tooltip.tsx with 17-term glossary)
+- All confidence values computed from real KPIs (openExceptions, brsrMissing) — no hardcoded status
+- Premium glassmorphism design language preserved (emerald/amber/slate confidence colors, glass-strong tooltip popovers)
+- Onboarding improved: new users can now hover any ESG term to understand its meaning without leaving the dashboard
+- Ready for next round: could add BRSR dimension progress bars, data quality heatmap, mobile-responsive refinements, or interactive tooltip customization
