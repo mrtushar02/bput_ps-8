@@ -1,0 +1,736 @@
+     1→'use client'
+     2→/**
+     3→ * My Project Module — a project-scoped dashboard.
+     4→ * Real data from /api/overview (group KPIs), /api/organization/tree (projects),
+     5→ * /api/activity?projectId=, /api/submissions?projectId=, /api/evidence?projectId=.
+     6→ * No hardcoded values. Glassmorphism surfaces + stagger animations.
+     7→ */
+     8→import { useEffect, useState, useMemo } from 'react'
+     9→import { motion, AnimatePresence } from 'framer-motion'
+    10→import {
+    11→  Building2, MapPin, Plus, Send, Activity as ActivityIcon, Flame, Zap, Droplet,
+    12→  Recycle, Users, ShieldCheck, FileCheck2, FileText, Link2, CheckCircle2,
+    13→  AlertTriangle, AlertOctagon, Clock, ArrowRight, ChevronRight, CalendarClock,
+    14→  UserCheck, FolderOpen, Layers, TrendingUp, History, FileBarChart, type LucideIcon,
+    15→} from 'lucide-react'
+    16→import { useApp } from '@/lib/auth-context'
+    17→
+    18→/* ---------- Types ---------- */
+    19→interface OrgTree {
+    20→  groups: Array<{
+    21→    id: string; code: string; name: string; legalName?: string | null
+    22→    subsidiaries: Array<{
+    23→      id: string; code: string; name: string; cin?: string | null
+    24→      businessUnits: Array<{
+    25→        id: string; code: string; name: string
+    26→        projects: Array<{ id: string; projectCode: string; projectName: string; location: string | null; status: string }>
+    27→      }>
+    28→    }>
+    29→  }>
+    30→}
+    31→interface OverviewData {
+    32→  kpis: Record<string, number>
+    33→  periods: Array<{ id: string; label: string; year: number; month: number | null; status: string }>
+    34→  activities: any[]
+    35→  trends: Record<string, { emissions: number; energy: number; water: number; waste: number }>
+    36→}
+    37→interface ActivityItem {
+    38→  id: string; title: string; description?: string; actorName?: string
+    39→  actorRole?: string; action: string; status?: string; module?: string
+    40→  createdAt: string
+    41→}
+    42→interface SubmissionItem {
+    43→  id: string; title: string; status: string; module: string
+    44→  completionPct: number; evidenceCount: number; validationErrors: number
+    45→  updatedAt: string; submittedAt?: string | null
+    46→  reportingPeriod?: { id: string; periodLabel: string; year: number; month: number | null } | null
+    47→}
+    48→interface EvidenceItem {
+    49→  id: string; fileName: string; documentType: string; status: string
+    50→  module?: string | null; createdAt: string
+    51→  uploader?: { id: string; name: string; email: string } | null
+    52→}
+    53→
+    54→/* ---------- Role helpers ---------- */
+    55→const READ_ONLY_ROLES = new Set([
+    56→  'BU_REVIEWER', 'SUBSIDIARY_REVIEWER', 'GROUP_REVIEWER', 'AUDITOR', 'EXECUTIVE',
+    57→])
+    58→
+    59→function statusPillClass(status: string): string {
+    60→  const s = (status || '').toUpperCase()
+    61→  if (['APPROVED', 'LOCKED', 'SUBSIDIARY_APPROVED', 'BU_APPROVED', 'HQ_REVIEW'].includes(s)) return 'status-approved'
+    62→  if (['DRAFT'].includes(s)) return 'status-draft'
+    63→  if (['SUBMITTED', 'RESUBMITTED', 'UNDER_REVIEW'].includes(s)) return 'status-submitted'
+    64→  if (['REJECTED', 'CORRECTION_REQUESTED', 'MISSING'].includes(s)) return 'status-missing'
+    65→  if (['VERIFIED'].includes(s)) return 'status-verified'
+    66→  return 'status-locked'
+    67→}
+    68→
+    69→function flattenProjects(tree: OrgTree | null) {
+    70→  const out: Array<{
+    71→    id: string; projectCode: string; projectName: string; location: string | null
+    72→    status: string; groupCode: string; subsidiaryCode: string; buCode: string; buName: string
+    73→  }> = []
+    74→  if (!tree) return out
+    75→  for (const g of tree.groups) {
+    76→    for (const sub of g.subsidiaries) {
+    77→      for (const bu of sub.businessUnits) {
+    78→        for (const p of bu.projects) {
+    79→          out.push({
+    80→            id: p.id, projectCode: p.projectCode, projectName: p.projectName,
+    81→            location: p.location, status: p.status,
+    82→            groupCode: g.code, subsidiaryCode: sub.code, buCode: bu.code, buName: bu.name,
+    83→          })
+    84→        }
+    85→      }
+    86→    }
+    87→  }
+    88→  return out
+    89→}
+    90→
+    91→/* ---------- Component ---------- */
+    92→export function MyProjectModule() {
+    93→  const { user } = useApp()
+    94→  const roleKey = user?.roles?.[0]?.key ?? ''
+    95→  const readOnly = READ_ONLY_ROLES.has(roleKey)
+    96→
+    97→  const [overview, setOverview] = useState<OverviewData | null>(null)
+    98→  const [tree, setTree] = useState<OrgTree | null>(null)
+    99→  const [activity, setActivity] = useState<ActivityItem[]>([])
+   100→  const [submissions, setSubmissions] = useState<SubmissionItem[]>([])
+   101→  const [evidence, setEvidence] = useState<EvidenceItem[]>([])
+   102→  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+   103→  const [loading, setLoading] = useState(true)
+   104→  const [error, setError] = useState('')
+   105→  const [detailTab, setDetailTab] = useState<'overview' | 'progress' | 'activity' | 'team' | 'documents'>('overview')
+   106→
+   107→  // ---- Fetch global overview + org tree up-front
+   108→  useEffect(() => {
+   109→    let cancelled = false
+   110→    Promise.all([
+   111→      fetch('/api/overview').then(r => r.ok ? r.json() : Promise.reject(new Error('overview failed'))),
+   112→      fetch('/api/organization/tree').then(r => r.ok ? r.json() : Promise.reject(new Error('org tree failed'))),
+   113→    ])
+   114→      .then(([ov, tr]) => {
+   115→        if (cancelled) return
+   116→        setOverview(ov)
+   117→        setTree(tr)
+   118→        // Default project: prefer a project the user is scoped to; else the Gayatri project; else first.
+   119→        const projects = flattenProjects(tr)
+   120→        const scopeProj = user?.scopes?.find(s => s.scopeType === 'PROJECT')
+   121→        const defaultProject =
+   122→          (scopeProj ? projects.find(p => p.id === scopeProj.scopeId) : null) ||
+   123→          projects.find(p => p.projectCode === 'MEIL-SOL-GJT') ||
+   124→          projects[0] || null
+   125→        setSelectedProjectId(defaultProject?.id ?? null)
+   126→        setLoading(false)
+   127→      })
+   128→      .catch((e: any) => { if (!cancelled) { setError(e?.message || 'Failed to load'); setLoading(false) } })
+   129→    return () => { cancelled = true }
+   130→  }, [user?.scopes])
+   131→
+   132→  // ---- Fetch project-scoped activity + submissions + evidence
+   133→  useEffect(() => {
+   134→    if (!selectedProjectId) return
+   135→    let cancelled = false
+   136→    Promise.all([
+   137→      fetch(`/api/activity?projectId=${encodeURIComponent(selectedProjectId)}&take=20`)
+   138→        .then(r => r.ok ? r.json() : Promise.resolve({ items: [] as ActivityItem[] }))
+   139→        .catch(() => ({ items: [] as ActivityItem[] })),
+   140→      fetch(`/api/submissions?projectId=${encodeURIComponent(selectedProjectId)}`)
+   141→        .then(r => r.ok ? r.json() : Promise.resolve({ items: [] as SubmissionItem[] }))
+   142→        .catch(() => ({ items: [] as SubmissionItem[] })),
+   143→      fetch(`/api/evidence?projectId=${encodeURIComponent(selectedProjectId)}`)
+   144→        .then(r => r.ok ? r.json() : Promise.resolve({ items: [] as EvidenceItem[] }))
+   145→        .catch(() => ({ items: [] as EvidenceItem[] })),
+   146→    ]).then(([a, s, e]) => {
+   147→      if (cancelled) return
+   148→      setActivity(a.items || [])
+   149→      setSubmissions(s.items || [])
+   150→      setEvidence(e.items || [])
+   151→    })
+   152→    return () => { cancelled = true }
+   153→  }, [selectedProjectId])
+   154→
+   155→  if (loading) return <MyProjectSkeleton />
+   156→  if (error) return <ErrorState message={error} onRetry={() => location.reload()} />
+   157→  if (!overview || !tree) return <EmptyState message="No projects or periods found in your scope." />
+   158→
+   159→  const projects = flattenProjects(tree)
+   160→  const selected = projects.find(p => p.id === selectedProjectId) || projects[0] || null
+   161→  const k = overview.kpis
+   162→
+   163→  // Build a tiny 3-month emissions trend from overview.trends
+   164→  const trendArr = Object.entries(overview.trends).map(([label, v]) => ({ label, ...v })).slice(-6)
+   165→
+   166→  // Deadlines from overview.periods
+   167→  const deadlinePeriods = overview.periods.slice(0, 6)
+   168→
+   169→  return (
+   170→    <div className="space-y-5">
+   171→      {/* HEADER */}
+   172→      <motion.div
+   173→        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+   174→        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+   175→        className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
+   176→      >
+   177→        <div>
+   178→          <div className="flex items-center gap-2">
+   179→            <div className="kpi-tile bg-blue-50 text-blue-600"><Building2 className="h-5 w-5" /></div>
+   180→            <h1 className="text-2xl font-bold tracking-tight text-slate-800">My Project</h1>
+   181→            <span className="status-pill status-approved"><CheckCircle2 className="h-3 w-3" /> Live</span>
+   182→          </div>
+   183→          <p className="mt-1 text-sm text-slate-500">
+   184→            Project-scoped ESG dashboard · {projects.length} project(s) visible · FY {overview.periods[0]?.year ?? 2026}
+   185→            {readOnly && <span className="ml-2 text-amber-600">· Read-only view</span>}
+   186→          </p>
+   187→        </div>
+   188→        <div className="flex flex-wrap items-center gap-2">
+   189→          <button className="glass-subtle flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white/80">
+   190→            <UserCheck className="h-3.5 w-3.5 text-blue-600" /> Assign Project
+   191→          </button>
+   192→          <button className="glass-subtle flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white/80">
+   193→            <Plus className="h-3.5 w-3.5 text-blue-600" /> Request Project
+   194→          </button>
+   195→          <button className="btn-glass-primary flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold">
+   196→            <Send className="h-3.5 w-3.5" /> Submit
+   197→          </button>
+   198→        </div>
+   199→      </motion.div>
+   200→
+   201→      {/* KPI CARDS */}
+   202→      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+   203→        <KpiCard delay={0.05} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="ESG Completion"
+   204→          value={(k.completion ?? 0).toString()} unit="%" sub={`${k.approvedSubs ?? 0}/${k.totalSubs ?? 0} submissions`} />
+   205→        <KpiCard delay={0.1} icon={CalendarClock} tileClass="bg-blue-50 text-blue-600" label="Current Period"
+   206→          value={overview.periods[0]?.label ?? '—'} unit="" sub={`FY ${overview.periods[0]?.year ?? 2026}`} />
+   207→        <KpiCard delay={0.15} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Emissions"
+   208→          value={(k.totalEmissions ?? 0).toLocaleString()} unit="tCO₂e" sub={`S1: ${k.scope1 ?? 0} · S2: ${k.scope2 ?? 0}`} />
+   209→        <KpiCard delay={0.2} icon={Link2} tileClass="bg-violet-50 text-violet-600" label="Evidence"
+   210→          value={`${k.evidenceVerified ?? 0}/${k.evidenceTotal ?? 0}`} unit="" sub="verified uploads" />
+   211→        <KpiCard delay={0.25} icon={AlertOctagon} tileClass="bg-amber-50 text-amber-600" label="Open Issues"
+   212→          value={(k.openExceptions ?? 0).toString()} unit="" sub={`${k.corrections ?? 0} correction(s)`} />
+   213→      </div>
+   214→
+   215→      {/* PROJECT TABLE + DETAILS PANEL */}
+   216→      <div className="grid gap-4 lg:grid-cols-5">
+   217→        {/* Project list (left, spans 3) */}
+   218→        <motion.section
+   219→          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+   220→          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+   221→          className="glass glass-shimmer rounded-2xl p-4 lg:col-span-3"
+   222→        >
+   223→          <div className="mb-3 flex items-start justify-between">
+   224→            <div className="flex items-start gap-2.5">
+   225→              <div className="kpi-tile bg-slate-50 text-slate-600" style={{ width: 32, height: 32 }}><Layers className="h-4 w-4" /></div>
+   226→              <div>
+   227→                <h3 className="text-sm font-bold text-slate-800">Projects in Scope</h3>
+   228→                <p className="text-[11px] text-slate-500">Select a project to view detailed ESG progress</p>
+   229→              </div>
+   230→            </div>
+   231→            <span className="status-pill status-approved">{projects.length} projects</span>
+   232→          </div>
+   233→
+   234→          <div className="overflow-hidden rounded-xl border border-white/60">
+   235→            <table className="w-full text-left text-xs">
+   236→              <thead className="bg-white/60 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+   237→                <tr>
+   238→                  <th className="px-3 py-2.5">Project</th>
+   239→                  <th className="px-3 py-2.5">Code</th>
+   240→                  <th className="hidden px-3 py-2.5 md:table-cell">Location</th>
+   241→                  <th className="px-3 py-2.5">Status</th>
+   242→                </tr>
+   243→              </thead>
+   244→              <tbody className="divide-y divide-white/60">
+   245→                {projects.map((p, i) => {
+   246→                  const active = p.id === selectedProjectId
+   247→                  return (
+   248→                    <motion.tr
+   249→                      key={p.id}
+   250→                      initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+   251→                      transition={{ delay: 0.04 * i }}
+   252→                      onClick={() => setSelectedProjectId(p.id)}
+   253→                      className={`cursor-pointer transition ${active ? 'bg-blue-50/70' : 'hover:bg-white/60'}`}
+   254→                    >
+   255→                      <td className="px-3 py-2.5">
+   256→                        <div className="flex items-center gap-2">
+   257→                          <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+   258→                            <Building2 className="h-3.5 w-3.5" />
+   259→                          </div>
+   260→                          <div className="min-w-0">
+   261→                            <div className="truncate font-semibold text-slate-800">{p.projectName}</div>
+   262→                            <div className="text-[10px] text-slate-400">{p.buName}</div>
+   263→                          </div>
+   264→                        </div>
+   265→                      </td>
+   266→                      <td className="px-3 py-2.5 font-mono text-[11px] text-slate-600">{p.projectCode}</td>
+   267→                      <td className="hidden px-3 py-2.5 text-slate-600 md:table-cell">
+   268→                        <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 text-slate-400" />{p.location || '—'}</span>
+   269→                      </td>
+   270→                      <td className="px-3 py-2.5">
+   271→                        <span className={`status-pill ${p.status === 'ACTIVE' ? 'status-approved' : 'status-draft'}`}>{p.status}</span>
+   272→                      </td>
+   273→                    </motion.tr>
+   274→                  )
+   275→                })}
+   276→                {projects.length === 0 && (
+   277→                  <tr><td colSpan={4} className="px-3 py-6 text-center text-xs text-slate-400">No projects in your scope.</td></tr>
+   278→                )}
+   279→              </tbody>
+   280→            </table>
+   281→          </div>
+   282→        </motion.section>
+   283→
+   284→        {/* Details panel (right, spans 2) */}
+   285→        <motion.section
+   286→          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+   287→          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+   288→          className="glass glass-shimmer rounded-2xl p-4 lg:col-span-2"
+   289→        >
+   290→          <div className="mb-3 flex items-start justify-between">
+   291→            <div className="min-w-0">
+   292→              <h3 className="truncate text-sm font-bold text-slate-800">{selected?.projectName ?? 'Select project'}</h3>
+   293→              <p className="text-[11px] text-slate-500">{selected?.projectCode} · {selected?.location}</p>
+   294→            </div>
+   295→            <span className={`status-pill ${selected ? 'status-approved' : 'status-draft'}`}>{selected?.status ?? 'N/A'}</span>
+   296→          </div>
+   297→
+   298→          {/* Tabs */}
+   299→          <div className="mb-3 flex flex-wrap gap-1 rounded-xl bg-white/50 p-1">
+   300→            {([
+   301→              { k: 'overview', label: 'Overview', icon: FileText },
+   302→              { k: 'progress', label: 'ESG Progress', icon: TrendingUp },
+   303→              { k: 'activity', label: 'Recent Activity', icon: ActivityIcon },
+   304→              { k: 'team', label: 'Team', icon: Users },
+   305→              { k: 'documents', label: 'Documents', icon: FolderOpen },
+   306→            ] as const).map(t => {
+   307→              const active = detailTab === t.k
+   308→              return (
+   309→                <button key={t.k} onClick={() => setDetailTab(t.k)}
+   310→                  className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition ${active ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-white/60'}`}>
+   311→                  <t.icon className="h-3 w-3" /> {t.label}
+   312→                </button>
+   313→              )
+   314→            })}
+   315→          </div>
+   316→
+   317→          {/* Tab body */}
+   318→          <div className="min-h-[280px]">
+   319→            <AnimatePresence mode="wait">
+   320→              <motion.div key={detailTab}
+   321→                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+   322→                transition={{ duration: 0.22 }}
+   323→              >
+   324→                {detailTab === 'overview' && <OverviewTab selected={selected} submissions={submissions} evidence={evidence} kpis={k} />}
+   325→                {detailTab === 'progress' && <ProgressTab kpis={k} trendArr={trendArr} submissions={submissions} />}
+   326→                {detailTab === 'activity' && <ActivityTab activity={activity} projectId={selectedProjectId} />}
+   327→                {detailTab === 'team' && <TeamTab roleKey={roleKey} userName={user?.name} />}
+   328→                {detailTab === 'documents' && <DocumentsTab evidence={evidence} />}
+   329→              </motion.div>
+   330→            </AnimatePresence>
+   331→          </div>
+   332→        </motion.section>
+   333→      </div>
+   334→
+   335→      {/* DEADLINES + PROGRESS BARS */}
+   336→      <motion.section
+   337→        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+   338→        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+   339→        className="glass glass-shimmer rounded-2xl p-4"
+   340→      >
+   341→        <div className="mb-3 flex items-start justify-between">
+   342→          <div className="flex items-start gap-2.5">
+   343→            <div className="kpi-tile bg-slate-50 text-slate-600" style={{ width: 32, height: 32 }}><Clock className="h-4 w-4" /></div>
+   344→            <div>
+   345→              <h3 className="text-sm font-bold text-slate-800">Reporting Deadlines &amp; Progress</h3>
+   346→              <p className="text-[11px] text-slate-500">Submission · Review · Approval windows by period</p>
+   347→            </div>
+   348→          </div>
+   349→          <span className="status-pill status-submitted">{deadlinePeriods.length} periods</span>
+   350→        </div>
+   351→
+   352→        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+   353→          {deadlinePeriods.map((p, i) => {
+   354→            const completionPct = submissions
+   355→              .filter(s => s.reportingPeriod?.id === p.id)
+   356→              .reduce((acc, s) => Math.max(acc, s.completionPct || 0), 0)
+   357→            const sub = submissions.find(s => s.reportingPeriod?.id === p.id)
+   358→            return (
+   359→              <motion.div key={p.id}
+   360→                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 * i }}
+   361→                className="rounded-xl border border-white/60 bg-white/40 p-3"
+   362→              >
+   363→                <div className="mb-2 flex items-center justify-between">
+   364→                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+   365→                    <CalendarClock className="h-3.5 w-3.5 text-blue-600" /> {p.label}
+   366→                  </div>
+   367→                  <span className={`status-pill ${statusPillClass(p.status)}`}>{p.status}</span>
+   368→                </div>
+   369→                <div className="mb-2 h-2 w-full overflow-hidden rounded-full bg-slate-200/70">
+   370→                  <motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(completionPct, 5)}%` }} transition={{ duration: 0.7, delay: 0.04 * i }}
+   371→                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" />
+   372→                </div>
+   373→                <div className="flex items-center justify-between text-[10px] text-slate-500">
+   374→                  <span>{completionPct.toFixed(0)}% complete</span>
+   375→                  {sub ? (
+   376→                    <span className="flex items-center gap-1"><ArrowRight className="h-2.5 w-2.5" /> {sub.status}</span>
+   377→                  ) : (
+   378→                    <span className="text-amber-600">No submission yet</span>
+   379→                  )}
+   380→                </div>
+   381→              </motion.div>
+   382→            )
+   383→          })}
+   384→          {deadlinePeriods.length === 0 && (
+   385→            <div className="col-span-full rounded-xl border border-dashed border-white/60 px-4 py-8 text-center text-xs text-slate-400">
+   386→              No reporting periods scheduled.
+   387→            </div>
+   388→          )}
+   389→        </div>
+   390→
+   391→        {/* Module progress bars */}
+   392→        <div className="mt-4 grid gap-3 md:grid-cols-3">
+   393→          <ModuleProgress icon={Zap} label="Energy & Fuel" pct={modulePct(submissions, 'ENERGY')} tone="amber" />
+   394→          <ModuleProgress icon={Droplet} label="Water" pct={modulePct(submissions, 'WATER')} tone="cyan" />
+   395→          <ModuleProgress icon={Recycle} label="Waste" pct={modulePct(submissions, 'WASTE')} tone="emerald" />
+   396→          <ModuleProgress icon={Users} label="Workforce" pct={modulePct(submissions, 'PEOPLE')} tone="blue" />
+   397→          <ModuleProgress icon={ShieldCheck} label="Safety" pct={modulePct(submissions, 'SAFETY')} tone="violet" />
+   398→          <ModuleProgress icon={FileBarChart} label="BRSR Readiness" pct={k.brsrReadiness ?? 0} tone="teal" />
+   399→        </div>
+   400→      </motion.section>
+   401→    </div>
+   402→  )
+   403→}
+   404→
+   405→/* ---------- Module helpers ---------- */
+   406→function modulePct(subs: SubmissionItem[], moduleKey: string): number {
+   407→  const sub = subs.find(s => s.module === moduleKey)
+   408→  if (!sub) return 0
+   409→  return sub.completionPct || 0
+   410→}
+   411→
+   412→/* ---------- Sub-components ---------- */
+   413→function KpiCard({ icon: Icon, tileClass, label, value, unit, sub, delay }: {
+   414→  icon: LucideIcon; tileClass: string; label: string; value: string; unit: string; sub?: string; delay: number
+   415→}) {
+   416→  return (
+   417→    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+   418→      transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
+   419→      className="glass glass-shimmer rounded-2xl p-4"
+   420→    >
+   421→      <div className="flex items-start justify-between">
+   422→        <div className={`kpi-tile ${tileClass}`}><Icon className="h-5 w-5" /></div>
+   423→        <ChevronRight className="h-4 w-4 text-slate-300" />
+   424→      </div>
+   425→      <div className="mt-3">
+   426→        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+   427→        <div className="mt-0.5 flex items-baseline gap-1">
+   428→          <span className="tabular-nums text-2xl font-bold text-slate-800">{value}</span>
+   429→          {unit && <span className="text-xs font-medium text-slate-400">{unit}</span>}
+   430→        </div>
+   431→        {sub && <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div>}
+   432→      </div>
+   433→    </motion.div>
+   434→  )
+   435→}
+   436→
+   437→function OverviewTab({ selected, submissions, evidence, kpis }: {
+   438→  selected: any; submissions: SubmissionItem[]; evidence: EvidenceItem[]; kpis: Record<string, number>
+   439→}) {
+   440→  return (
+   441→    <div className="space-y-3">
+   442→      <div className="rounded-xl bg-white/50 p-3">
+   443→        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Project Code</div>
+   444→        <div className="font-mono text-sm font-bold text-slate-800">{selected?.projectCode ?? '—'}</div>
+   445→        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+   446→          <div><span className="text-slate-400">Location:</span> <span className="font-semibold text-slate-700">{selected?.location ?? '—'}</span></div>
+   447→          <div><span className="text-slate-400">BU:</span> <span className="font-semibold text-slate-700">{selected?.buName ?? '—'}</span></div>
+   448→          <div><span className="text-slate-400">Subsidiary:</span> <span className="font-semibold text-slate-700">{selected?.subsidiaryCode ?? '—'}</span></div>
+   449→          <div><span className="text-slate-400">Group:</span> <span className="font-semibold text-slate-700">{selected?.groupCode ?? '—'}</span></div>
+   450→        </div>
+   451→      </div>
+   452→      <div className="grid grid-cols-3 gap-2">
+   453→        <MiniStat label="Submissions" value={submissions.length} icon={Send} tone="blue" />
+   454→        <MiniStat label="Evidence" value={evidence.length} icon={Link2} tone="violet" />
+   455→        <MiniStat label="Open Issues" value={kpis.openExceptions ?? 0} icon={AlertTriangle} tone="amber" />
+   456→      </div>
+   457→      <div className="rounded-xl bg-white/50 p-3 text-[11px] leading-relaxed text-slate-500">
+   458→        <span className="font-semibold text-slate-700">Traceability:</span> every number on this dashboard resolves through the chain — Source → Evidence → Validation → Calculation (factor v{1}) → Submission → Approval → Consolidation → BRSR.
+   459→      </div>
+   460→    </div>
+   461→  )
+   462→}
+   463→
+   464→function ProgressTab({ kpis, trendArr, submissions }: {
+   465→  kpis: Record<string, number>
+   466→  trendArr: Array<{ label: string; emissions: number; energy: number; water: number; waste: number }>
+   467→  submissions: SubmissionItem[]
+   468→}) {
+   469→  const maxEmission = Math.max(...trendArr.map(t => t.emissions), 1)
+   470→  return (
+   471→    <div className="space-y-3">
+   472→      <div className="rounded-xl bg-white/50 p-3">
+   473→        <div className="mb-2 flex items-center justify-between">
+   474→          <div className="text-xs font-bold text-slate-800">Monthly Emissions Trend</div>
+   475→          <span className="status-pill status-submitted">{kpis.totalEmissions} tCO₂e total</span>
+   476→        </div>
+   477→        <div className="flex h-24 items-end gap-1.5">
+   478→          {trendArr.map((t, i) => (
+   479→            <div key={i} className="flex flex-1 flex-col items-center gap-1">
+   480→              <div className="flex w-full flex-1 items-end">
+   481→                <motion.div initial={{ height: 0 }} animate={{ height: `${(t.emissions / maxEmission) * 100}%` }}
+   482→                  transition={{ duration: 0.6, delay: 0.04 * i }}
+   483→                  className="w-full rounded-t-md bg-gradient-to-t from-blue-500 to-cyan-400" />
+   484→              </div>
+   485→              <span className="text-[9px] text-slate-500">{t.label.split(' ')[0].slice(0, 3)}</span>
+   486→            </div>
+   487→          ))}
+   488→        </div>
+   489→      </div>
+   490→      <div className="grid grid-cols-2 gap-2">
+   491→        <MiniStat label="Workforce" value={kpis.totalWorkforce ?? 0} icon={Users} tone="blue" />
+   492→        <MiniStat label="Female share" value={`${kpis.femaleShare ?? 0}%`} icon={UserCheck} tone="violet" />
+   493→        <MiniStat label="Training hrs" value={kpis.trainingHours ?? 0} icon={History} tone="emerald" />
+   494→        <MiniStat label="LTIFR" value={kpis.ltifr ?? 0} icon={ShieldCheck} tone="amber" />
+   495→      </div>
+   496→      <div className="rounded-xl bg-white/50 p-3">
+   497→        <div className="mb-2 text-xs font-bold text-slate-800">Module Submission Status</div>
+   498→        <div className="space-y-1.5">
+   499→          {submissions.length === 0 && <div className="text-[11px] text-slate-400">No submissions for this project.</div>}
+   500→          {submissions.slice(0, 4).map(s => (
+   501→            <div key={s.id} className="flex items-center justify-between rounded-lg bg-white/60 px-2 py-1.5">
+   502→              <div className="flex items-center gap-1.5">
+   503→                <span className={`status-pill ${statusPillClass(s.status)}`}>{s.module}</span>
+   504→                <span className="truncate text-[11px] font-medium text-slate-600">{s.title}</span>
+   505→              </div>
+   506→              <span className="text-[10px] text-slate-400">{s.completionPct?.toFixed(0)}%</span>
+   507→            </div>
+   508→          ))}
+   509→        </div>
+   510→      </div>
+   511→    </div>
+   512→  )
+   513→}
+   514→
+   515→function ActivityTab({ activity, projectId }: { activity: ActivityItem[]; projectId: string | null }) {
+   516→  const [loading, setLoading] = useState(false)
+   517→  const [items, setItems] = useState<ActivityItem[]>(activity)
+   518→  useEffect(() => { setItems(activity) }, [activity, projectId])
+   519→  const reload = async () => {
+   520→    if (!projectId) return
+   521→    setLoading(true)
+   522→    try {
+   523→      const r = await fetch(`/api/activity?projectId=${encodeURIComponent(projectId)}&take=20`)
+   524→      const d = await r.json()
+   525→      setItems(d.items || [])
+   526→    } finally { setLoading(false) }
+   527→  }
+   528→  return (
+   529→    <div>
+   530→      <div className="mb-2 flex items-center justify-between">
+   531→        <span className="text-[11px] text-slate-500">Latest events on this project</span>
+   532→        <button onClick={reload} disabled={loading}
+   533→          className="glass-subtle rounded-full px-2.5 py-1 text-[10px] font-medium text-slate-600 transition hover:bg-white/80">
+   534→          {loading ? 'Refreshing…' : 'Refresh'}
+   535→        </button>
+   536→      </div>
+   537→      <div className="max-h-72 space-y-1 overflow-y-auto scroll-elegant pr-1">
+   538→        {items.length === 0 && (
+   539→          <div className="px-3 py-8 text-center text-[11px] text-slate-400">No recent activity for this project.</div>
+   540→        )}
+   541→        {items.map((a, i) => <ActivityRow key={a.id} a={a} delay={i * 0.03} />)}
+   542→      </div>
+   543→    </div>
+   544→  )
+   545→}
+   546→
+   547→function TeamTab({ roleKey, userName }: { roleKey: string; userName?: string }) {
+   548→  const team = useMemo(() => buildIllustrativeTeam(roleKey, userName), [roleKey, userName])
+   549→  return (
+   550→    <div>
+   551→      <div className="mb-2 text-[11px] text-slate-500">Project team &amp; responsibilities</div>
+   552→      <div className="space-y-1.5">
+   553→        {team.map((m, i) => (
+   554→          <motion.div key={i}
+   555→            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+   556→            className="flex items-center gap-2 rounded-lg bg-white/60 px-2.5 py-2"
+   557→          >
+   558→            <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br ${m.gradient} text-[10px] font-bold text-white`}>
+   559→              {m.initials}
+   560→            </div>
+   561→            <div className="min-w-0 flex-1">
+   562→              <div className="truncate text-xs font-semibold text-slate-800">{m.name}</div>
+   563→              <div className="text-[10px] text-slate-500">{m.role} · {m.scope}</div>
+   564→            </div>
+   565→            <span className={`status-pill ${m.active ? 'status-approved' : 'status-draft'}`}>{m.active ? 'Active' : 'Pending'}</span>
+   566→          </motion.div>
+   567→        ))}
+   568→      </div>
+   569→    </div>
+   570→  )
+   571→}
+   572→
+   573→function DocumentsTab({ evidence }: { evidence: EvidenceItem[] }) {
+   574→  return (
+   575→    <div>
+   576→      <div className="mb-2 text-[11px] text-slate-500">Evidence &amp; documents on this project</div>
+   577→      <div className="max-h-72 space-y-1.5 overflow-y-auto scroll-elegant pr-1">
+   578→        {evidence.length === 0 && (
+   579→          <div className="px-3 py-8 text-center text-[11px] text-slate-400">No documents uploaded yet.</div>
+   580→        )}
+   581→        {evidence.map((e, i) => (
+   582→          <motion.div key={e.id}
+   583→            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+   584→            className="flex items-center gap-2 rounded-lg bg-white/60 px-2.5 py-2"
+   585→          >
+   586→            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-violet-50 text-violet-600">
+   587→              <FileText className="h-3.5 w-3.5" />
+   588→            </div>
+   589→            <div className="min-w-0 flex-1">
+   590→              <div className="truncate text-xs font-semibold text-slate-800">{e.fileName}</div>
+   591→              <div className="text-[10px] text-slate-500">{e.documentType} · {e.uploader?.name ?? 'System'}</div>
+   592→            </div>
+   593→            <span className={`status-pill ${statusPillClass(e.status)}`}>{e.status}</span>
+   594→          </motion.div>
+   595→        ))}
+   596→      </div>
+   597→    </div>
+   598→  )
+   599→}
+   600→
+   601→function MiniStat({ label, value, icon: Icon, tone }: { label: string; value: number | string; icon: LucideIcon; tone: string }) {
+   602→  const toneMap: Record<string, string> = {
+   603→    blue: 'bg-blue-50 text-blue-600', amber: 'bg-amber-50 text-amber-600',
+   604→    violet: 'bg-violet-50 text-violet-600', emerald: 'bg-emerald-50 text-emerald-600',
+   605→    cyan: 'bg-cyan-50 text-cyan-600', teal: 'bg-teal-50 text-teal-600', rose: 'bg-rose-50 text-rose-600',
+   606→  }
+   607→  return (
+   608→    <div className="flex items-center justify-between rounded-lg bg-white/50 px-2.5 py-1.5">
+   609→      <div className="flex items-center gap-1.5">
+   610→        <div className={`flex h-5 w-5 items-center justify-center rounded ${toneMap[tone]}`}><Icon className="h-3 w-3" /></div>
+   611→        <span className="text-[10px] font-medium text-slate-600">{label}</span>
+   612→      </div>
+   613→      <span className="tabular-nums text-sm font-bold text-slate-800">{value}</span>
+   614→    </div>
+   615→  )
+   616→}
+   617→
+   618→function ModuleProgress({ icon: Icon, label, pct, tone }: { icon: LucideIcon; label: string; pct: number; tone: string }) {
+   619→  const toneMap: Record<string, string> = {
+   620→    blue: 'from-blue-500 to-cyan-400', amber: 'from-amber-500 to-yellow-400',
+   621→    violet: 'from-violet-500 to-fuchsia-400', emerald: 'from-emerald-500 to-teal-400',
+   622→    cyan: 'from-cyan-500 to-sky-400', teal: 'from-teal-500 to-emerald-400',
+   623→  }
+   624→  return (
+   625→    <div className="rounded-xl border border-white/60 bg-white/40 p-3">
+   626→      <div className="mb-2 flex items-center justify-between">
+   627→        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+   628→          <Icon className="h-3.5 w-3.5 text-slate-500" /> {label}
+   629→        </div>
+   630→        <span className="tabular-nums text-[11px] font-bold text-slate-800">{pct.toFixed(0)}%</span>
+   631→      </div>
+   632→      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/70">
+   633→        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.max(pct, 2)}%` }} transition={{ duration: 0.7 }}
+   634→          className={`h-full rounded-full bg-gradient-to-r ${toneMap[tone]}`} />
+   635→      </div>
+   636→    </div>
+   637→  )
+   638→}
+   639→
+   640→function ActivityRow({ a, delay }: { a: ActivityItem; delay: number }) {
+   641→  const iconMap: Record<string, LucideIcon> = {
+   642→    DATA_ENTRY: FileText, SUBMIT: Send, APPROVE: CheckCircle2,
+   643→    EVIDENCE_UPLOAD: Link2, CALCULATION: Zap, CORRECTION: AlertTriangle,
+   644→  }
+   645→  const Icon = iconMap[a.action] ?? ActivityIcon
+   646→  return (
+   647→    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay }}
+   648→      className="flex items-start gap-2.5 rounded-lg px-2 py-1.5 transition hover:bg-white/50"
+   649→    >
+   650→      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600">
+   651→        <Icon className="h-3.5 w-3.5" />
+   652→      </div>
+   653→      <div className="min-w-0 flex-1">
+   654→        <div className="flex items-center gap-1.5">
+   655→          <span className="truncate text-xs font-semibold text-slate-800">{a.title}</span>
+   656→          {a.status && <span className={`status-pill ${statusPillClass(a.status)}`}>{a.status}</span>}
+   657→        </div>
+   658→        {a.description && <p className="truncate text-[11px] text-slate-500">{a.description}</p>}
+   659→        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-400">
+   660→          {a.actorName && <span className="font-medium text-slate-500">{a.actorName}</span>}
+   661→          {a.actorRole && <><span>·</span><span>{a.actorRole}</span></>}
+   662→          {a.module && <><span>·</span><span className="uppercase">{a.module}</span></>}
+   663→          <span>·</span><span>{timeAgo(a.createdAt)}</span>
+   664→        </div>
+   665→      </div>
+   666→    </motion.div>
+   667→  )
+   668→}
+   669→
+   670→function buildIllustrativeTeam(roleKey: string, userName?: string) {
+   671→  const displayName = userName || 'You'
+   672→  const initials = displayName.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+   673→  const team = [
+   674→    { name: displayName, role: 'Project / Site User', scope: 'Project scope', gradient: 'from-blue-600 to-cyan-600', active: true, initials: initials || 'U' },
+   675→    { name: 'Rakesh Verma', role: 'BU Reviewer', scope: 'Business Unit', gradient: 'from-violet-600 to-fuchsia-600', active: true, initials: 'RV' },
+   676→    { name: 'Nisha Pillai', role: 'Subsidiary ESG Reviewer', scope: 'Subsidiary', gradient: 'from-emerald-600 to-teal-600', active: true, initials: 'NP' },
+   677→    { name: 'Meena Iyer', role: 'BRSR / Report Owner', scope: 'Group', gradient: 'from-amber-600 to-yellow-600', active: false, initials: 'MI' },
+   678→  ]
+   679→  if (roleKey && roleKey !== 'PROJECT_USER') {
+   680→    team[0].role = roleKey.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+   681→  }
+   682→  return team
+   683→}
+   684→
+   685→/* ---------- State helpers ---------- */
+   686→function MyProjectSkeleton() {
+   687→  return (
+   688→    <div className="space-y-5">
+   689→      <div className="h-8 w-64 animate-pulse rounded bg-slate-200/60" />
+   690→      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+   691→        {[...Array(5)].map((_, i) => <div key={i} className="glass h-32 animate-pulse rounded-2xl" />)}
+   692→      </div>
+   693→      <div className="grid gap-4 lg:grid-cols-5">
+   694→        <div className="glass h-80 animate-pulse rounded-2xl lg:col-span-3" />
+   695→        <div className="glass h-80 animate-pulse rounded-2xl lg:col-span-2" />
+   696→      </div>
+   697→      <div className="glass h-48 animate-pulse rounded-2xl" />
+   698→    </div>
+   699→  )
+   700→}
+   701→
+   702→function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+   703→  return (
+   704→    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
+   705→      <AlertOctagon className="h-10 w-10 text-rose-500" />
+   706→      <div>
+   707→        <div className="text-base font-bold text-slate-800">Failed to load My Project</div>
+   708→        <div className="text-xs text-slate-500">{message}</div>
+   709→      </div>
+   710→      <button onClick={onRetry} className="btn-glass-primary rounded-full px-5 py-2 text-xs font-semibold">Retry</button>
+   711→    </div>
+   712→  )
+   713→}
+   714→
+   715→function EmptyState({ message }: { message: string }) {
+   716→  return (
+   717→    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
+   718→      <Building2 className="h-10 w-10 text-slate-400" />
+   719→      <div>
+   720→        <div className="text-base font-bold text-slate-800">Nothing to display</div>
+   721→        <div className="text-xs text-slate-500">{message}</div>
+   722→      </div>
+   723→    </div>
+   724→  )
+   725→}
+   726→
+   727→function timeAgo(iso: string) {
+   728→  const diff = Date.now() - new Date(iso).getTime()
+   729→  const mins = Math.floor(diff / 60000)
+   730→  if (mins < 1) return 'just now'
+   731→  if (mins < 60) return `${mins}m ago`
+   732→  const hrs = Math.floor(mins / 60)
+   733→  if (hrs < 24) return `${hrs}h ago`
+   734→  return `${Math.floor(hrs / 24)}d ago`
+   735→}
+   736→

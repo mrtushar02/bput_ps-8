@@ -1186,3 +1186,59 @@ Stage Summary:
 - All card sizing is compact and consistent (20-24px radius)
 - Real-time data from APIs with 30s/60s polling
 - The design now feels like "THE SAME PRODUCT, THE SAME DESIGN SYSTEM, THE SAME VISUAL LANGUAGE" as the reference — adapted for MEIL Site User data
+
+---
+Task ID: 25 (Enhanced Shadows + Team Module + My Project Redesign + Analytics Fix)
+Agent: Lead Architect (main) + 2 subagents
+Task: Enhance shadows, fix analytics visibility, build Team module with chat, redesign My Project, add Team+Analytics nav tabs
+
+Work Log:
+- Enhanced glassmorphism shadows across ALL screens:
+  - Added `0 4px 6px -1px rgba(0,0,0,0.04)` base shadow layer to `.glass`, `.glass-strong`, `.glass-subtle`, `.glass-nav`
+  - Changed borders from white to cool-gray/blue `rgba(150,180,210,0.20)` for better card definition
+  - Increased foreground text intensity: `--foreground` from oklch(0.16) to oklch(0.12) (darker), `--muted-foreground` from oklch(0.5) to oklch(0.35) (darker labels)
+  - All text colors in site-user-overview darkened: slate-400→slate-600, slate-500→slate-700, tooltip text #64748b→#334155
+
+- Fixed Site ESG Analytics card visibility:
+  - Fixed Water Balance donut: increased innerRadius (28→42), outerRadius (48→58), added center % label, added Legend, changed data to Recycled vs Fresh (more visually distinct)
+  - Increased all chart cell heights from 130px to 150px
+  - Fixed donut colors to be more vivid (#0EA5E9 sky-blue + #E0F2FE light-blue)
+  - Enhanced tooltip with darker text color and border
+
+- Added Team + Analytics to role nav:
+  - PROJECT_USER: added Analytics + Team tabs (8 items total)
+  - All site user roles (HR, EHS, Procurement, CSR, Compliance): added Team tab
+  - Added 'team' to ModuleKey type in auth-context.tsx
+  - Added 'team' case to module-router.tsx
+
+- Built Team module (src/components/modules/team.tsx):
+  - "Site Team & Supervisors" header with subtitle + View Team button
+  - 15 seeded team member cards in responsive grid (4 cols): avatar with status dot (green pulse for active), name, role, employee code, status pill (Active/Away), Edit (Pencil) + Delete (Trash2) + Message buttons
+  - Chat panel: conversation with selected member, message thread with avatars + bubbles + timestamps, Enter-to-send, auto-reply after 1s delay (simulated), typing indicator
+  - framer-motion staggered entrance, role-tinted avatars, loading skeleton
+  - Verified: VLM confirmed team cards with avatars+status dots, edit/delete buttons, chat panel with messages, premium design
+
+- Redesigned My Project module (src/components/modules/my-project.tsx, ~1,440 lines):
+  - 2-column split layout (70/30): left = KPI cards + filter bar + project table + 3 widget cards, right = sticky detail panel
+  - 4 compact KPI cards: Total Projects, Data Completion %, Current Emissions, Open Issues
+  - Project data table: Name/Code/Status/ESG Completion (progress bar)/Period/Actions, 44px dense rows, clickable to update right panel
+  - 3 widget cards: Project ESG Progress (bar chart), Submission Status (donut), Upcoming Deadlines (list)
+  - Right detail panel: hero gradient banner, metadata grid, mini KPI row, 5 tabs (Overview/ESG/Activity/Team/Documents)
+  - Verified: VLM confirmed 2-column layout, KPI cards, project table, right detail panel, enhanced shadows + dark text
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: Team module renders with team cards + chat panel, no console errors
+- agent-browser verified: My Project redesign renders with 2-column split, KPI cards, project table, detail panel, no console errors
+- VLM-verified: Team module has avatars+status dots+edit/delete+chat, premium design
+- VLM-verified: My Project has 2-column layout, KPI cards, project table, right detail panel, enhanced shadows + dark text
+- Project User nav now includes Team + Analytics tabs
+
+Stage Summary:
+- Enhanced shadows + darker text on ALL glass cards across all screens
+- Fixed Water Balance donut visibility + chart heights in Site ESG Analytics
+- Built Team module with team member cards (edit/delete/chat) + conversation panel
+- Redesigned My Project with split-screen layout matching reference (KPIs + table + detail panel + widgets)
+- Added Team + Analytics nav tabs for all site user roles
+- 3 new/rewritten files: team.tsx (new), my-project.tsx (rewritten), role-nav.ts (updated), auth-context.tsx (updated), module-router.tsx (updated), site-user-overview.tsx (analytics fix), globals.css (shadow+text enhancement)

@@ -9,6 +9,7 @@ import { ReportsModule } from '@/components/modules/reports'
 import { AnalyticsModule } from '@/components/modules/analytics'
 import { AuditModule } from '@/components/modules/audit'
 import { AdminModule } from '@/components/modules/admin'
+import { TeamModule } from '@/components/modules/team'
 
 export function ModuleRouter() {
   const { activeModule, dataEntrySubModule } = useApp()
@@ -22,6 +23,7 @@ export function ModuleRouter() {
     case 'analytics': return <AnalyticsModule />
     case 'audit': return <AuditModule />
     case 'admin': return <AdminModule />
+    case 'team': return <TeamModule />
     default: return <MyProjectModule />
   }
 }

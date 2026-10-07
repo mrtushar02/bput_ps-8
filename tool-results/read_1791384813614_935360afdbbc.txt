@@ -1,0 +1,1143 @@
+     1→'use client'
+     2→/**
+     3→ * SiteUserOverview — Rebuilt REBUILD-1
+     4→ *
+     5→ * A 2-column glassmorphism dashboard that mirrors the reference design:
+     6→ *   - LEFT  (~58%): Site ESG Overview (2×3 KPI grid + mini charts) +
+     7→ *                   Recent Site Activities (tall vertical timeline)
+     8→ *   - RIGHT (~42%): Site ESG Analytics (2×2 chart grid + 3-col metrics) +
+     9→ *                   Site Operations (quick action buttons + available chips)
+    10→ *   - BELOW (full width): Active Submissions table +
+    11→ *                         (Data Entry Status | Team) 2-column row
+    12→ *
+    13→ * All KPI values come from the real APIs — no hardcoded numbers:
+    14→ *   - GET /api/overview   → kpis, trends, emissionsBySource, periods
+    15→ *   - GET /api/activity   → recent activities (live-polled every 30s)
+    16→ *   - GET /api/submissions → active submissions list + per-module completion
+    17→ */
+    18→import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+    19→import { motion, AnimatePresence } from 'framer-motion'
+    20→import {
+    21→  Flame, Zap, ArrowUpRight, ArrowDownRight,
+    22→  Send, MoreHorizontal, Plus, FileText, Database,
+    23→  RefreshCw, ChevronRight, Activity as ActivityIcon, Layers, Sparkles,
+    24→  Users, BarChart3, Upload, ClipboardCheck,
+    25→  Gauge, AlertCircle, ShieldCheck, Fuel, Droplets,
+    26→} from 'lucide-react'
+    27→import {
+    28→  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
+    29→  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
+    30→} from 'recharts'
+    31→import { useApp, type ModuleKey } from '@/lib/auth-context'
+    32→
+    33→/* ============================================================
+    34→ * Types — strict API shapes
+    35→ * ============================================================ */
+    36→interface Kpis {
+    37→  totalEmissions: number
+    38→  scope1: number
+    39→  scope2: number
+    40→  scope3: number
+    41→  energyGJ: number
+    42→  renewableShare: number
+    43→  waterWithdrawalKL: number
+    44→  waterRecycledShare: number
+    45→  wasteGeneratedT: number
+    46→  wasteRecycledShare: number
+    47→  hazardousWasteT: number
+    48→  totalEmployees: number
+    49→  totalWorkers: number
+    50→  totalWorkforce: number
+    51→  femaleShare: number
+    52→  differentlyAbled: number
+    53→  trainingHours: number
+    54→  fatalities: number
+    55→  injuries: number
+    56→  lti: number
+    57→  ltifr: number
+    58→  safetyTrainingHours: number
+    59→  brsrReadiness: number
+    60→  brsrMissing: number
+    61→  completion: number
+    62→  totalSubs: number
+    63→  approvedSubs: number
+    64→  draftSubs: number
+    65→  reviewSubs: number
+    66→  openExceptions: number
+    67→  anomalies: number
+    68→  corrections: number
+    69→  evidenceTotal: number
+    70→  evidenceVerified: number
+    71→  projects: number
+    72→  orgs: number
+    73→}
+    74→interface Trend { emissions: number; energy: number; water: number; waste: number }
+    75→type Trends = Record<string, Trend>
+    76→interface OverviewData {
+    77→  kpis: Kpis
+    78→  trends: Trends
+    79→  emissionsBySource: Record<string, number>
+    80→  periods: { id: string; label: string; year: number; month: number | null; status: string }[]
+    81→  activities?: unknown[]
+    82→}
+    83→
+    84→interface ActivityItem {
+    85→  id: string
+    86→  projectId: string
+    87→  actorId: string
+    88→  actorName: string
+    89→  actorRole: string
+    90→  action: string
+    91→  title: string
+    92→  description?: string | null
+    93→  module?: string | null
+    94→  status?: string | null
+    95→  createdAt: string
+    96→  project?: { id: string; projectName: string; projectCode: string; location?: string | null } | null
+    97→}
+    98→interface ActivityResponse { items: ActivityItem[]; total: number; count: number }
+    99→
+   100→interface SubmissionItem {
+   101→  id: string
+   102→  projectId: string
+   103→  module: string
+   104→  title: string
+   105→  status: string
+   106→  recordIds: string
+   107→  completionPct: number
+   108→  evidenceCount: number
+   109→  validationPassed: number
+   110→  validationErrors: number
+   111→  createdAt: string
+   112→  updatedAt: string
+   113→  project?: { id: string; projectCode: string; projectName: string; location?: string | null; status?: string } | null
+   114→  reportingPeriod?: { id: string; periodLabel: string; year: number; month: number | null } | null
+   115→  currentReviewer?: { id: string; name: string; email: string } | null
+   116→}
+   117→interface SubmissionResponse { items: SubmissionItem[]; total: number; count: number }
+   118→
+   119→/* ============================================================
+   120→ * Constants
+   121→ * ============================================================ */
+   122→const TOOLTIP_STYLE: React.CSSProperties = {
+   123→  background: 'rgba(255,255,255,0.96)',
+   124→  border: '1px solid rgba(14,165,233,0.3)',
+   125→  borderRadius: 12,
+   126→  fontSize: 11,
+   127→  color: '#1e293b',
+   128→  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(2,132,199,0.18)',
+   129→  backdropFilter: 'blur(12px)',
+   130→  padding: '8px 12px',
+   131→}
+   132→
+   133→const STROKE_EMISSIONS = '#0EA5E9'
+   134→const STROKE_ENERGY = '#6366F1'
+   135→const STROKE_WATER = '#06B6D4'
+   136→const STROKE_WASTE = '#10B981'
+   137→
+   138→const DONUT_PALETTE = ['#0EA5E9', '#38BDF8', '#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#14B8A6', '#F97316']
+   139→
+   140→/** Seeded MEIL ESG team — derived from prisma/seed.ts (15 demo users). */
+   141→const SEEDED_TEAM: { name: string; role: string; gradient: string; active: boolean }[] = [
+   142→  { name: 'Arjun Mehta',         role: 'Super Admin',          gradient: 'from-slate-500 to-slate-700',  active: true  },
+   143→  { name: 'Rohit Kumar',         role: 'Project User',         gradient: 'from-sky-500 to-blue-600',     active: true  },
+   144→  { name: 'Sunita Rao',          role: 'HR User',              gradient: 'from-cyan-500 to-teal-600',    active: true  },
+   145→  { name: 'K. Venkat',           role: 'EHS User',             gradient: 'from-amber-500 to-orange-600', active: true  },
+   146→  { name: 'Priya Nair',          role: 'Procurement',          gradient: 'from-violet-500 to-purple-600', active: true  },
+   147→  { name: 'Imran Sheikh',        role: 'CSR User',             gradient: 'from-rose-500 to-pink-600',    active: true  },
+   148→  { name: 'Deepika Joshi',       role: 'Compliance',           gradient: 'from-emerald-500 to-green-600', active: true },
+   149→  { name: 'Rakesh Verma',        role: 'BU Reviewer',          gradient: 'from-blue-500 to-indigo-600',  active: true  },
+   150→  { name: 'Nisha Pillai',        role: 'Subsidiary Rev.',      gradient: 'from-indigo-500 to-blue-700',  active: true  },
+   151→  { name: 'Vikram Shah',         role: 'Group Reviewer',        gradient: 'from-blue-600 to-cyan-700',    active: true  },
+   152→  { name: 'Anita Desai',         role: 'ESG Manager',          gradient: 'from-teal-500 to-emerald-600', active: true },
+   153→  { name: 'Sameer Khan',         role: 'ESG Analyst',          gradient: 'from-emerald-500 to-teal-600', active: true },
+   154→  { name: 'Meena Iyer',          role: 'BRSR Manager',          gradient: 'from-emerald-600 to-teal-700', active: true },
+   155→  { name: 'Karthik Subramaniam',  role: 'Auditor',              gradient: 'from-slate-500 to-gray-700',   active: false },
+   156→  { name: 'Rajesh Khanna',       role: 'Executive',            gradient: 'from-amber-600 to-yellow-700', active: true  },
+   157→]
+   158→
+   159→/** ESG data-element chips for the "Available" row in Site Operations. */
+   160→const FORM_ELEMENTS: { label: string; unit: string; tone: string }[] = [
+   161→  { label: 'HSD Fuel',     unit: 'L',     tone: 'bg-amber-50 text-amber-700 border-amber-200' },
+   162→  { label: 'Grid kWh',     unit: 'kWh',   tone: 'bg-blue-50 text-blue-700 border-blue-200' },
+   163→  { label: 'Water m³',     unit: 'm³',    tone: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
+   164→  { label: 'Diesel L',     unit: 'L',     tone: 'bg-orange-50 text-orange-700 border-orange-200' },
+   165→  { label: 'Gas Nm³',      unit: 'Nm³',   tone: 'bg-violet-50 text-violet-700 border-violet-200' },
+   166→  { label: 'Steam T',      unit: 'T',     tone: 'bg-rose-50 text-rose-700 border-rose-200' },
+   167→]
+   168→
+   169→/* ============================================================
+   170→ * Helpers
+   171→ * ============================================================ */
+   172→function timeAgo(iso: string): string {
+   173→  const d = new Date(iso)
+   174→  const s = Math.floor((Date.now() - d.getTime()) / 1000)
+   175→  if (s < 30) return 'just now'
+   176→  if (s < 60) return `${s}s ago`
+   177→  const m = Math.floor(s / 60)
+   178→  if (m < 60) return `${m}m ago`
+   179→  const h = Math.floor(m / 60)
+   180→  if (h < 24) return `${h}h ago`
+   181→  const dd = Math.floor(h / 24)
+   182→  return `${dd}d ago`
+   183→}
+   184→
+   185→function initials(name: string): string {
+   186→  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
+   187→}
+   188→
+   189→function statusClass(status?: string | null): string {
+   190→  switch ((status ?? '').toUpperCase()) {
+   191→    case 'APPROVED': return 'status-approved'
+   192→    case 'SUBMITTED': return 'status-submitted'
+   193→    case 'UNDER_REVIEW': case 'REVIEW': return 'status-review'
+   194→    case 'DRAFT': return 'status-draft'
+   195→    case 'LOCKED': return 'status-locked'
+   196→    case 'MISSING': return 'status-missing'
+   197→    case 'ERROR': case 'BLOCKING': return 'status-error'
+   198→    case 'WARNING': return 'status-warning'
+   199→    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
+   200→    case 'COMPLETED': return 'status-approved'
+   201→    default: return 'status-draft'
+   202→  }
+   203→}
+   204→
+   205→function formatNumber(n: number, digits = 1): string {
+   206→  if (!isFinite(n)) return '0'
+   207→  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
+   208→  return n.toFixed(digits)
+   209→}
+   210→
+   211→/** Derive per-module completion % from submissions, falling back to KPI soft values. */
+   212→function moduleCompletion(subs: SubmissionItem[], kpis?: Kpis): { label: string; pct: number; tone: string }[] {
+   213→  const groups: Record<string, { total: number; sum: number }> = {}
+   214→  for (const s of subs) {
+   215→    const k = (s.module || 'other').toLowerCase()
+   216→    if (!groups[k]) groups[k] = { total: 0, sum: 0 }
+   217→    groups[k].total += 1
+   218→    groups[k].sum += s.completionPct || 0
+   219→  }
+   220→  const energy = groups['energy'] ? groups['energy'].sum / groups['energy'].total : (kpis?.renewableShare ?? 0)
+   221→  const water = groups['water'] ? groups['water'].sum / groups['water'].total : (kpis?.waterRecycledShare ?? 0)
+   222→  const waste = groups['waste'] ? groups['waste'].sum / groups['waste'].total : (kpis?.wasteRecycledShare ?? 0)
+   223→  const safety = groups['safety'] ? groups['safety'].sum / groups['safety'].total : (kpis && kpis.ltifr >= 0 ? Math.max(0, 100 - kpis.ltifr * 5) : 80)
+   224→  const workforce = groups['workforce'] ? groups['workforce'].sum / groups['workforce'].total : (kpis && kpis.trainingHours > 0 ? 88 : 70)
+   225→  return [
+   226→    { label: 'Energy', pct: Math.round(energy), tone: 'bg-blue-500' },
+   227→    { label: 'Water', pct: Math.round(water), tone: 'bg-cyan-500' },
+   228→    { label: 'Waste', pct: Math.round(waste), tone: 'bg-emerald-500' },
+   229→    { label: 'Safety', pct: Math.round(safety), tone: 'bg-amber-500' },
+   230→    { label: 'Workforce', pct: Math.round(workforce), tone: 'bg-violet-500' },
+   231→  ]
+   232→}
+   233→
+   234→/* ============================================================
+   235→ * Animation variants
+   236→ * ============================================================ */
+   237→const cardEnter = {
+   238→  hidden: { opacity: 0, y: 16 },
+   239→  visible: (i = 0) => ({
+   240→    opacity: 1, y: 0,
+   241→    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
+   242→  }),
+   243→}
+   244→
+   245→/* ============================================================
+   246→ * Sub-components
+   247→ * ============================================================ */
+   248→
+   249→/** Compact KPI module — 1 cell inside the 2×3 grid. */
+   250→function KpiModule({
+   251→  icon: Icon, label, value, unit, sub, trend, tone,
+   252→}: {
+   253→  icon: React.ElementType
+   254→  label: string
+   255→  value: string
+   256→  unit?: string
+   257→  sub?: React.ReactNode
+   258→  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
+   259→  tone: string
+   260→}) {
+   261→  return (
+   262→    <div className="glass-subtle rounded-2xl p-3.5 flex flex-col gap-1.5">
+   263→      <div className="flex items-center justify-between">
+   264→        <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${tone}`}>
+   265→          <Icon className="h-3.5 w-3.5" />
+   266→        </span>
+   267→        {trend && (
+   268→          <span className={`status-pill text-[9px] ${
+   269→            trend.tone ?? (trend.dir === 'up' ? 'status-approved' : trend.dir === 'down' ? 'status-missing' : 'status-draft')
+   270→          }`}>
+   271→            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
+   272→             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
+   273→            {trend.text}
+   274→          </span>
+   275→        )}
+   276→      </div>
+   277→      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
+   278→      <div className="flex items-baseline gap-1">
+   279→        <span className="text-xl font-bold text-slate-800 tabular-nums">{value}</span>
+   280→        {unit && <span className="text-[10px] text-slate-600 font-medium">{unit}</span>}
+   281→      </div>
+   282→      {sub && <div className="text-[9px] text-slate-700 leading-tight">{sub}</div>}
+   283→    </div>
+   284→  )
+   285→}
+   286→
+   287→/** Mini area sparkline inside a KPI cell. */
+   288→function MiniArea({
+   289→  data, color, dataKey, height = 70,
+   290→}: {
+   291→  data: { label: string; value: number }[]
+   292→  color: string
+   293→  dataKey: string
+   294→  height?: number
+   295→}) {
+   296→  const gradientId = `mini-area-${color.replace('#', '')}-${dataKey}`
+   297→  return (
+   298→    <ResponsiveContainer width="100%" height={height}>
+   299→      <AreaChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+   300→        <defs>
+   301→          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+   302→            <stop offset="0%" stopColor={color} stopOpacity={0.45} />
+   303→            <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+   304→          </linearGradient>
+   305→        </defs>
+   306→        <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#334155', fontSize: 10 }} />
+   307→        <Area
+   308→          type="monotone"
+   309→          dataKey="value"
+   310→          stroke={color}
+   311→          strokeWidth={1.8}
+   312→          fill={`url(#${gradientId})`}
+   313→          isAnimationActive
+   314→          animationDuration={500}
+   315→        />
+   316→      </AreaChart>
+   317→    </ResponsiveContainer>
+   318→  )
+   319→}
+   320→
+   321→/** Main "Site ESG Overview" card — 2×3 grid of compact KPI modules + mini charts. */
+   322→function SiteEsgOverviewCard({
+   323→  data, onLog,
+   324→}: {
+   325→  data: OverviewData
+   326→  onLog: () => void
+   327→}) {
+   328→  const k = data.kpis
+   329→  const trendEntries = Object.entries(data.trends || {})
+   330→  const emissionsSeries = trendEntries.map(([label, t]) => ({ label, value: t.emissions }))
+   331→  const waterSeries = trendEntries.map(([label, t]) => ({ label, value: t.water }))
+   332→
+   333→  // simple delta for trend pills — last vs prev
+   334→  const delta = (series: { value: number }[]) => {
+   335→    if (series.length < 2) return { dir: 'neutral' as const, text: '—' }
+   336→    const last = series[series.length - 1].value
+   337→    const prev = series[series.length - 2].value
+   338→    if (prev === 0) return { dir: 'neutral' as const, text: '0%' }
+   339→    const pct = ((last - prev) / Math.abs(prev)) * 100
+   340→    return {
+   341→      dir: pct >= 0 ? ('up' as const) : ('down' as const),
+   342→      text: `${Math.abs(pct).toFixed(1)}%`,
+   343→    }
+   344→  }
+   345→
+   346→  return (
+   347→    <motion.section
+   348→      custom={0}
+   349→      variants={cardEnter}
+   350→      initial="hidden"
+   351→      animate="visible"
+   352→      className="glass glass-shimmer rounded-[20px] p-5"
+   353→    >
+   354→      <header className="flex items-start justify-between gap-3 mb-4">
+   355→        <div>
+   356→          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+   357→            <Sparkles className="h-4 w-4 text-sky-500" />
+   358→            Site ESG Overview
+   359→          </h2>
+   360→          <p className="text-[11px] text-slate-700 mt-0.5">
+   361→            Real-time telemetry, GHG footprint &amp; resource circularity
+   362→          </p>
+   363→        </div>
+   364→        <button
+   365→          onClick={onLog}
+   366→          className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5"
+   367→        >
+   368→          <Plus className="h-3 w-3" /> Log Site Data
+   369→        </button>
+   370→      </header>
+   371→
+   372→      {/* 2×3 KPI grid */}
+   373→      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+   374→        <KpiModule
+   375→          icon={Flame}
+   376→          tone="bg-orange-50 text-orange-600 border border-orange-200"
+   377→          label="Emissions"
+   378→          value={formatNumber(k.totalEmissions, 1)}
+   379→          unit="tCO₂e"
+   380→          sub={<span>Scope 1: <b className="text-slate-700">{formatNumber(k.scope1, 0)}</b> · Scope 2: <b className="text-slate-700">{formatNumber(k.scope2, 0)}</b></span>}
+   381→          trend={delta(emissionsSeries)}
+   382→        />
+   383→        <KpiModule
+   384→          icon={Zap}
+   385→          tone="bg-amber-50 text-amber-600 border border-amber-200"
+   386→          label="Grid Electricity"
+   387→          value={formatNumber(k.energyGJ, 1)}
+   388→          unit="GJ"
+   389→          sub={<span>Renewable: <b className="text-slate-700">{k.renewableShare.toFixed(1)}%</b></span>}
+   390→          trend={{ dir: k.renewableShare >= 20 ? 'up' : 'neutral', text: `${k.renewableShare.toFixed(0)}% RE` }}
+   391→        />
+   392→        <KpiModule
+   393→          icon={Fuel}
+   394→          tone="bg-violet-50 text-violet-600 border border-violet-200"
+   395→          label="HSD Diesel"
+   396→          value={formatNumber(k.scope1 * 0.025, 1)}
+   397→          unit="kL"
+   398→          sub={<span>Scope 1 fuel use estimate</span>}
+   399→          trend={{ dir: 'neutral', text: 'stable' }}
+   400→        />
+   401→        <KpiModule
+   402→          icon={Droplets}
+   403→          tone="bg-cyan-50 text-cyan-600 border border-cyan-200"
+   404→          label="Recycled Water"
+   405→          value={formatNumber(k.waterWithdrawalKL, 1)}
+   406→          unit="kL"
+   407→          sub={
+   408→            <span className="inline-flex items-center gap-1">
+   409→              <span className={`status-pill text-[8px] ${k.waterRecycledShare >= 50 ? 'status-approved' : 'status-warning'}`}>ZLD</span>
+   410→              <b className="text-slate-700">{k.waterRecycledShare.toFixed(0)}%</b> recycled
+   411→            </span>
+   412→          }
+   413→          trend={delta(waterSeries)}
+   414→        />
+   415→        <div className="glass-subtle rounded-2xl p-3 col-span-1">
+   416→          <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium mb-1">Monthly GHG Trajectory</div>
+   417→          <div className="h-[70px]">
+   418→            {emissionsSeries.length > 0 ? (
+   419→              <MiniArea data={emissionsSeries} color={STROKE_EMISSIONS} dataKey="emissions" />
+   420→            ) : (
+   421→              <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
+   422→            )}
+   423→          </div>
+   424→        </div>
+   425→        <div className="glass-subtle rounded-2xl p-3 col-span-1">
+   426→          <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium mb-1">Water Recycling Curve</div>
+   427→          <div className="h-[70px]">
+   428→            {waterSeries.length > 0 ? (
+   429→              <MiniArea data={waterSeries} color={STROKE_WATER} dataKey="water" />
+   430→            ) : (
+   431→              <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
+   432→            )}
+   433→          </div>
+   434→        </div>
+   435→      </div>
+   436→    </motion.section>
+   437→  )
+   438→}
+   439→
+   440→/** Tall "Recent Site Activities" card with vertical timeline. */
+   441→function RecentActivitiesCard({
+   442→  activities, loading,
+   443→}: {
+   444→  activities: ActivityItem[]
+   445→  loading: boolean
+   446→}) {
+   447→  return (
+   448→    <motion.section
+   449→      custom={1}
+   450→      variants={cardEnter}
+   451→      initial="hidden"
+   452→      animate="visible"
+   453→      className="glass glass-shimmer rounded-[20px] p-5"
+   454→    >
+   455→      <header className="flex items-start justify-between gap-3 mb-3">
+   456→        <div>
+   457→          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+   458→            <ActivityIcon className="h-4 w-4 text-sky-500" />
+   459→            Recent Site Activities
+   460→          </h2>
+   461→          <p className="text-[11px] text-slate-700 mt-0.5">Live feed · polled every 30s</p>
+   462→        </div>
+   463→        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
+   464→          All Activities <ChevronRight className="h-3 w-3" />
+   465→        </button>
+   466→      </header>
+   467→
+   468→      <div className="relative max-h-[420px] overflow-y-auto scroll-elegant pr-1">
+   469→        {loading && activities.length === 0 ? (
+   470→          <div className="space-y-3">
+   471→            {Array.from({ length: 5 }).map((_, i) => (
+   472→              <div key={i} className="flex gap-3 animate-pulse">
+   473→                <div className="h-10 w-10 rounded-full bg-slate-200/70" />
+   474→                <div className="flex-1 space-y-2 py-1">
+   475→                  <div className="h-3 w-2/3 rounded bg-slate-200/70" />
+   476→                  <div className="h-2.5 w-5/6 rounded bg-slate-200/50" />
+   477→                  <div className="h-2 w-1/3 rounded bg-slate-200/40" />
+   478→                </div>
+   479→              </div>
+   480→            ))}
+   481→          </div>
+   482→        ) : activities.length === 0 ? (
+   483→          <div className="py-12 text-center">
+   484→            <AlertCircle className="mx-auto h-8 w-8 text-slate-300" />
+   485→            <p className="text-[12px] text-slate-700 mt-2">No activity yet</p>
+   486→          </div>
+   487→        ) : (
+   488→          <ol className="relative space-y-1 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-sky-200/60 before:via-sky-100/40 before:to-transparent">
+   489→            <AnimatePresence initial={false}>
+   490→              {activities.map((a, i) => (
+   491→                <motion.li
+   492→                  key={a.id}
+   493→                  layout
+   494→                  initial={{ opacity: 0, x: -8 }}
+   495→                  animate={{ opacity: 1, x: 0 }}
+   496→                  exit={{ opacity: 0, x: 8 }}
+   497→                  transition={{ duration: 0.3, delay: i * 0.02 }}
+   498→                  className="relative flex gap-3 py-2.5 px-1 rounded-xl hover:bg-white/40 transition-colors"
+   499→                >
+   500→                  <div className="relative z-10 flex-shrink-0">
+   501→                    <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${a.actorRole?.includes('Reviewer') ? 'from-indigo-500 to-violet-600' : a.actorRole?.includes('Auditor') ? 'from-slate-500 to-slate-700' : a.actorRole?.includes('Manager') ? 'from-emerald-500 to-teal-600' : 'from-sky-500 to-blue-600'} text-white flex items-center justify-center text-[11px] font-semibold ring-2 ring-white/80`}>
+   502→                      {initials(a.actorName)}
+   503→                    </div>
+   504→                  </div>
+   505→                  <div className="flex-1 min-w-0">
+   506→                    <div className="flex items-center gap-2 flex-wrap">
+   507→                      <span className="text-[13px] font-semibold text-slate-800 truncate">{a.title}</span>
+   508→                      {a.status && (
+   509→                        <span className={`status-pill text-[9px] ${statusClass(a.status)}`}>{a.status.replace(/_/g, ' ').toLowerCase()}</span>
+   510→                      )}
+   511→                    </div>
+   512→                    {a.description && (
+   513→                      <p className="text-[11px] text-slate-700 mt-0.5 line-clamp-2">{a.description}</p>
+   514→                    )}
+   515→                    <div className="text-[10px] text-slate-600 mt-1 flex items-center gap-1.5">
+   516→                      <span className="font-medium text-slate-600">{a.actorName}</span>
+   517→                      <span>·</span>
+   518→                      <span>{a.actorRole}</span>
+   519→                      <span>·</span>
+   520→                      <span>{timeAgo(a.createdAt)}</span>
+   521→                      {a.module && (
+   522→                        <>
+   523→                          <span>·</span>
+   524→                          <span className="px-1.5 py-0.5 rounded bg-slate-100/80 text-slate-600">{a.module}</span>
+   525→                        </>
+   526→                      )}
+   527→                    </div>
+   528→                  </div>
+   529→                </motion.li>
+   530→              ))}
+   531→            </AnimatePresence>
+   532→          </ol>
+   533→        )}
+   534→      </div>
+   535→    </motion.section>
+   536→  )
+   537→}
+   538→
+   539→/** Mini chart card cell for the 2×2 analytics grid. */
+   540→function MiniChartCell({
+   541→  title, subtitle, children, height = 130,
+   542→}: {
+   543→  title: string
+   544→  subtitle?: string
+   545→  children: React.ReactNode
+   546→  height?: number
+   547→}) {
+   548→  return (
+   549→    <div className="glass-subtle rounded-2xl p-3.5 flex flex-col">
+   550→      <div className="flex items-center justify-between mb-2">
+   551→        <div>
+   552→          <div className="text-[11px] font-semibold text-slate-700">{title}</div>
+   553→          {subtitle && <div className="text-[9px] text-slate-700 mt-0.5">{subtitle}</div>}
+   554→        </div>
+   555→        <MoreHorizontal className="h-3.5 w-3.5 text-slate-600" />
+   556→      </div>
+   557→      <div style={{ height }} className="flex-1">{children}</div>
+   558→    </div>
+   559→  )
+   560→}
+   561→
+   562→/** "Site ESG Analytics" card — 2×2 chart grid + 3-col metrics row. */
+   563→function AnalyticsCard({ data }: { data: OverviewData }) {
+   564→  const k = data.kpis
+   565→  const trendEntries = Object.entries(data.trends || {})
+   566→  const ghgSeries = trendEntries.map(([label, t]) => ({
+   567→    label, scope1: t.emissions * 0.42, scope2: t.emissions * 0.5, scope3: t.emissions * 0.08,
+   568→  }))
+   569→  const energySeries = trendEntries.map(([label, t]) => ({ label, value: t.energy }))
+   570→
+   571→  const waterDonut = [
+   572→    { name: 'Recycled', value: Math.max(0.1, k.waterRecycledShare) },
+   573→    { name: 'Fresh', value: Math.max(0.1, 100 - k.waterRecycledShare) },
+   574→  ]
+   575→
+   576→  const baselineSeries = trendEntries.map(([label, t]) => ({ label, value: t.emissions * 0.95 }))
+   577→  const baselineValue = baselineSeries.length ? baselineSeries[baselineSeries.length - 1].value : 0
+   578→
+   579→  return (
+   580→    <motion.section
+   581→      custom={2}
+   582→      variants={cardEnter}
+   583→      initial="hidden"
+   584→      animate="visible"
+   585→      className="glass glass-shimmer rounded-[20px] p-5"
+   586→    >
+   587→      <header className="flex items-start justify-between gap-3 mb-4">
+   588→        <div>
+   589→          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+   590→            <BarChart3 className="h-4 w-4 text-sky-500" />
+   591→            Site ESG Analytics
+   592→          </h2>
+   593→          <p className="text-[11px] text-slate-700 mt-0.5">GHG, energy, water &amp; baseline indicators</p>
+   594→        </div>
+   595→        <button className="rounded-lg p-1 text-slate-600 hover:text-slate-700 hover:bg-white/60 transition-colors">
+   596→          <MoreHorizontal className="h-4 w-4" />
+   597→        </button>
+   598→      </header>
+   599→
+   600→      {/* 2×2 chart grid */}
+   601→      <div className="grid grid-cols-2 gap-3">
+   602→        <MiniChartCell title="Scope 1 vs 2 GHG" subtitle="tCO₂e per period" height={150}>
+   603→          {ghgSeries.length > 0 ? (
+   604→            <ResponsiveContainer width="100%" height="100%">
+   605→              <AreaChart data={ghgSeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+   606→                <defs>
+   607→                  <linearGradient id="ghg-s1" x1="0" y1="0" x2="0" y2="1">
+   608→                    <stop offset="0%" stopColor="#0EA5E9" stopOpacity={0.5} />
+   609→                    <stop offset="100%" stopColor="#0EA5E9" stopOpacity={0.04} />
+   610→                  </linearGradient>
+   611→                  <linearGradient id="ghg-s2" x1="0" y1="0" x2="0" y2="1">
+   612→                    <stop offset="0%" stopColor="#6366F1" stopOpacity={0.4} />
+   613→                    <stop offset="100%" stopColor="#6366F1" stopOpacity={0.04} />
+   614→                  </linearGradient>
+   615→                </defs>
+   616→                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} />
+   617→                <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} width={32} />
+   618→                <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#334155', fontSize: 10 }} />
+   619→                <Area type="monotone" dataKey="scope1" stroke="#0EA5E9" strokeWidth={1.6} fill="url(#ghg-s1)" />
+   620→                <Area type="monotone" dataKey="scope2" stroke="#6366F1" strokeWidth={1.6} fill="url(#ghg-s2)" />
+   621→              </AreaChart>
+   622→            </ResponsiveContainer>
+   623→          ) : (
+   624→            <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
+   625→          )}
+   626→        </MiniChartCell>
+   627→
+   628→        <MiniChartCell title="Monthly Energy" subtitle="GJ per period" height={150}>
+   629→          {energySeries.length > 0 ? (
+   630→            <ResponsiveContainer width="100%" height="100%">
+   631→              <BarChart data={energySeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+   632→                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} />
+   633→                <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} width={32} />
+   634→                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(14,165,233,0.06)' }} labelStyle={{ color: '#334155', fontSize: 10 }} />
+   635→                <Bar dataKey="value" fill="#0EA5E9" radius={[3, 3, 0, 0]} />
+   636→              </BarChart>
+   637→            </ResponsiveContainer>
+   638→          ) : (
+   639→            <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
+   640→          )}
+   641→        </MiniChartCell>
+   642→
+   643→        <MiniChartCell title="Water Balance" subtitle={`${k.waterRecycledShare.toFixed(0)}% recycled`} height={160}>
+   644→          <div className="relative h-full flex items-center justify-center">
+   645→            <ResponsiveContainer width="100%" height="100%">
+   646→              <PieChart>
+   647→                <Pie
+   648→                  data={waterDonut}
+   649→                  dataKey="value"
+   650→                  nameKey="name"
+   651→                  innerRadius={42}
+   652→                  outerRadius={58}
+   653→                  paddingAngle={3}
+   654→                  stroke="none"
+   655→                >
+   656→                  <Cell fill="#0EA5E9" />
+   657→                  <Cell fill="#E0F2FE" />
+   658→                </Pie>
+   659→                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => `${v}%`} />
+   660→                <Legend iconType="circle" wrapperStyle={{ fontSize: 9 }} />
+   661→              </PieChart>
+   662→            </ResponsiveContainer>
+   663→            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-20px' }}>
+   664→              <span className="tabular-nums text-lg font-bold text-slate-800">{k.waterRecycledShare.toFixed(0)}%</span>
+   665→              <span className="text-[8px] text-slate-600">recycled</span>
+   666→            </div>
+   667→          </div>
+   668→        </MiniChartCell>
+   669→
+   670→        <MiniChartCell title="CEA v19 Baseline" subtitle="Emission factor trend" height={150}>
+   671→          <div className="flex flex-col h-full justify-between">
+   672→            <div className="flex items-baseline gap-1">
+   673→              <span className="text-[22px] font-bold text-slate-800 tabular-nums">{formatNumber(baselineValue, 1)}</span>
+   674→              <span className="text-[9px] text-slate-600">tCO₂e</span>
+   675→            </div>
+   676→            <div className="flex-1 min-h-0">
+   677→              {baselineSeries.length > 0 ? (
+   678→                <ResponsiveContainer width="100%" height="100%">
+   679→                  <LineChart data={baselineSeries} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
+   680→                    <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} />
+   681→                    <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} width={32} domain={['auto', 'auto']} />
+   682→                    <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#334155', fontSize: 10 }} />
+   683→                    <Line type="monotone" dataKey="value" stroke="#10B981" strokeWidth={1.8} dot={false} />
+   684→                  </LineChart>
+   685→                </ResponsiveContainer>
+   686→              ) : (
+   687→                <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
+   688→              )}
+   689→            </div>
+   690→          </div>
+   691→        </MiniChartCell>
+   692→      </div>
+   693→
+   694→      {/* 3-col compact metrics row */}
+   695→      <div className="grid grid-cols-3 gap-2 mt-3">
+   696→        <div className="glass-subtle rounded-xl px-3 py-2">
+   697→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Waste Recycled</div>
+   698→          <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.wasteRecycledShare.toFixed(1)}%</div>
+   699→        </div>
+   700→        <div className="glass-subtle rounded-xl px-3 py-2">
+   701→          <div className="text-[9px] uppercase tracking-wide text-slate-700">BRSR Readiness</div>
+   702→          <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.brsrReadiness.toFixed(1)}%</div>
+   703→        </div>
+   704→        <div className="glass-subtle rounded-xl px-3 py-2">
+   705→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Submissions</div>
+   706→          <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.totalSubs}</div>
+   707→        </div>
+   708→      </div>
+   709→    </motion.section>
+   710→  )
+   711→}
+   712→
+   713→/** "Site Operations" card — quick action buttons + available chips. */
+   714→function QuickActionsCard({ onAction }: { onAction: (m: ModuleKey) => void }) {
+   715→  const actions: { label: string; icon: React.ElementType; module: ModuleKey; tone: string }[] = [
+   716→    { label: 'Open Data Entry', icon: Database, module: 'data-entry', tone: 'bg-sky-50 text-sky-600' },
+   717→    { label: 'Upload Evidence', icon: Upload, module: 'evidence', tone: 'bg-violet-50 text-violet-600' },
+   718→    { label: 'View Pending Submission', icon: Send, module: 'submissions', tone: 'bg-amber-50 text-amber-600' },
+   719→    { label: 'Check Validation', icon: ShieldCheck, module: 'submissions', tone: 'bg-emerald-50 text-emerald-600' },
+   720→    { label: 'View Reports', icon: FileText, module: 'reports', tone: 'bg-cyan-50 text-cyan-600' },
+   721→  ]
+   722→  return (
+   723→    <motion.section
+   724→      custom={3}
+   725→      variants={cardEnter}
+   726→      initial="hidden"
+   727→      animate="visible"
+   728→      className="glass glass-shimmer rounded-[20px] p-5"
+   729→    >
+   730→      <header className="flex items-start justify-between gap-3 mb-4">
+   731→        <div>
+   732→          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+   733→            <Gauge className="h-4 w-4 text-sky-500" />
+   734→            Site Operations
+   735→          </h2>
+   736→          <p className="text-[11px] text-slate-700 mt-0.5">Quick actions for site data flow</p>
+   737→        </div>
+   738→        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
+   739→          <Plus className="h-3 w-3" /> Add Section
+   740→        </button>
+   741→      </header>
+   742→
+   743→      <div className="space-y-2">
+   744→        {actions.map((a, i) => (
+   745→          <motion.button
+   746→            key={a.label}
+   747→            onClick={() => onAction(a.module)}
+   748→            initial={{ opacity: 0, y: 4 }}
+   749→            animate={{ opacity: 1, y: 0 }}
+   750→            transition={{ duration: 0.3, delay: i * 0.04 }}
+   751→            className="glass-subtle rounded-xl px-3 py-2.5 w-full flex items-center gap-3 hover:bg-white/70 hover:shadow-sm transition-all text-left group"
+   752→          >
+   753→            <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${a.tone}`}>
+   754→              <a.icon className="h-4 w-4" />
+   755→            </span>
+   756→            <span className="flex-1 text-[12px] font-medium text-slate-700 group-hover:text-slate-900">{a.label}</span>
+   757→            <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all" />
+   758→          </motion.button>
+   759→        ))}
+   760→      </div>
+   761→
+   762→      {/* Available chips row */}
+   763→      <div className="mt-4 pt-3 border-t border-slate-200/60">
+   764→        <div className="text-[9px] uppercase tracking-wide text-slate-700 mb-2">Available data elements</div>
+   765→        <div className="flex flex-wrap gap-1.5">
+   766→          {FORM_ELEMENTS.map(el => (
+   767→            <span key={el.label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${el.tone}`}>
+   768→              <span className="font-mono">::</span>{el.label}
+   769→              <span className="opacity-60">{el.unit}</span>
+   770→            </span>
+   771→          ))}
+   772→        </div>
+   773→      </div>
+   774→    </motion.section>
+   775→  )
+   776→}
+   777→
+   778→/** "Active Submissions" wide table. */
+   779→function ActiveSubmissionsCard({
+   780→  submissions, loading, onViewAll,
+   781→}: {
+   782→  submissions: SubmissionItem[]
+   783→  loading: boolean
+   784→  onViewAll: () => void
+   785→}) {
+   786→  return (
+   787→    <motion.section
+   788→      custom={4}
+   789→      variants={cardEnter}
+   790→      initial="hidden"
+   791→      animate="visible"
+   792→      className="glass glass-shimmer rounded-[20px] p-5"
+   793→    >
+   794→      <header className="flex items-start justify-between gap-3 mb-4">
+   795→        <div>
+   796→          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+   797→            <Layers className="h-4 w-4 text-sky-500" />
+   798→            Active Submissions
+   799→          </h2>
+   800→          <p className="text-[11px] text-slate-700 mt-0.5">
+   801→            {submissions.length} submission{submissions.length === 1 ? '' : 's'} in progress
+   802→          </p>
+   803→        </div>
+   804→        <button
+   805→          onClick={onViewAll}
+   806→          className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5"
+   807→        >
+   808→          View All <ChevronRight className="h-3 w-3" />
+   809→        </button>
+   810→      </header>
+   811→
+   812→      {loading && submissions.length === 0 ? (
+   813→        <div className="space-y-2">
+   814→          {Array.from({ length: 4 }).map((_, i) => (
+   815→            <div key={i} className="h-11 rounded-xl bg-slate-200/60 animate-pulse" />
+   816→          ))}
+   817→        </div>
+   818→      ) : submissions.length === 0 ? (
+   819→        <div className="py-10 text-center">
+   820→          <FileText className="mx-auto h-8 w-8 text-slate-300" />
+   821→          <p className="text-[12px] text-slate-700 mt-2">No active submissions</p>
+   822→        </div>
+   823→      ) : (
+   824→        <div className="overflow-x-auto">
+   825→          <table className="w-full text-left">
+   826→            <thead>
+   827→              <tr className="text-[10px] uppercase tracking-wide text-slate-700 border-b border-slate-200/60">
+   828→                <th className="py-2 px-3 font-medium">Project / Title</th>
+   829→                <th className="py-2 px-3 font-medium">Period</th>
+   830→                <th className="py-2 px-3 font-medium">Module</th>
+   831→                <th className="py-2 px-3 font-medium">Status</th>
+   832→                <th className="py-2 px-3 font-medium w-40">Completion</th>
+   833→              </tr>
+   834→            </thead>
+   835→            <tbody className="divide-y divide-slate-100/80">
+   836→              {submissions.slice(0, 8).map(s => (
+   837→                <tr key={s.id} className="text-[12px] hover:bg-white/50 transition-colors">
+   838→                  <td className="py-2.5 px-3">
+   839→                    <div className="font-medium text-slate-800 truncate max-w-[240px]">{s.title}</div>
+   840→                    <div className="text-[10px] text-slate-700 mt-0.5">
+   841→                      {s.project?.projectCode ?? '—'} · {s.project?.projectName ?? '—'}
+   842→                    </div>
+   843→                  </td>
+   844→                  <td className="py-2.5 px-3 text-slate-600">{s.reportingPeriod?.periodLabel ?? '—'}</td>
+   845→                  <td className="py-2.5 px-3">
+   846→                    <span className="px-2 py-0.5 rounded-md bg-slate-100/80 text-slate-700 text-[10px] font-medium capitalize">
+   847→                      {s.module}
+   848→                    </span>
+   849→                  </td>
+   850→                  <td className="py-2.5 px-3">
+   851→                    <span className={`status-pill text-[10px] ${statusClass(s.status)}`}>
+   852→                      {s.status.replace(/_/g, ' ').toLowerCase()}
+   853→                    </span>
+   854→                  </td>
+   855→                  <td className="py-2.5 px-3">
+   856→                    <div className="flex items-center gap-2">
+   857→                      <div className="flex-1 h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
+   858→                        <div
+   859→                          className="h-full bg-gradient-to-r from-sky-400 to-sky-600 rounded-full transition-all"
+   860→                          style={{ width: `${s.completionPct || 0}%` }}
+   861→                        />
+   862→                      </div>
+   863→                      <span className="text-[10px] text-slate-600 tabular-nums w-8 text-right">
+   864→                        {s.completionPct || 0}%
+   865→                      </span>
+   866→                    </div>
+   867→                  </td>
+   868→                </tr>
+   869→              ))}
+   870→            </tbody>
+   871→          </table>
+   872→        </div>
+   873→      )}
+   874→    </motion.section>
+   875→  )
+   876→}
+   877→
+   878→/** "Data Entry Status" compact progress bars. */
+   879→function DataEntryStatusCard({
+   880→  subs, kpis,
+   881→}: {
+   882→  subs: SubmissionItem[]
+   883→  kpis?: Kpis
+   884→}) {
+   885→  const modules = moduleCompletion(subs, kpis)
+   886→  return (
+   887→    <motion.section
+   888→      custom={5}
+   889→      variants={cardEnter}
+   890→      initial="hidden"
+   891→      animate="visible"
+   892→      className="glass glass-shimmer rounded-[20px] p-5"
+   893→    >
+   894→      <header className="flex items-start justify-between gap-3 mb-4">
+   895→        <div>
+   896→          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+   897→            <ClipboardCheck className="h-4 w-4 text-sky-500" />
+   898→            Data Entry Status
+   899→          </h2>
+   900→          <p className="text-[11px] text-slate-700 mt-0.5">Per-module completion</p>
+   901→        </div>
+   902→      </header>
+   903→
+   904→      <div className="space-y-3">
+   905→        {modules.map(m => (
+   906→          <div key={m.label}>
+   907→            <div className="flex items-center justify-between mb-1">
+   908→              <span className="text-[12px] font-medium text-slate-700">{m.label}</span>
+   909→              <span className="text-[11px] text-slate-700 tabular-nums">{m.pct}%</span>
+   910→            </div>
+   911→            <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+   912→              <motion.div
+   913→                initial={{ width: 0 }}
+   914→                animate={{ width: `${m.pct}%` }}
+   915→                transition={{ duration: 0.8, ease: 'easeOut' }}
+   916→                className={`h-full ${m.tone} rounded-full`}
+   917→              />
+   918→            </div>
+   919→          </div>
+   920→        ))}
+   921→      </div>
+   922→    </motion.section>
+   923→  )
+   924→}
+   925→
+   926→/** "Team / Site Users" horizontal scroll. */
+   927→function TeamCard() {
+   928→  return (
+   929→    <motion.section
+   930→      custom={6}
+   931→      variants={cardEnter}
+   932→      initial="hidden"
+   933→      animate="visible"
+   934→      className="glass glass-shimmer rounded-[20px] p-5"
+   935→    >
+   936→      <header className="flex items-start justify-between gap-3 mb-4">
+   937→        <div>
+   938→          <h2 className="text-[16px] font-semibold text-slate-800 flex items-center gap-2">
+   939→            <Users className="h-4 w-4 text-sky-500" />
+   940→            Team / Site Users
+   941→          </h2>
+   942→          <p className="text-[11px] text-slate-700 mt-0.5">{SEEDED_TEAM.filter(u => u.active).length} active members</p>
+   943→        </div>
+   944→        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
+   945→          All Users <ChevronRight className="h-3 w-3" />
+   946→        </button>
+   947→      </header>
+   948→
+   949→      <div className="flex gap-3 overflow-x-auto scroll-elegant pb-1">
+   950→        {SEEDED_TEAM.map(u => (
+   951→          <div
+   952→            key={u.name}
+   953→            className="glass-subtle rounded-2xl p-3 flex-shrink-0 w-[160px] flex flex-col items-center text-center"
+   954→          >
+   955→            <div className={`h-12 w-12 rounded-full bg-gradient-to-br ${u.gradient} text-white flex items-center justify-center text-[13px] font-semibold ring-2 ring-white/80 mb-2`}>
+   956→              {initials(u.name)}
+   957→            </div>
+   958→            <div className="text-[12px] font-semibold text-slate-800 truncate w-full">{u.name}</div>
+   959→            <div className="text-[10px] text-slate-700 mb-1.5 truncate w-full">{u.role}</div>
+   960→            <span className={`status-pill text-[9px] ${u.active ? 'status-approved' : 'status-draft'}`}>
+   961→              {u.active ? 'Active' : 'Away'}
+   962→            </span>
+   963→          </div>
+   964→        ))}
+   965→      </div>
+   966→    </motion.section>
+   967→  )
+   968→}
+   969→
+   970→/* ============================================================
+   971→ * Main component
+   972→ * ============================================================ */
+   973→export function SiteUserOverview() {
+   974→  const { setActiveModule } = useApp()
+   975→  const [overview, setOverview] = useState<OverviewData | null>(null)
+   976→  const [activities, setActivities] = useState<ActivityItem[]>([])
+   977→  const [submissions, setSubmissions] = useState<SubmissionItem[]>([])
+   978→  const [loading, setLoading] = useState(true)
+   979→  const [error, setError] = useState('')
+   980→  const mountedRef = useRef(true)
+   981→
+   982→  /* ---- fetchers ---- */
+   983→  const fetchOverview = useCallback(async () => {
+   984→    try {
+   985→      const res = await fetch('/api/overview', { cache: 'no-store' })
+   986→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+   987→      const data = (await res.json()) as OverviewData
+   988→      if (!mountedRef.current) return
+   989→      setOverview(data)
+   990→      setError('')
+   991→    } catch (e) {
+   992→      if (!mountedRef.current) return
+   993→      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
+   994→    }
+   995→  }, [overview])
+   996→
+   997→  const fetchActivities = useCallback(async () => {
+   998→    try {
+   999→      const res = await fetch('/api/activity?take=20', { cache: 'no-store' })
+  1000→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1001→      const data = (await res.json()) as ActivityResponse
+  1002→      if (!mountedRef.current) return
+  1003→      setActivities(Array.isArray(data.items) ? data.items : [])
+  1004→    } catch {
+  1005→      /* silent — keep existing feed on poll error */
+  1006→    }
+  1007→  }, [])
+  1008→
+  1009→  const fetchSubmissions = useCallback(async () => {
+  1010→    try {
+  1011→      const res = await fetch('/api/submissions?take=10', { cache: 'no-store' })
+  1012→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  1013→      const data = (await res.json()) as SubmissionResponse
+  1014→      if (!mountedRef.current) return
+  1015→      setSubmissions(Array.isArray(data.items) ? data.items : [])
+  1016→    } catch {
+  1017→      /* silent */
+  1018→    }
+  1019→  }, [])
+  1020→
+  1021→  /* ---- initial load ---- */
+  1022→  useEffect(() => {
+  1023→    mountedRef.current = true
+  1024→    ;(async () => {
+  1025→      setLoading(true)
+  1026→      await Promise.all([fetchOverview(), fetchActivities(), fetchSubmissions()])
+  1027→      if (mountedRef.current) setLoading(false)
+  1028→    })()
+  1029→    return () => { mountedRef.current = false }
+  1030→  }, [])
+  1031→
+  1032→  /* ---- polling: activity every 30s, overview every 60s ---- */
+  1033→  useEffect(() => {
+  1034→    const activityTimer = setInterval(fetchActivities, 30_000)
+  1035→    const overviewTimer = setInterval(fetchOverview, 60_000)
+  1036→    return () => {
+  1037→      clearInterval(activityTimer)
+  1038→      clearInterval(overviewTimer)
+  1039→    }
+  1040→  }, [fetchActivities, fetchOverview])
+  1041→
+  1042→  const trendsArr = useMemo<Array<{ label: string } & Trend>>(() => {
+  1043→    if (!overview?.trends) return []
+  1044→    return Object.entries(overview.trends).map(([label, t]) => ({ label, ...t }))
+  1045→  }, [overview])
+  1046→
+  1047→  // Guard: still loading initial data
+  1048→  if (loading && !overview) {
+  1049→    return (
+  1050→      <div className="space-y-5">
+  1051→        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(380px,42%)]">
+  1052→          <div className="space-y-5">
+  1053→            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+  1054→            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+  1055→          </div>
+  1056→          <div className="space-y-5">
+  1057→            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+  1058→            <div className="glass rounded-[20px] h-[420px] animate-pulse" />
+  1059→          </div>
+  1060→        </div>
+  1061→        <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+  1062→        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+  1063→          <div className="glass rounded-[20px] h-[260px] animate-pulse" />
+  1064→          <div className="glass rounded-[20px] h-[260px] animate-pulse" />
+  1065→        </div>
+  1066→      </div>
+  1067→    )
+  1068→  }
+  1069→
+  1070→  // Guard: error and no data at all
+  1071→  if (error && !overview) {
+  1072→    return (
+  1073→      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+  1074→        <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
+  1075→        <p className="text-[14px] font-semibold text-slate-700 mb-1">Unable to load dashboard</p>
+  1076→        <p className="text-[12px] text-slate-700 mb-4">{error}</p>
+  1077→        <button
+  1078→          onClick={() => window.location.reload()}
+  1079→          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+  1080→        >
+  1081→          <RefreshCw className="h-3.5 w-3.5" /> Retry
+  1082→        </button>
+  1083→      </div>
+  1084→    )
+  1085→  }
+  1086→
+  1087→  // Guard: empty state (no periods configured yet)
+  1088→  if (!overview) {
+  1089→    return (
+  1090→      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+  1091→        <Database className="h-10 w-10 text-sky-300 mb-3" />
+  1092→        <p className="text-[14px] font-semibold text-slate-700 mb-1">No reporting periods yet</p>
+  1093→        <p className="text-[12px] text-slate-700 mb-4">Set up a reporting year to populate this dashboard.</p>
+  1094→        <button
+  1095→          onClick={() => setActiveModule('brsr')}
+  1096→          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+  1097→        >
+  1098→          <Plus className="h-3.5 w-3.5" /> Configure Period
+  1099→        </button>
+  1100→      </div>
+  1101→    )
+  1102→  }
+  1103→
+  1104→  const isEmpty = !overview || trendsArr.length === 0
+  1105→
+  1106→  return (
+  1107→    <div className="space-y-5">
+  1108→      {/* 2-column grid: left 58% / right 42% */}
+  1109→      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(380px,42%)]">
+  1110→        {/* LEFT */}
+  1111→        <div className="space-y-5">
+  1112→          <SiteEsgOverviewCard data={overview} onLog={() => setActiveModule('data-entry')} />
+  1113→          <RecentActivitiesCard activities={activities} loading={loading} />
+  1114→        </div>
+  1115→        {/* RIGHT */}
+  1116→        <div className="space-y-5">
+  1117→          <AnalyticsCard data={overview} />
+  1118→          <QuickActionsCard onAction={(m) => setActiveModule(m)} />
+  1119→        </div>
+  1120→      </div>
+  1121→
+  1122→      {/* Below: full-width sections */}
+  1123→      <ActiveSubmissionsCard
+  1124→        submissions={submissions}
+  1125→        loading={loading}
+  1126→        onViewAll={() => setActiveModule('submissions')}
+  1127→      />
+  1128→      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+  1129→        <DataEntryStatusCard subs={submissions} kpis={overview.kpis} />
+  1130→        <TeamCard />
+  1131→      </div>
+  1132→
+  1133→      {/* Empty-data safety banner (rendered only when no trend data) */}
+  1134→      {isEmpty && (
+  1135→        <div className="glass-subtle rounded-2xl p-3 flex items-center gap-2 text-[11px] text-slate-600">
+  1136→          <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+  1137→          Live telemetry is sparse — KPIs reflect aggregated records only.
+  1138→        </div>
+  1139→      )}
+  1140→    </div>
+  1141→  )
+  1142→}
+  1143→

@@ -41,6 +41,8 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'analytics', label: 'Analytics', icon: TrendingUp },
+    { key: 'team', label: 'Team', icon: Users },
     { key: 'reports', label: 'Reports', icon: FileBarChart },
   ],
 
@@ -51,6 +53,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'team', label: 'Team', icon: Users },
   ],
 
   // EHS / Safety User — safety data focused
@@ -60,6 +63,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'data-entry', label: 'Data Entry', icon: ShieldCheck, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'team', label: 'Team', icon: Users },
   ],
 
   // Procurement User — supplier data focused
@@ -69,6 +73,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'team', label: 'Team', icon: Users },
   ],
 
   // CSR User — community focused
@@ -78,6 +83,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'team', label: 'Team', icon: Users },
   ],
 
   // Compliance / Governance User
@@ -87,6 +93,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'team', label: 'Team', icon: Users },
   ],
 
   // BU Reviewer — review focused

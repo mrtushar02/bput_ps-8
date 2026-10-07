@@ -45,19 +45,19 @@
 
 :root {
   --radius: 1rem;
-  /* MEIL Liquid Glass — premium sky-blue atmosphere */
+  /* MEIL Liquid Glass — premium sky-blue atmosphere (darker text for visibility) */
   --background: oklch(0.975 0.02 235);
-  --foreground: oklch(0.16 0.05 245);
+  --foreground: oklch(0.12 0.04 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.05 245);
+  --card-foreground: oklch(0.12 0.04 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.05 245);
-  --primary: oklch(0.6 0.19 235);
+  --popover-foreground: oklch(0.12 0.04 250);
+  --primary: oklch(0.55 0.20 240);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.95 0.02 230);
-  --secondary-foreground: oklch(0.2 0.05 245);
-  --muted: oklch(0.95 0.015 230);
-  --muted-foreground: oklch(0.5 0.03 245);
+  --secondary: oklch(0.94 0.02 230);
+  --secondary-foreground: oklch(0.15 0.04 245);
+  --muted: oklch(0.94 0.015 230);
+  --muted-foreground: oklch(0.35 0.03 245);
   --accent: oklch(0.93 0.03 230);
   --accent-foreground: oklch(0.2 0.05 245);
   --destructive: oklch(0.58 0.22 27);
@@ -129,51 +129,55 @@
    ============================================================ */
 
 @layer components {
-  /* Frosted glass surface — MAXIMUM liquid glass with sky-blue tint */
+  /* Frosted glass surface — premium shadow + readable text intensity */
   .glass {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.72) 0%, rgba(224, 242, 254, 0.55) 50%, rgba(240, 249, 255, 0.65) 100%);
-    backdrop-filter: blur(24px) saturate(200%) brightness(1.05);
-    -webkit-backdrop-filter: blur(24px) saturate(200%) brightness(1.05);
-    border: 1px solid rgba(255, 255, 255, 0.85);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.80) 0%, rgba(240, 248, 255, 0.70) 50%, rgba(245, 250, 255, 0.75) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(150, 180, 210, 0.20);
     box-shadow:
       0 1px 0 0 rgba(255, 255, 255, 0.98) inset,
-      0 0 0 1px rgba(14, 165, 233, 0.06),
-      0 8px 32px -6px rgba(2, 132, 199, 0.15),
-      0 2px 8px -2px rgba(2, 132, 199, 0.08),
-      inset 0 1px 2px rgba(255, 255, 255, 0.5);
+      0 0 0 1px rgba(14, 165, 233, 0.05),
+      0 4px 6px -1px rgba(0, 0, 0, 0.04),
+      0 10px 30px -8px rgba(2, 132, 199, 0.12),
+      0 4px 12px -4px rgba(2, 132, 199, 0.08),
+      inset 0 1px 2px rgba(255, 255, 255, 0.6);
   }
 
   .glass-strong {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0%, rgba(224, 242, 254, 0.75) 50%, rgba(240, 249, 255, 0.82) 100%);
-    backdrop-filter: blur(30px) saturate(220%) brightness(1.05);
-    -webkit-backdrop-filter: blur(30px) saturate(220%) brightness(1.05);
-    border: 1px solid rgba(255, 255, 255, 0.92);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.90) 0%, rgba(240, 248, 255, 0.85) 50%, rgba(245, 250, 255, 0.88) 100%);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    border: 1px solid rgba(150, 180, 210, 0.25);
     box-shadow:
       0 1px 0 0 rgba(255, 255, 255, 1) inset,
-      0 0 0 1px rgba(14, 165, 233, 0.08),
-      0 16px 48px -10px rgba(2, 132, 199, 0.2),
-      0 4px 12px -3px rgba(2, 132, 199, 0.1),
-      inset 0 1px 3px rgba(255, 255, 255, 0.6);
+      0 0 0 1px rgba(14, 165, 233, 0.06),
+      0 4px 6px -1px rgba(0, 0, 0, 0.05),
+      0 16px 40px -10px rgba(2, 132, 199, 0.15),
+      0 6px 16px -4px rgba(2, 132, 199, 0.1),
+      inset 0 1px 3px rgba(255, 255, 255, 0.7);
   }
 
   .glass-subtle {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0%, rgba(224, 242, 254, 0.4) 100%);
-    backdrop-filter: blur(16px) saturate(170%);
-    -webkit-backdrop-filter: blur(16px) saturate(170%);
-    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.65) 0%, rgba(240, 248, 255, 0.55) 100%);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid rgba(150, 180, 210, 0.18);
     box-shadow:
-      0 4px 20px -6px rgba(2, 132, 199, 0.12),
-      inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      0 2px 4px -1px rgba(0, 0, 0, 0.03),
+      0 4px 16px -4px rgba(2, 132, 199, 0.10),
+      inset 0 1px 1px rgba(255, 255, 255, 0.5);
   }
 
   .glass-nav {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(240, 249, 255, 0.7) 100%);
-    backdrop-filter: blur(26px) saturate(200%);
-    -webkit-backdrop-filter: blur(26px) saturate(200%);
-    border: 1px solid rgba(255, 255, 255, 0.8);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.82) 0%, rgba(245, 250, 255, 0.78) 100%);
+    backdrop-filter: blur(22px) saturate(190%);
+    -webkit-backdrop-filter: blur(22px) saturate(190%);
+    border: 1px solid rgba(150, 180, 210, 0.20);
     box-shadow:
       0 1px 0 0 rgba(255, 255, 255, 0.98) inset,
-      0 4px 24px -6px rgba(2, 132, 199, 0.12),
+      0 4px 6px -1px rgba(0, 0, 0, 0.03),
+      0 4px 20px -6px rgba(2, 132, 199, 0.10),
       inset 0 1px 2px rgba(255, 255, 255, 0.5);
   }
 

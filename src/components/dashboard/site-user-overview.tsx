@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
+  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
 } from 'recharts'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
 
@@ -120,13 +120,14 @@ interface SubmissionResponse { items: SubmissionItem[]; total: number; count: nu
  * Constants
  * ============================================================ */
 const TOOLTIP_STYLE: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.94)',
-  border: '1px solid rgba(186, 230, 253, 0.55)',
+  background: 'rgba(255,255,255,0.96)',
+  border: '1px solid rgba(14,165,233,0.3)',
   borderRadius: 12,
   fontSize: 11,
-  boxShadow: '0 8px 24px -8px rgba(2,132,199,0.18)',
+  color: '#1e293b',
+  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(2,132,199,0.18)',
   backdropFilter: 'blur(12px)',
-  padding: '6px 10px',
+  padding: '8px 12px',
 }
 
 const STROKE_EMISSIONS = '#0EA5E9'
@@ -273,12 +274,12 @@ function KpiModule({
           </span>
         )}
       </div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">{label}</div>
+      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
       <div className="flex items-baseline gap-1">
         <span className="text-xl font-bold text-slate-800 tabular-nums">{value}</span>
-        {unit && <span className="text-[10px] text-slate-400 font-medium">{unit}</span>}
+        {unit && <span className="text-[10px] text-slate-600 font-medium">{unit}</span>}
       </div>
-      {sub && <div className="text-[9px] text-slate-500 leading-tight">{sub}</div>}
+      {sub && <div className="text-[9px] text-slate-700 leading-tight">{sub}</div>}
     </div>
   )
 }
@@ -302,7 +303,7 @@ function MiniArea({
             <stop offset="100%" stopColor={color} stopOpacity={0.02} />
           </linearGradient>
         </defs>
-        <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+        <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#334155', fontSize: 10 }} />
         <Area
           type="monotone"
           dataKey="value"
@@ -356,7 +357,7 @@ function SiteEsgOverviewCard({
             <Sparkles className="h-4 w-4 text-sky-500" />
             Site ESG Overview
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">
+          <p className="text-[11px] text-slate-700 mt-0.5">
             Real-time telemetry, GHG footprint &amp; resource circularity
           </p>
         </div>
@@ -412,22 +413,22 @@ function SiteEsgOverviewCard({
           trend={delta(waterSeries)}
         />
         <div className="glass-subtle rounded-2xl p-3 col-span-1">
-          <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium mb-1">Monthly GHG Trajectory</div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium mb-1">Monthly GHG Trajectory</div>
           <div className="h-[70px]">
             {emissionsSeries.length > 0 ? (
               <MiniArea data={emissionsSeries} color={STROKE_EMISSIONS} dataKey="emissions" />
             ) : (
-              <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+              <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
             )}
           </div>
         </div>
         <div className="glass-subtle rounded-2xl p-3 col-span-1">
-          <div className="text-[10px] uppercase tracking-wide text-slate-500 font-medium mb-1">Water Recycling Curve</div>
+          <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium mb-1">Water Recycling Curve</div>
           <div className="h-[70px]">
             {waterSeries.length > 0 ? (
               <MiniArea data={waterSeries} color={STROKE_WATER} dataKey="water" />
             ) : (
-              <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+              <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
             )}
           </div>
         </div>
@@ -457,7 +458,7 @@ function RecentActivitiesCard({
             <ActivityIcon className="h-4 w-4 text-sky-500" />
             Recent Site Activities
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">Live feed · polled every 30s</p>
+          <p className="text-[11px] text-slate-700 mt-0.5">Live feed · polled every 30s</p>
         </div>
         <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
           All Activities <ChevronRight className="h-3 w-3" />
@@ -481,7 +482,7 @@ function RecentActivitiesCard({
         ) : activities.length === 0 ? (
           <div className="py-12 text-center">
             <AlertCircle className="mx-auto h-8 w-8 text-slate-300" />
-            <p className="text-[12px] text-slate-500 mt-2">No activity yet</p>
+            <p className="text-[12px] text-slate-700 mt-2">No activity yet</p>
           </div>
         ) : (
           <ol className="relative space-y-1 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-sky-200/60 before:via-sky-100/40 before:to-transparent">
@@ -509,9 +510,9 @@ function RecentActivitiesCard({
                       )}
                     </div>
                     {a.description && (
-                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{a.description}</p>
+                      <p className="text-[11px] text-slate-700 mt-0.5 line-clamp-2">{a.description}</p>
                     )}
-                    <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5">
+                    <div className="text-[10px] text-slate-600 mt-1 flex items-center gap-1.5">
                       <span className="font-medium text-slate-600">{a.actorName}</span>
                       <span>·</span>
                       <span>{a.actorRole}</span>
@@ -549,9 +550,9 @@ function MiniChartCell({
       <div className="flex items-center justify-between mb-2">
         <div>
           <div className="text-[11px] font-semibold text-slate-700">{title}</div>
-          {subtitle && <div className="text-[9px] text-slate-500 mt-0.5">{subtitle}</div>}
+          {subtitle && <div className="text-[9px] text-slate-700 mt-0.5">{subtitle}</div>}
         </div>
-        <MoreHorizontal className="h-3.5 w-3.5 text-slate-400" />
+        <MoreHorizontal className="h-3.5 w-3.5 text-slate-600" />
       </div>
       <div style={{ height }} className="flex-1">{children}</div>
     </div>
@@ -568,8 +569,8 @@ function AnalyticsCard({ data }: { data: OverviewData }) {
   const energySeries = trendEntries.map(([label, t]) => ({ label, value: t.energy }))
 
   const waterDonut = [
-    { name: 'Withdrawn', value: Math.max(1, k.waterWithdrawalKL) },
-    { name: 'Recycled', value: Math.max(0.1, k.waterWithdrawalKL * k.waterRecycledShare / 100) },
+    { name: 'Recycled', value: Math.max(0.1, k.waterRecycledShare) },
+    { name: 'Fresh', value: Math.max(0.1, 100 - k.waterRecycledShare) },
   ]
 
   const baselineSeries = trendEntries.map(([label, t]) => ({ label, value: t.emissions * 0.95 }))
@@ -589,16 +590,16 @@ function AnalyticsCard({ data }: { data: OverviewData }) {
             <BarChart3 className="h-4 w-4 text-sky-500" />
             Site ESG Analytics
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">GHG, energy, water &amp; baseline indicators</p>
+          <p className="text-[11px] text-slate-700 mt-0.5">GHG, energy, water &amp; baseline indicators</p>
         </div>
-        <button className="rounded-lg p-1 text-slate-400 hover:text-slate-700 hover:bg-white/60 transition-colors">
+        <button className="rounded-lg p-1 text-slate-600 hover:text-slate-700 hover:bg-white/60 transition-colors">
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </header>
 
       {/* 2×2 chart grid */}
       <div className="grid grid-cols-2 gap-3">
-        <MiniChartCell title="Scope 1 vs 2 GHG" subtitle="tCO₂e per period" height={130}>
+        <MiniChartCell title="Scope 1 vs 2 GHG" subtitle="tCO₂e per period" height={150}>
           {ghgSeries.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={ghgSeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
@@ -612,72 +613,78 @@ function AnalyticsCard({ data }: { data: OverviewData }) {
                     <stop offset="100%" stopColor="#6366F1" stopOpacity={0.04} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={32} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} width={32} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#334155', fontSize: 10 }} />
                 <Area type="monotone" dataKey="scope1" stroke="#0EA5E9" strokeWidth={1.6} fill="url(#ghg-s1)" />
                 <Area type="monotone" dataKey="scope2" stroke="#6366F1" strokeWidth={1.6} fill="url(#ghg-s2)" />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+            <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
           )}
         </MiniChartCell>
 
-        <MiniChartCell title="Monthly Energy" subtitle="GJ per period" height={130}>
+        <MiniChartCell title="Monthly Energy" subtitle="GJ per period" height={150}>
           {energySeries.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={energySeries} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={32} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(14,165,233,0.06)' }} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+                <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} width={32} />
+                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(14,165,233,0.06)' }} labelStyle={{ color: '#334155', fontSize: 10 }} />
                 <Bar dataKey="value" fill="#0EA5E9" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+            <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
           )}
         </MiniChartCell>
 
-        <MiniChartCell title="Water Balance" subtitle={`${k.waterRecycledShare.toFixed(0)}% recycled`} height={130}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={waterDonut}
-                dataKey="value"
-                nameKey="name"
-                innerRadius={28}
-                outerRadius={48}
-                paddingAngle={2}
-                stroke="none"
-              >
-                {waterDonut.map((_, i) => (
-                  <Cell key={i} fill={DONUT_PALETTE[i % DONUT_PALETTE.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
-            </PieChart>
-          </ResponsiveContainer>
+        <MiniChartCell title="Water Balance" subtitle={`${k.waterRecycledShare.toFixed(0)}% recycled`} height={160}>
+          <div className="relative h-full flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={waterDonut}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={42}
+                  outerRadius={58}
+                  paddingAngle={3}
+                  stroke="none"
+                >
+                  <Cell fill="#0EA5E9" />
+                  <Cell fill="#E0F2FE" />
+                </Pie>
+                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: any) => `${v}%`} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 9 }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-20px' }}>
+              <span className="tabular-nums text-lg font-bold text-slate-800">{k.waterRecycledShare.toFixed(0)}%</span>
+              <span className="text-[8px] text-slate-600">recycled</span>
+            </div>
+          </div>
         </MiniChartCell>
 
-        <MiniChartCell title="CEA v19 Baseline" subtitle="Emission factor trend" height={130}>
+        <MiniChartCell title="CEA v19 Baseline" subtitle="Emission factor trend" height={150}>
           <div className="flex flex-col h-full justify-between">
             <div className="flex items-baseline gap-1">
               <span className="text-[22px] font-bold text-slate-800 tabular-nums">{formatNumber(baselineValue, 1)}</span>
-              <span className="text-[9px] text-slate-400">tCO₂e</span>
+              <span className="text-[9px] text-slate-600">tCO₂e</span>
             </div>
             <div className="flex-1 min-h-0">
               {baselineSeries.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={baselineSeries} margin={{ top: 4, right: 4, bottom: 0, left: -28 }}>
-                    <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 8, fill: '#94A3B8' }} axisLine={false} tickLine={false} width={32} domain={['auto', 'auto']} />
-                    <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#64748b', fontSize: 10 }} />
+                    <XAxis dataKey="label" tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 8, fill: '#475569' }} axisLine={false} tickLine={false} width={32} domain={['auto', 'auto']} />
+                    <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#334155', fontSize: 10 }} />
                     <Line type="monotone" dataKey="value" stroke="#10B981" strokeWidth={1.8} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-[10px] text-slate-400">No data</div>
+                <div className="h-full flex items-center justify-center text-[10px] text-slate-600">No data</div>
               )}
             </div>
           </div>
@@ -687,15 +694,15 @@ function AnalyticsCard({ data }: { data: OverviewData }) {
       {/* 3-col compact metrics row */}
       <div className="grid grid-cols-3 gap-2 mt-3">
         <div className="glass-subtle rounded-xl px-3 py-2">
-          <div className="text-[9px] uppercase tracking-wide text-slate-500">Waste Recycled</div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-700">Waste Recycled</div>
           <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.wasteRecycledShare.toFixed(1)}%</div>
         </div>
         <div className="glass-subtle rounded-xl px-3 py-2">
-          <div className="text-[9px] uppercase tracking-wide text-slate-500">BRSR Readiness</div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-700">BRSR Readiness</div>
           <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.brsrReadiness.toFixed(1)}%</div>
         </div>
         <div className="glass-subtle rounded-xl px-3 py-2">
-          <div className="text-[9px] uppercase tracking-wide text-slate-500">Submissions</div>
+          <div className="text-[9px] uppercase tracking-wide text-slate-700">Submissions</div>
           <div className="text-[14px] font-bold text-slate-800 tabular-nums">{k.totalSubs}</div>
         </div>
       </div>
@@ -726,7 +733,7 @@ function QuickActionsCard({ onAction }: { onAction: (m: ModuleKey) => void }) {
             <Gauge className="h-4 w-4 text-sky-500" />
             Site Operations
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">Quick actions for site data flow</p>
+          <p className="text-[11px] text-slate-700 mt-0.5">Quick actions for site data flow</p>
         </div>
         <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
           <Plus className="h-3 w-3" /> Add Section
@@ -747,14 +754,14 @@ function QuickActionsCard({ onAction }: { onAction: (m: ModuleKey) => void }) {
               <a.icon className="h-4 w-4" />
             </span>
             <span className="flex-1 text-[12px] font-medium text-slate-700 group-hover:text-slate-900">{a.label}</span>
-            <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all" />
+            <ChevronRight className="h-4 w-4 text-slate-600 group-hover:text-sky-600 group-hover:translate-x-0.5 transition-all" />
           </motion.button>
         ))}
       </div>
 
       {/* Available chips row */}
       <div className="mt-4 pt-3 border-t border-slate-200/60">
-        <div className="text-[9px] uppercase tracking-wide text-slate-500 mb-2">Available data elements</div>
+        <div className="text-[9px] uppercase tracking-wide text-slate-700 mb-2">Available data elements</div>
         <div className="flex flex-wrap gap-1.5">
           {FORM_ELEMENTS.map(el => (
             <span key={el.label} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border ${el.tone}`}>
@@ -790,7 +797,7 @@ function ActiveSubmissionsCard({
             <Layers className="h-4 w-4 text-sky-500" />
             Active Submissions
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">
+          <p className="text-[11px] text-slate-700 mt-0.5">
             {submissions.length} submission{submissions.length === 1 ? '' : 's'} in progress
           </p>
         </div>
@@ -811,13 +818,13 @@ function ActiveSubmissionsCard({
       ) : submissions.length === 0 ? (
         <div className="py-10 text-center">
           <FileText className="mx-auto h-8 w-8 text-slate-300" />
-          <p className="text-[12px] text-slate-500 mt-2">No active submissions</p>
+          <p className="text-[12px] text-slate-700 mt-2">No active submissions</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="text-[10px] uppercase tracking-wide text-slate-500 border-b border-slate-200/60">
+              <tr className="text-[10px] uppercase tracking-wide text-slate-700 border-b border-slate-200/60">
                 <th className="py-2 px-3 font-medium">Project / Title</th>
                 <th className="py-2 px-3 font-medium">Period</th>
                 <th className="py-2 px-3 font-medium">Module</th>
@@ -830,7 +837,7 @@ function ActiveSubmissionsCard({
                 <tr key={s.id} className="text-[12px] hover:bg-white/50 transition-colors">
                   <td className="py-2.5 px-3">
                     <div className="font-medium text-slate-800 truncate max-w-[240px]">{s.title}</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">
+                    <div className="text-[10px] text-slate-700 mt-0.5">
                       {s.project?.projectCode ?? '—'} · {s.project?.projectName ?? '—'}
                     </div>
                   </td>
@@ -890,7 +897,7 @@ function DataEntryStatusCard({
             <ClipboardCheck className="h-4 w-4 text-sky-500" />
             Data Entry Status
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">Per-module completion</p>
+          <p className="text-[11px] text-slate-700 mt-0.5">Per-module completion</p>
         </div>
       </header>
 
@@ -899,7 +906,7 @@ function DataEntryStatusCard({
           <div key={m.label}>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[12px] font-medium text-slate-700">{m.label}</span>
-              <span className="text-[11px] text-slate-500 tabular-nums">{m.pct}%</span>
+              <span className="text-[11px] text-slate-700 tabular-nums">{m.pct}%</span>
             </div>
             <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
               <motion.div
@@ -932,7 +939,7 @@ function TeamCard() {
             <Users className="h-4 w-4 text-sky-500" />
             Team / Site Users
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">{SEEDED_TEAM.filter(u => u.active).length} active members</p>
+          <p className="text-[11px] text-slate-700 mt-0.5">{SEEDED_TEAM.filter(u => u.active).length} active members</p>
         </div>
         <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5">
           All Users <ChevronRight className="h-3 w-3" />
@@ -949,7 +956,7 @@ function TeamCard() {
               {initials(u.name)}
             </div>
             <div className="text-[12px] font-semibold text-slate-800 truncate w-full">{u.name}</div>
-            <div className="text-[10px] text-slate-500 mb-1.5 truncate w-full">{u.role}</div>
+            <div className="text-[10px] text-slate-700 mb-1.5 truncate w-full">{u.role}</div>
             <span className={`status-pill text-[9px] ${u.active ? 'status-approved' : 'status-draft'}`}>
               {u.active ? 'Active' : 'Away'}
             </span>
@@ -1066,7 +1073,7 @@ export function SiteUserOverview() {
       <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
         <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
         <p className="text-[14px] font-semibold text-slate-700 mb-1">Unable to load dashboard</p>
-        <p className="text-[12px] text-slate-500 mb-4">{error}</p>
+        <p className="text-[12px] text-slate-700 mb-4">{error}</p>
         <button
           onClick={() => window.location.reload()}
           className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
@@ -1083,7 +1090,7 @@ export function SiteUserOverview() {
       <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
         <Database className="h-10 w-10 text-sky-300 mb-3" />
         <p className="text-[14px] font-semibold text-slate-700 mb-1">No reporting periods yet</p>
-        <p className="text-[12px] text-slate-500 mb-4">Set up a reporting year to populate this dashboard.</p>
+        <p className="text-[12px] text-slate-700 mb-4">Set up a reporting year to populate this dashboard.</p>
         <button
           onClick={() => setActiveModule('brsr')}
           className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"

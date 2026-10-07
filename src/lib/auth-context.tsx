@@ -19,7 +19,7 @@ export interface SessionUser {
 
 export type ModuleKey =
   | 'overview' | 'my-project' | 'data-entry' | 'evidence'
-  | 'submissions' | 'reports' | 'analytics' | 'audit' | 'brsr' | 'admin'
+  | 'submissions' | 'reports' | 'analytics' | 'audit' | 'brsr' | 'admin' | 'team'
 
 interface AppState {
   user: SessionUser | null
