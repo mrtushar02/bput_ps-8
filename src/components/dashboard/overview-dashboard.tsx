@@ -10,7 +10,7 @@ import {
   Building2, Activity, ArrowUpRight, ArrowRight, CheckCircle2, AlertTriangle, AlertOctagon, Clock, Gauge, Leaf, Battery, Send, Link2, X, Sparkles, AlertCircle, ChevronRight, Award, FileDown
 } from 'lucide-react'
 import {
-  AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadialBarChart, RadialBar
+  AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadialBarChart, RadialBar, ComposedChart, ReferenceDot
 } from 'recharts'
 import { PipelineTracker } from '@/components/dashboard/pipeline-tracker'
 import { TargetsWidget } from '@/components/dashboard/targets-widget'
@@ -44,6 +44,7 @@ export function OverviewDashboard() {
   const { setActiveModule } = useApp()
   const [drillDown, setDrillDown] = useState<null | 'emissions' | 'energy' | 'water' | 'waste'>(null)
   const [exporting, setExporting] = useState(false)
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('all')
   // Compute ESG composite score (0-100) from real KPIs — no hardcoded values
   const esgScore = useMemo(() => {
     if (!data) return 0
@@ -66,7 +67,12 @@ export function OverviewDashboard() {
   if (!data) return <EmptyState />
 
   const k = data.kpis
-  const trendArr = Object.entries(data.trends).map(([label, v]) => ({ label, ...v }))
+  const allTrendArr = Object.entries(data.trends).map(([label, v]) => ({ label, ...v }))
+  // Filter by selected period (if not 'all')
+  const trendArr = selectedPeriod === 'all' ? allTrendArr : (() => {
+    const period = data.periods.find((p: any) => p.id === selectedPeriod)
+    return period ? allTrendArr.filter(t => t.label === period.label) : allTrendArr
+  })()
   const sourceArr = Object.entries(data.emissionsBySource).map(([name, value]) => ({ name, value }))
   const waterDonut = [
     { name: 'Recycled', value: k.waterRecycledShare },
@@ -102,6 +108,22 @@ export function OverviewDashboard() {
       {/* EXECUTIVE SUMMARY BANNER — smart alert with the single most important action */}
       <ExecutiveSummary kpis={k} onNavigate={(m) => setActiveModule(m as ModuleKey)} />
 
+      {/* PERIOD SELECTOR — filter all charts/KPIs by reporting period */}
+      {data.periods.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto scroll-elegant">
+          <button onClick={() => setSelectedPeriod('all')}
+            className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${selectedPeriod === 'all' ? 'bg-blue-500 text-white shadow-sm' : 'glass-subtle text-slate-500 hover:text-slate-700'}`}>
+            All Periods
+          </button>
+          {data.periods.map((p: any) => (
+            <button key={p.id} onClick={() => setSelectedPeriod(p.id)}
+              className={`flex-shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${selectedPeriod === p.id ? 'bg-blue-500 text-white shadow-sm' : 'glass-subtle text-slate-500 hover:text-slate-700'}`}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* ESG SCORE GAUGE + KPI GRID */}
       <div className="grid gap-4 lg:grid-cols-[260px,1fr]">
         <EsgScoreGauge score={esgScore} />
@@ -110,10 +132,10 @@ export function OverviewDashboard() {
 
       {/* KPI GRID — real month-over-month deltas from trends data (no hardcoded values) */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
-        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={trendArr.map(t => t.emissions)} sparkColor="#f43f5e" onClick={() => setDrillDown('emissions')} />
-        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={trendArr.map(t => t.energy)} sparkColor="#f59e0b" onClick={() => setDrillDown('energy')} />
-        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={trendArr.map(t => t.water)} sparkColor="#06b6d4" onClick={() => setDrillDown('water')} />
-        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={trendArr.map(t => t.waste)} sparkColor="#10b981" onClick={() => setDrillDown('waste')} />
+        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={allTrendArr.map(t => t.emissions)} sparkColor="#f43f5e" onClick={() => setDrillDown('emissions')} />
+        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={allTrendArr.map(t => t.energy)} sparkColor="#f59e0b" onClick={() => setDrillDown('energy')} />
+        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={allTrendArr.map(t => t.water)} sparkColor="#06b6d4" onClick={() => setDrillDown('water')} />
+        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={allTrendArr.map(t => t.waste)} sparkColor="#10b981" onClick={() => setDrillDown('waste')} />
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
         <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={null} goodDirection="up" sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} />
@@ -129,12 +151,16 @@ export function OverviewDashboard() {
 
       {/* CHARTS ROW 1 */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Emissions trend */}
+        {/* Emissions trend — with PoP comparison + anomaly annotations */}
         <GlassCard className="lg:col-span-2" delay={0.1}>
-          <CardHeader icon={Flame} title="Monthly GHG Trajectory" subtitle="tCO₂e by reporting period · deterministic calc" right={<span className="status-pill status-approved">Target &lt; 5k</span>} />
+          <CardHeader icon={Flame} title="Monthly GHG Trajectory" subtitle="tCO₂e by reporting period · deterministic calc" right={
+            <div className="flex items-center gap-1.5">
+              <span className="status-pill status-approved">Target &lt; 5k</span>
+            </div>
+          } />
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trendArr} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
+              <ComposedChart data={trendArr} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
                 <defs>
                   <linearGradient id="emGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.5} />
@@ -146,9 +172,41 @@ export function OverviewDashboard() {
                 <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Area type="monotone" dataKey="emissions" stroke="#3b82f6" strokeWidth={2.5} fill="url(#emGrad)" name="Emissions tCO₂e" />
-              </AreaChart>
+                {(() => {
+                  // Detect anomalies (MoM change > 30%) and render annotation dots
+                  const dots: any[] = []
+                  for (let i = 1; i < trendArr.length; i++) {
+                    const prev = trendArr[i - 1].emissions
+                    const cur = trendArr[i].emissions
+                    if (prev > 0) {
+                      const pct = ((cur - prev) / prev) * 100
+                      if (Math.abs(pct) > 30) {
+                        dots.push(
+                          <ReferenceDot key={`anomaly-${i}`} x={trendArr[i].label} y={cur} r={6} fill={pct > 0 ? '#f43f5e' : '#10b981'} stroke="white" strokeWidth={2} />
+                        )
+                      }
+                    }
+                  }
+                  return dots
+                })()}
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
+          {/* Anomaly legend */}
+          {trendArr.length >= 2 && (() => {
+            const last = trendArr[trendArr.length - 1].emissions
+            const prev = trendArr[trendArr.length - 2].emissions
+            if (prev <= 0) return null
+            const pct = Math.round(((last - prev) / prev) * 1000) / 10
+            const isAnomaly = Math.abs(pct) > 30
+            return (
+              <div className={`mt-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-[11px] ${isAnomaly ? (pct > 0 ? 'bg-rose-50/70 text-rose-700' : 'bg-emerald-50/70 text-emerald-700') : 'bg-slate-50/60 text-slate-600'}`}>
+                <span className="font-semibold">{isAnomaly ? (pct > 0 ? 'Anomaly detected' : 'Significant improvement') : 'Stable period'}</span>
+                <span>· Last vs previous: {pct > 0 ? '+' : ''}{pct}%</span>
+                {isAnomaly && pct > 0 && <span className="ml-auto">Review the spike source →</span>}
+              </div>
+            )
+          })()}
         </GlassCard>
 
         {/* Emissions by source */}

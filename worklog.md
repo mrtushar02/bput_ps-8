@@ -743,3 +743,35 @@ Stage Summary:
 - All values in the PDF computed from real DB data — no hardcoded KPIs
 - Premium ReportLab PDF with MEIL branding, KPI cards, trends table, control chain summary
 - Ready for next round: could add interactive chart tooltips, YoY comparison overlays, data quality heatmap, BRSR framework comparison, or mobile-responsive refinements
+
+---
+Task ID: 15 (QA + Features round 6)
+Agent: Lead Architect (main) — autonomous webDevReview round 6
+Task: Anomaly annotations, period selector, chart interactivity
+
+Work Log:
+- Reviewed worklog (5 prior rounds). Platform was stable with all 9 modules passing.
+- Performed fresh QA via agent-browser: logged in as Super Admin, tested all 9 modules (all OK), used VLM to identify highest-impact gaps: (1) charts lack interactive annotations / anomaly detection, (2) no period filtering, (3) no period-over-period comparison.
+
+- Added 3 NEW FEATURES:
+  1. **Anomaly Annotation Dots on GHG Trajectory Chart** — the Monthly GHG Trajectory chart now renders ReferenceDot markers at any month where the MoM change exceeds ±30% (rose dot for spike, emerald dot for improvement). Switched from AreaChart to ComposedChart to support the ReferenceDot overlay. Below the chart, an anomaly status banner shows: "Anomaly detected · Last vs previous: +75% · Review the spike source →" (rose for spike, emerald for improvement, slate for stable). Verified: red dot on June (75% spike from May), banner shows "Anomaly detected · +75%".
+  2. **Period Selector** — a pill bar below the Executive Summary banner with "All Periods" + each reporting period (April/May/June 2026). Clicking a period filters the GHG Trajectory chart to show only that period's data. KPI sparklines always show the full trend (using allTrendArr) for consistent context. Active period is highlighted in blue. Verified: clicking "June 2026" filters the chart to show only June data.
+  3. **Period-aware trend filtering** — the trendArr now respects the selectedPeriod state: 'all' shows all months, a specific period shows only that month. Sparklines use allTrendArr so they always show the full trend regardless of filter.
+
+- Updated the chart to use ComposedChart (from recharts) which supports combining Area + ReferenceDot in a single chart.
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- VLM-verified anomaly annotation dots (red + green) on the GHG chart
+- DOM-verified anomaly banner: "Anomaly detected · Last vs previous: +75% · Review the spike source →"
+- DOM-verified period selector buttons: "All Periods | April 2026 | May 2026 | June 2026"
+- Verified period filter: clicking June 2026 filters the chart to show only June data
+
+Stage Summary:
+- 3 new features (anomaly annotation dots, period selector, period-aware trend filtering)
+- Upgraded chart from AreaChart to ComposedChart (supports ReferenceDot overlay)
+- All values computed from real DB data — anomalies detected from real MoM deltas, periods from real reporting periods
+- Premium glassmorphism design language preserved (blue active period pills, rose/emerald anomaly colors)
+- Ready for next round: could add data quality heatmap, BRSR framework comparison, mobile-responsive refinements, or interactive tooltip customization
