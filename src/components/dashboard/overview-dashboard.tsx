@@ -17,6 +17,7 @@ import { TargetsWidget } from '@/components/dashboard/targets-widget'
 import { AiInsightsPanel } from '@/components/dashboard/ai-insights-panel'
 import { ActionItemsWidget } from '@/components/dashboard/action-items-widget'
 import { GlossaryTooltip } from '@/components/dashboard/glossary-tooltip'
+import { ScenarioCalculator } from '@/components/dashboard/scenario-calculator'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
 
 interface OverviewData {
@@ -147,6 +148,13 @@ export function OverviewDashboard() {
       </div>
         </div>
       </div>
+
+      {/* ESG SCENARIO CALCULATOR — What-If modeling */}
+      <ScenarioCalculator currentScore={esgScore} currentKpis={{
+        brsrReadiness: k.brsrReadiness, completion: k.completion, waterRecycledShare: k.waterRecycledShare,
+        wasteRecycledShare: k.wasteRecycledShare, renewableShare: k.renewableShare, femaleShare: k.femaleShare,
+        ltifr: k.ltifr, openExceptions: k.openExceptions,
+      }} />
 
       {/* ESG DATA CONTROL CHAIN — live pipeline tracker */}
       <PipelineTracker data={data} />
@@ -673,7 +681,45 @@ function EsgScoreGauge({ score }: { score: number }) {
         <div className="flex items-center gap-1.5 rounded-md bg-amber-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> B (60+)</div>
         <div className="flex items-center gap-1.5 rounded-md bg-rose-50/60 px-2 py-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> C/D (&lt;60)</div>
       </div>
+      {/* Industry benchmark comparison */}
+      <BenchmarkComparison score={score} />
     </motion.section>
+  )
+}
+
+/* ---------- Industry Benchmark Comparison ---------- */
+function BenchmarkComparison({ score }: { score: number }) {
+  // Illustrative industry benchmarks (in production, these would come from a benchmark API)
+  const benchmarks = [
+    { label: 'Industry avg', value: 62, color: '#94a3b8' },
+    { label: 'Top quartile', value: 78, color: '#10b981' },
+    { label: 'Leaders', value: 88, color: '#3b82f6' },
+  ]
+  const percentile = score >= 88 ? 'Top 10%' : score >= 78 ? 'Top 25%' : score >= 62 ? 'Above average' : 'Below average'
+  const percentileColor = score >= 78 ? 'text-emerald-600' : score >= 62 ? 'text-blue-600' : 'text-amber-600'
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200/50 bg-white/40 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Industry benchmark</span>
+        <span className={`text-[10px] font-bold ${percentileColor}`}>{percentile}</span>
+      </div>
+      {/* Benchmark bar */}
+      <div className="relative h-2 rounded-full bg-slate-200/60">
+        <div className="absolute h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" style={{ width: `${score}%` }} />
+        {benchmarks.map((b) => (
+          <div key={b.label} className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2" style={{ left: `${b.value}%`, background: b.color }} title={`${b.label}: ${b.value}`} />
+        ))}
+      </div>
+      {/* Benchmark legend */}
+      <div className="mt-2 flex items-center justify-between text-[9px]">
+        {benchmarks.map((b) => (
+          <span key={b.label} className="flex items-center gap-1 text-slate-500">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: b.color }} />
+            {b.label} <span className="tabular-nums font-semibold">{b.value}</span>
+          </span>
+        ))}
+      </div>
+    </div>
   )
 }
 

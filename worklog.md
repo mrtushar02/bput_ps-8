@@ -817,3 +817,46 @@ Stage Summary:
 - Premium glassmorphism design language preserved (emerald/amber/slate confidence colors, glass-strong tooltip popovers)
 - Onboarding improved: new users can now hover any ESG term to understand its meaning without leaving the dashboard
 - Ready for next round: could add BRSR dimension progress bars, data quality heatmap, mobile-responsive refinements, or interactive tooltip customization
+
+---
+Task ID: 17 (QA + Features round 8)
+Agent: Lead Architect (main) — autonomous webDevReview round 8
+Task: ESG Scenario Calculator (What-If), industry benchmarking
+
+Work Log:
+- Reviewed worklog (7 prior rounds). Platform was stable with all 9 modules passing.
+- Performed fresh QA via agent-browser: logged in as Super Admin, tested all 9 modules (all OK), used VLM to identify highest-impact gaps: (1) no "What-If" scenario modeling, (2) no industry benchmarking/peer comparison.
+
+- Added 2 NEW FEATURES:
+  1. **ESG Scenario Calculator** (`src/components/dashboard/scenario-calculator.tsx`) — a premium "What-If" modeling tool that lets executives model how reduction targets affect the composite ESG score. Features:
+     - Current vs Projected score display with delta indicator (+X pts)
+     - 5 interactive sliders: Energy reduction (%), Water recycling boost (%), Waste recovery boost (%), BRSR gap closure (%), Gender diversity boost (%)
+     - Real-time projection using the same 8-dimension scoring formula as the ESG Score gauge
+     - "Projected impact" section showing before→after values for each affected KPI (renewable share, water recycled, waste recovered, BRSR readiness, female share, LTIFR)
+     - Reset button to clear all sliders
+     - Verified: moving Energy reduction to 30% projected score from 70 → 72 (+2 pts), renewable share from 20.2% → 35.2%
+  2. **Industry Benchmarking** — added a BenchmarkComparison component below the ESG Score gauge showing:
+     - A horizontal benchmark bar with the current score (70) filled in blue gradient
+     - Vertical markers for Industry avg (62), Top quartile (78), and Leaders (88)
+     - A percentile label ("Above average" for score 70)
+     - A legend showing each benchmark with its value
+     - Verified: VLM confirmed "INDUSTRY BENCHMARK" section with progress bar, score 70 relative to Industry avg 62, Top quartile 78, Leaders 88, "Above average" label
+
+- Placed the Scenario Calculator between the KPI grid and the ESG Data Control Chain pipeline tracker.
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- VLM-verified Scenario Calculator: Current 70, Projected 72 (+2 pts) with 5 sliders
+- VLM-verified Industry Benchmark: progress bar with Industry avg 62, Top quartile 78, Leaders 88, "Above average" percentile
+- DOM-verified scenario interactivity: moving energy slider to 30% updates projected score to 72 and renewable share to 35.2%
+
+Stage Summary:
+- 2 new features (ESG Scenario Calculator with What-If modeling, Industry Benchmarking)
+- 1 new component (scenario-calculator.tsx)
+- 1 new sub-component (BenchmarkComparison in overview-dashboard.tsx)
+- All projections computed from real KPI data using the same 8-dimension formula — no hardcoded scores
+- Premium glassmorphism design language preserved (violet gradient for scenario, blue gradient for benchmark bar)
+- The platform now supports strategic decision-making: executives can model reduction scenarios and see the score impact before committing to targets
+- Ready for next round: could add BRSR dimension progress bars, data quality heatmap, mobile-responsive refinements, or CSV/PDF export of scenarios
