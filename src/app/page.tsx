@@ -2,35 +2,44 @@
 import { AppProvider, useApp } from '@/lib/auth-context'
 import { WelcomeScreen } from '@/components/welcome/welcome-screen'
 import { AppShell } from '@/components/shell/app-shell'
-import { OverviewDashboard } from '@/components/dashboard/overview-dashboard'
 import { SiteUserOverview } from '@/components/dashboard/site-user-overview'
+import { HrDashboard } from '@/components/dashboard/hr-dashboard'
+import { EhsDashboard } from '@/components/dashboard/ehs-dashboard'
+import { ProcurementDashboard } from '@/components/dashboard/procurement-dashboard'
+import { CsrDashboard } from '@/components/dashboard/csr-dashboard'
+import { ComplianceDashboard } from '@/components/dashboard/compliance-dashboard'
 import { ReviewerDashboard } from '@/components/dashboard/reviewer-dashboard'
+import { SubsidiaryReviewerDashboard } from '@/components/dashboard/subsidiary-reviewer-dashboard'
+import { GroupReviewerDashboard } from '@/components/dashboard/group-reviewer-dashboard'
+import { EsgManagerDashboard } from '@/components/dashboard/esg-manager-dashboard'
+import { EsgAnalystDashboard } from '@/components/dashboard/esg-analyst-dashboard'
+import { BrsrManagerDashboard } from '@/components/dashboard/brsr-manager-dashboard'
 import { ExecutiveDashboard } from '@/components/dashboard/executive-dashboard'
 import { AuditorDashboard } from '@/components/dashboard/auditor-dashboard'
 import { ModuleRouter } from '@/components/modules/module-router'
 import { ErrorBoundary } from '@/components/error-boundary'
 
-// Role → dashboard mapping. Each role group gets a UNIQUE dashboard with a
-// distinct color theme, layout, and information density.
-function getDashboardForRole(roleKey: string) {
-  // Site users (data entry) — sky-blue 3-column operational dashboard
-  const siteUserRoles = ['PROJECT_USER', 'HR_USER', 'EHS_USER', 'PROCUREMENT_USER', 'CSR_USER', 'COMPLIANCE_USER']
-  // Reviewers — indigo/violet review-queue dashboard
-  const reviewerRoles = ['BU_REVIEWER', 'SUBSIDIARY_REVIEWER', 'GROUP_REVIEWER']
-  // Executives + Super Admin — amber/gold executive briefing
-  const executiveRoles = ['EXECUTIVE', 'SUPER_ADMIN']
-  // Auditors — slate/steel assurance dashboard
-  const auditorRoles = ['AUDITOR']
-  // ESG managers/analysts + BRSR manager — keep the command center (emerald/teal)
-  const managerRoles = ['ESG_MANAGER', 'ESG_ANALYST', 'BRSR_MANAGER']
-
-  if (siteUserRoles.includes(roleKey)) return <SiteUserOverview />
-  if (reviewerRoles.includes(roleKey)) return <ReviewerDashboard />
-  if (executiveRoles.includes(roleKey)) return <ExecutiveDashboard />
-  if (auditorRoles.includes(roleKey)) return <AuditorDashboard />
-  if (managerRoles.includes(roleKey)) return <OverviewDashboard />
-  // Fallback for unknown roles
-  return <OverviewDashboard />
+// EXACT per-role dashboard mapping — each of the 15 roles gets a UNIQUE dashboard
+// with a distinct color theme, layout, and information focus.
+function getRoleDashboard(roleKey: string) {
+  switch (roleKey) {
+    case 'SUPER_ADMIN': return <ExecutiveDashboard />
+    case 'PROJECT_USER': return <SiteUserOverview />
+    case 'HR_USER': return <HrDashboard />
+    case 'EHS_USER': return <EhsDashboard />
+    case 'PROCUREMENT_USER': return <ProcurementDashboard />
+    case 'CSR_USER': return <CsrDashboard />
+    case 'COMPLIANCE_USER': return <ComplianceDashboard />
+    case 'BU_REVIEWER': return <ReviewerDashboard />
+    case 'SUBSIDIARY_REVIEWER': return <SubsidiaryReviewerDashboard />
+    case 'GROUP_REVIEWER': return <GroupReviewerDashboard />
+    case 'ESG_MANAGER': return <EsgManagerDashboard />
+    case 'ESG_ANALYST': return <EsgAnalystDashboard />
+    case 'BRSR_MANAGER': return <BrsrManagerDashboard />
+    case 'AUDITOR': return <AuditorDashboard />
+    case 'EXECUTIVE': return <ExecutiveDashboard />
+    default: return <ExecutiveDashboard />
+  }
 }
 
 function Root() {
@@ -57,7 +66,7 @@ function Root() {
   return (
     <AppShell>
       <ErrorBoundary label={activeModule}>
-        {activeModule === 'overview' ? getDashboardForRole(roleKey) : <ModuleRouter />}
+        {activeModule === 'overview' ? getRoleDashboard(roleKey) : <ModuleRouter />}
       </ErrorBoundary>
     </AppShell>
   )

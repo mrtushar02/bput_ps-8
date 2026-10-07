@@ -1242,3 +1242,47 @@ Stage Summary:
 - Redesigned My Project with split-screen layout matching reference (KPIs + table + detail panel + widgets)
 - Added Team + Analytics nav tabs for all site user roles
 - 3 new/rewritten files: team.tsx (new), my-project.tsx (rewritten), role-nav.ts (updated), auth-context.tsx (updated), module-router.tsx (updated), site-user-overview.tsx (analytics fix), globals.css (shadow+text enhancement)
+
+---
+Task ID: 26 (Per-Role Unique Dashboards — 10 New Designs)
+Agent: Lead Architect (main) + 3 subagents
+Task: Build unique dashboard for EACH of the 15 roles (previously HR/EHS/Procurement/CSR/Compliance all shared the same SiteUserOverview)
+
+Work Log:
+- User reported: "all the users overview screens are same" — HR, EHS, Procurement, CSR, Compliance all saw the SAME SiteUserOverview as the Project User. Each role needs a UNIQUE dashboard.
+- Dispatched 3 subagents in parallel to build 10 new unique dashboards:
+
+  **Subagent 1 — HR + EHS:**
+  1. HrDashboard (hr-dashboard.tsx) — teal/cyan theme, 2-col 65/35, workforce KPIs + employee breakdown bar chart + gender diversity donut + training progress bars + HR activities feed
+  2. EhsDashboard (ehs-dashboard.tsx) — amber/orange theme, 2-col 65/35, safety KPIs + incident trend area chart + incident type donut + safety training bars + corrective actions
+
+  **Subagent 2 — Procurement + CSR + Compliance:**
+  3. ProcurementDashboard (procurement-dashboard.tsx) — violet/purple theme, single column, supplier KPIs + supplier distribution horizontal bar + sourcing mix donut + supplier assessment table
+  4. CsrDashboard (csr-dashboard.tsx) — rose/pink theme, 2-col 60/40, CSR KPIs + beneficiary breakdown stacked bar + impact distribution donut + project list + vulnerable groups
+  5. ComplianceDashboard (compliance-dashboard.tsx) — emerald/green theme, 3-col asymmetric 50/30/20, policy KPIs + P1-P9 coverage bars + complaints donut + compliance status list
+
+  **Subagent 3 — Reviewers + Managers:**
+  6. SubsidiaryReviewerDashboard (subsidiary-reviewer-dashboard.tsx) — blue/indigo-deep theme, top banner + 2-col 55/45, consolidation progress + BU table + approval pipeline + exceptions
+  7. GroupReviewerDashboard (group-reviewer-dashboard.tsx) — navy/gold theme, hero gauge + 3-col, subsidiary overview + final review queue + group KPIs
+  8. EsgManagerDashboard (esg-manager-dashboard.tsx) — teal/emerald theme, 2-col 60/40, data quality KPIs + validation monitoring table + emission trend with anomaly markers + calculation monitoring + factor inventory
+  9. EsgAnalystDashboard (esg-analyst-dashboard.tsx) — emerald/green-deep theme, 2×3 chart grid, 6 different chart types (emissions area, energy mix bar, water donut, waste bar, workforce pie, LTIFR line)
+  10. BrsrManagerDashboard (brsr-manager-dashboard.tsx) — green/teal-deep theme, top readiness banner + 2-col 60/40, Section A/C breakdown + P1-P9 principle cards + indicator explorer + report generation + missing items
+
+- Wired per-role routing in page.tsx: each of the 15 roles now maps to its own unique dashboard via a switch statement. No two roles share the same dashboard.
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: HR User sees "HR Workforce Dashboard" (teal theme, workforce KPIs, gender diversity donut, training bars)
+- agent-browser verified: EHS User sees "EHS Safety Dashboard" (amber theme, safety KPIs, incident trend chart, incident donut, corrective actions)
+- VLM-verified: HR dashboard is teal/cyan, EHS dashboard is amber/orange — visually distinct from each other
+- No console errors on any dashboard
+
+Stage Summary:
+- 10 new unique dashboards built (hr, ehs, procurement, csr, compliance, subsidiary-reviewer, group-reviewer, esg-manager, esg-analyst, brsr-manager)
+- Each of the 15 roles now has a UNIQUE dashboard with:
+  - Distinct color theme (teal, amber, violet, rose, emerald, blue-deep, navy/gold, teal/emerald, emerald-deep, green-deep)
+  - Distinct layout (2-col 65/35, single column, 2-col 60/40, 3-col 50/30/20, hero+3-col, 2×3 chart grid, top banner+2-col)
+  - Distinct information focus (workforce, safety, suppliers, community, governance, consolidation, final review, data quality, analytics, BRSR compliance)
+- Per-role switch routing in page.tsx ensures each role sees only their unique dashboard
+- All data from real APIs, glassmorphism, framer-motion, compact cards, enhanced shadows, darker text
