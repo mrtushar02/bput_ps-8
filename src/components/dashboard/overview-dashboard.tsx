@@ -73,16 +73,16 @@ export function OverviewDashboard() {
 
       {/* KPI GRID — real month-over-month deltas from trends data (no hardcoded values) */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
-        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} />
-        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} />
-        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} />
-        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} />
+        <KpiCard delay={0.05} icon={Flame} tileClass="bg-rose-50 text-rose-600" label="Scope 1 & 2 Emissions" value={k.totalEmissions.toLocaleString()} unit="tCO₂e" trend={trendDelta(trendArr, 'emissions')} goodDirection="down" sub={`S1: ${k.scope1} · S2: ${k.scope2}`} spark={trendArr.map(t => t.emissions)} sparkColor="#f43f5e" />
+        <KpiCard delay={0.1} icon={Zap} tileClass="bg-amber-50 text-amber-600" label="Energy Consumption" value={k.energyGJ.toLocaleString()} unit="GJ" trend={trendDelta(trendArr, 'energy')} goodDirection="down" sub={`Renewable ${k.renewableShare}%`} spark={trendArr.map(t => t.energy)} sparkColor="#f59e0b" />
+        <KpiCard delay={0.15} icon={Droplet} tileClass="bg-cyan-50 text-cyan-600" label="Water Withdrawal" value={k.waterWithdrawalKL.toLocaleString()} unit="KL" trend={trendDelta(trendArr, 'water')} goodDirection="down" sub={`Recycled ${k.waterRecycledShare}%`} spark={trendArr.map(t => t.water)} sparkColor="#06b6d4" />
+        <KpiCard delay={0.2} icon={Recycle} tileClass="bg-emerald-50 text-emerald-600" label="Waste Recovered" value={k.wasteRecycledShare.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.wasteGeneratedT}T generated`} spark={trendArr.map(t => t.waste)} sparkColor="#10b981" />
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-4">
         <KpiCard delay={0.05} icon={Users} tileClass="bg-blue-50 text-blue-600" label="Total Workforce" value={k.totalWorkforce.toLocaleString()} unit="people" trend={null} goodDirection="up" sub={`${k.totalEmployees} emp · ${k.totalWorkers} workers`} />
-        <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={null} goodDirection="down" sub={`${k.injuries} injuries · 0 fatal`} />
-        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} />
-        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} />
+        <KpiCard delay={0.1} icon={ShieldCheck} tileClass="bg-violet-50 text-violet-600" label="Safety · LTIFR" value={k.ltifr.toString()} unit="/M hrs" trend={null} goodDirection="down" sub={`${k.injuries} injuries · 0 fatal`} risk={k.fatalities > 0 ? { level: 'danger', text: `${k.fatalities} fatality` } : undefined} />
+        <KpiCard delay={0.15} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="BRSR Readiness" value={k.brsrReadiness.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.brsrMissing} items missing`} risk={k.brsrMissing > 0 ? { level: 'warning', text: `${k.brsrMissing} gaps` } : undefined} />
+        <KpiCard delay={0.2} icon={Gauge} tileClass="bg-slate-50 text-slate-600" label="Reporting Completion" value={k.completion.toString()} unit="%" trend={null} goodDirection="up" sub={`${k.approvedSubs}/${k.totalSubs} submissions approved`} risk={k.openExceptions > 0 ? { level: 'warning', text: `${k.openExceptions} exceptions` } : undefined} />
       </div>
 
       {/* ESG DATA CONTROL CHAIN — live pipeline tracker */}
@@ -278,23 +278,26 @@ function trendDelta(trends: { emissions: number; energy: number; water: number; 
   return Math.round(((last - prev) / prev) * 1000) / 10
 }
 
-function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay }: any) {
+function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirection, sub, delay, spark, sparkColor, risk }: any) {
   // ESG semantics: trend direction vs what's "good" determines colour
-  // goodDirection='down' → decreasing is good (emissions, energy, water, LTIFR)
-  // goodDirection='up' → increasing is good (readiness, completion, workforce, recovery%)
   const hasTrend = trend !== null && trend !== undefined && !isNaN(trend)
   const isGood = hasTrend && ((goodDirection === 'down' && trend < 0) || (goodDirection === 'up' && trend > 0))
   const isNeutral = hasTrend && trend === 0
   const pillClass = !hasTrend ? 'status-review' : isNeutral ? 'status-review' : isGood ? 'status-approved' : 'status-warning'
+  const hasSpark = Array.isArray(spark) && spark.length >= 2
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay }}
-      className="glass glass-shimmer rounded-2xl p-4">
+      className="glass glass-shimmer relative overflow-hidden rounded-2xl p-4">
       <div className="flex items-start justify-between">
         <div className={`kpi-tile ${tileClass}`}><Icon className="h-5 w-5" /></div>
         {hasTrend ? (
           <span className={`status-pill ${pillClass}`}>
             {trend < 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
             {trend > 0 ? '+' : ''}{trend}%
+          </span>
+        ) : risk ? (
+          <span className={`status-pill ${risk.level === 'danger' ? 'status-error' : 'status-warning'}`}>
+            <AlertTriangle className="h-3 w-3" /> {risk.text}
           </span>
         ) : (
           <span className="status-pill status-review"><Activity className="h-3 w-3" /> current</span>
@@ -303,11 +306,28 @@ function KpiCard({ icon: Icon, tileClass, label, value, unit, trend, goodDirecti
       <div className="mt-3">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
         <div className="mt-0.5 flex items-baseline gap-1">
-          <span className="tabular-nums text-2xl font-bold text-slate-800">{value}</span>
+          <span className="tabular-nums text-[26px] font-bold leading-none text-slate-800">{value}</span>
           <span className="text-xs font-medium text-slate-400">&nbsp;{unit}</span>
         </div>
-        {sub && <div className="mt-0.5 text-[11px] text-slate-500">{sub}</div>}
+        <div className="mt-1.5 flex items-end justify-between gap-2">
+          {sub && <div className="text-[11px] leading-tight text-slate-500">{sub}</div>}
+          {hasSpark && (
+            <div className="h-7 w-16 flex-shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={spark.map((v: number, i: number) => ({ i, v }))} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                  <Line type="monotone" dataKey="v" stroke={sparkColor || '#3b82f6'} strokeWidth={1.8} dot={false} isAnimationActive={true} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </div>
+      {risk && (
+        <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-rose-50/70 px-2 py-1 text-[10px] font-medium text-rose-700">
+          <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+          <span>{risk.text} — review required</span>
+        </div>
+      )}
     </motion.div>
   )
 }

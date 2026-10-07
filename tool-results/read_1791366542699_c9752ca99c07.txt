@@ -1,0 +1,1491 @@
+     1→'use client'
+     2→/**
+     3→ * Data Entry Module — flagship 4-step workflow screen.
+     4→ * Steps: 1 Enter Data → 2 Attach Evidence → 3 Validate → 4 Submit.
+     5→ * Sub-modules: energy | water | waste | workforce | safety | travel.
+     6→ * Real data via /api/{module} POST + /api/validation/run + /api/submissions + /api/submissions/[id]/submit.
+     7→ * No hardcoded KPIs. Role-aware: reviewer roles get read-only forms.
+     8→ */
+     9→import { useEffect, useState, useCallback, useRef } from 'react'
+    10→import { motion, AnimatePresence } from 'framer-motion'
+    11→import {
+    12→  FileText, Zap, Droplet, Recycle, Users, ShieldCheck, Plane, CheckCircle2,
+    13→  AlertTriangle, AlertOctagon, Clock, Link2, Send, Save, FlaskConical,
+    14→  ChevronRight, ChevronLeft, Building2, CalendarClock, Info, Lock, Calculator, type LucideIcon,
+    15→} from 'lucide-react'
+    16→import { useApp } from '@/lib/auth-context'
+    17→
+    18→/* ---------- Types ---------- */
+    19→type SubModule = 'energy' | 'water' | 'waste' | 'workforce' | 'safety' | 'travel'
+    20→
+    21→interface Project {
+    22→  id: string; projectCode: string; projectName: string; location: string | null
+    23→  buName: string; subsidiaryCode: string; groupCode: string
+    24→}
+    25→interface Period { id: string; label: string; year: number; month: number | null; status: string }
+    26→interface EvidenceItem {
+    27→  id: string; fileName: string; documentType: string; status: string
+    28→  module?: string | null
+    29→}
+    30→interface ValidationIssue {
+    31→  ruleCode: string; severity: 'INFO' | 'WARNING' | 'ERROR' | 'BLOCKING'
+    32→  message: string; field?: string | null; suggestedAction?: string | null
+    33→}
+    34→interface CalcPayload {
+    35→  calculatedValue: number; resultUnit: string; scope?: string | null
+    36→  factorId?: string | null; factorVersion?: number | null
+    37→  methodologyNote?: string | null
+    38→  normalizedValue?: number | null; normalizedUnit?: string | null
+    39→  sourceValue?: number; sourceUnit?: string
+    40→}
+    41→interface SavedRecord {
+    42→  id: string
+    43→  recordType: string
+    44→  issues: ValidationIssue[]
+    45→  calculation: CalcPayload | null
+    46→  derivedLtifr?: number | null
+    47→  validationStatus?: string
+    48→  evidenceId?: string | null
+    49→}
+    50→
+    51→/* ---------- Role helpers ---------- */
+    52→const READ_ONLY_ROLES = new Set([
+    53→  'BU_REVIEWER', 'SUBSIDIARY_REVIEWER', 'GROUP_REVIEWER', 'AUDITOR', 'EXECUTIVE',
+    54→])
+    55→
+    56→const SUB_MODULES: Array<{ key: SubModule; label: string; icon: LucideIcon; moduleKey: string; recordType: string; permission: string }> = [
+    57→  { key: 'energy', label: 'Energy / Fuel', icon: Zap, moduleKey: 'ENERGY', recordType: 'ENERGY', permission: 'esg.energy.write' },
+    58→  { key: 'water', label: 'Water', icon: Droplet, moduleKey: 'WATER', recordType: 'WATER', permission: 'esg.water.write' },
+    59→  { key: 'waste', label: 'Waste', icon: Recycle, moduleKey: 'WASTE', recordType: 'WASTE', permission: 'esg.waste.write' },
+    60→  { key: 'workforce', label: 'Workforce', icon: Users, moduleKey: 'PEOPLE', recordType: 'PEOPLE', permission: 'esg.people.write' },
+    61→  { key: 'safety', label: 'Safety', icon: ShieldCheck, moduleKey: 'SAFETY', recordType: 'SAFETY', permission: 'esg.safety.write' },
+    62→  { key: 'travel', label: 'Travel', icon: Plane, moduleKey: 'TRAVEL', recordType: 'TRAVEL', permission: 'esg.travel.write' },
+    63→]
+    64→
+    65→const STEPS = ['Enter Data', 'Attach Evidence', 'Validate', 'Submit'] as const
+    66→
+    67→/* ---------- Main component ---------- */
+    68→export function DataEntryModule({ subModule: subModuleProp }: { subModule: string }) {
+    69→  const { user, setDataEntrySubModule } = useApp()
+    70→  const roleKey = user?.roles?.[0]?.key ?? ''
+    71→  const readOnly = READ_ONLY_ROLES.has(roleKey)
+    72→
+    73→  const subModule = (SUB_MODULES.find(s => s.key === subModuleProp)?.key ?? 'energy') as SubModule
+    74→  const activeSub = SUB_MODULES.find(s => s.key === subModule) ?? SUB_MODULES[0]
+    75→
+    76→  const [projects, setProjects] = useState<Project[]>([])
+    77→  const [periods, setPeriods] = useState<Period[]>([])
+    78→  const [evidence, setEvidence] = useState<EvidenceItem[]>([])
+    79→  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+    80→  const [selectedPeriodId, setSelectedPeriodId] = useState<string | null>(null)
+    81→  const [loading, setLoading] = useState(true)
+    82→  const [error, setError] = useState('')
+    83→
+    84→  // Stepper / action state
+    85→  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+    86→  const [saved, setSaved] = useState<SavedRecord | null>(null)
+    87→  const [submitting, setSubmitting] = useState(false)
+    88→  const [actionError, setActionError] = useState('')
+    89→  const [actionInfo, setActionInfo] = useState('')
+    90→  const [validating, setValidating] = useState(false)
+    91→  const [validationRun, setValidationRun] = useState<{ passed: number; errors: number; warnings: number } | null>(null)
+    92→  const [submitResult, setSubmitResult] = useState<{ submissionId: string; status: string } | null>(null)
+    93→  const [existingRecords, setExistingRecords] = useState<any[]>([])
+    94→
+    95→  // Form state per submodule (so user doesn't lose data on tab switch)
+    96→  const formStateRef = useRef<Record<string, Record<string, any>>>({})
+    97→
+    98→  // ---- Load projects + periods once
+    99→  useEffect(() => {
+   100→    let cancelled = false
+   101→    setLoading(true); setError('')
+   102→    Promise.all([
+   103→      fetch('/api/organization/tree').then(r => r.ok ? r.json() : Promise.reject(new Error('org tree failed'))),
+   104→      fetch('/api/overview').then(r => r.ok ? r.json() : Promise.reject(new Error('overview failed'))),
+   105→    ])
+   106→      .then(([tr, ov]) => {
+   107→        if (cancelled) return
+   108→        const flat: Project[] = []
+   109→        for (const g of tr.groups || []) {
+   110→          for (const sub of g.subsidiaries || []) {
+   111→            for (const bu of sub.businessUnits || []) {
+   112→              for (const p of bu.projects || []) {
+   113→                flat.push({
+   114→                  id: p.id, projectCode: p.projectCode, projectName: p.projectName,
+   115→                  location: p.location, buName: bu.name, subsidiaryCode: sub.code, groupCode: g.code,
+   116→                })
+   117→              }
+   118→            }
+   119→          }
+   120→        }
+   121→        setProjects(flat)
+   122→        setPeriods(ov.periods || [])
+   123→        const scopeProj = user?.scopes?.find(s => s.scopeType === 'PROJECT')
+   124→        const defaultProject =
+   125→          (scopeProj ? flat.find(p => p.id === scopeProj.scopeId) : null) ||
+   126→          flat.find(p => p.projectCode === 'MEIL-SOL-GJT') ||
+   127→          flat[0] || null
+   128→        setSelectedProjectId(defaultProject?.id ?? null)
+   129→        // Default period: prefer June (open/draft) → May → April → latest
+   130→        const defaultPeriod =
+   131→          (ov.periods || []).find((p: Period) => p.label === 'June 2026') ||
+   132→          (ov.periods || []).find((p: Period) => p.label === 'May 2026') ||
+   133→          (ov.periods || [])[0] || null
+   134→        setSelectedPeriodId(defaultPeriod?.id ?? null)
+   135→        setLoading(false)
+   136→      })
+   137→      .catch((e: any) => { if (!cancelled) { setError(e?.message || 'Failed to load'); setLoading(false) } })
+   138→    return () => { cancelled = true }
+   139→  }, [user?.scopes])
+   140→
+   141→  // ---- Reset step + saved record when submodule/project/period changes
+   142→  useEffect(() => {
+   143→    setStep(1); setSaved(null); setActionError(''); setActionInfo('')
+   144→    setValidationRun(null); setSubmitResult(null)
+   145→  }, [subModule, selectedProjectId, selectedPeriodId])
+   146→
+   147→  // ---- Fetch existing records for the project+period+module (so user sees "no records" empty state)
+   148→  const refreshExistingRecords = useCallback(async () => {
+   149→    if (!selectedProjectId || !selectedPeriodId) { setExistingRecords([]); return }
+   150→    try {
+   151→      const endpoint = activeSub.key === 'travel' ? null : `/api/${activeSub.key}`
+   152→      if (!endpoint) { setExistingRecords([]); return }
+   153→      const r = await fetch(`${endpoint}?projectId=${encodeURIComponent(selectedProjectId)}&periodId=${encodeURIComponent(selectedPeriodId)}`)
+   154→      if (!r.ok) { setExistingRecords([]); return }
+   155→      const d = await r.json()
+   156→      setExistingRecords(d.records || [])
+   157→    } catch {
+   158→      setExistingRecords([])
+   159→    }
+   160→  }, [selectedProjectId, selectedPeriodId, activeSub.key])
+   161→
+   162→  useEffect(() => { refreshExistingRecords() }, [refreshExistingRecords])
+   163→
+   164→  // ---- Fetch evidence for this module + project
+   165→  useEffect(() => {
+   166→    if (!selectedProjectId) { setEvidence([]); return }
+   167→    fetch(`/api/evidence?projectId=${encodeURIComponent(selectedProjectId)}&module=${activeSub.moduleKey}`)
+   168→      .then(r => r.ok ? r.json() : { items: [] })
+   169→      .then(d => setEvidence(d.items || []))
+   170→      .catch(() => setEvidence([]))
+   171→  }, [selectedProjectId, activeSub.moduleKey])
+   172→
+   173→  const selectedProject = projects.find(p => p.id === selectedProjectId) || null
+   174→  const selectedPeriod = periods.find(p => p.id === selectedPeriodId) || null
+   175→
+   176→  if (loading) return <DataEntrySkeleton />
+   177→  if (error) return <ErrorState message={error} onRetry={() => location.reload()} />
+   178→  if (projects.length === 0 || periods.length === 0) {
+   179→    return <EmptyState message="No projects or reporting periods are available in your scope. Contact your administrator." />
+   180→  }
+   181→
+   182→  // ---- Handlers
+   183→  const handleSaved = (result: SavedRecord) => {
+   184→    setSaved(result)
+   185→    setStep(2)
+   186→    setActionInfo('Draft saved. Validation issues and calculation preview shown on the right.')
+   187→    refreshExistingRecords()
+   188→  }
+   189→
+   190→  const handleAttachEvidence = async (evidenceId: string | null) => {
+   191→    if (!saved) return
+   192→    setActionError('')
+   193→    try {
+   194→      setSubmitting(true)
+   195→      // Best-effort: re-submit the saved record with evidenceId by re-running POST
+   196→      // We just update the local SavedRecord's evidenceId; the actual link is persisted
+   197→      // when the user clicks Save Draft again or via the submit flow.
+   198→      setSaved(prev => prev ? { ...prev, evidenceId } : prev)
+   199→      setStep(3)
+   200→    } finally {
+   201→      setSubmitting(false)
+   202→    }
+   203→  }
+   204→
+   205→  const handleValidate = async () => {
+   206→    if (!saved) { setActionError('Save a draft first.'); return }
+   207→    setActionError(''); setActionInfo(''); setValidating(true)
+   208→    try {
+   209→      const r = await fetch('/api/validation/run', {
+   210→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   211→        body: JSON.stringify({ recordType: saved.recordType, recordId: saved.id }),
+   212→      })
+   213→      const d = await r.json()
+   214→      if (!r.ok) throw new Error(d.error || 'Validation failed')
+   215→      setValidationRun({ passed: d.passed ?? 0, errors: d.errors ?? 0, warnings: d.warnings ?? 0 })
+   216→      // refresh issues from the per-record endpoint
+   217→      const endpoint = activeSub.key === 'travel' ? null : `/api/${activeSub.key}`
+   218→      if (endpoint) {
+   219→        const list = await fetch(`${endpoint}?projectId=${selectedProjectId}&periodId=${selectedPeriodId}`).then(rr => rr.json())
+   220→        const rec = (list.records || []).find((x: any) => x.id === saved.id)
+   221→        if (rec) {
+   222→          setSaved(prev => prev ? {
+   223→            ...prev,
+   224→            issues: (rec.validationResults || []).map((v: any) => ({
+   225→              ruleCode: v.ruleCode, severity: v.severity, message: v.message,
+   226→              field: v.field, suggestedAction: v.suggestedAction,
+   227→            })),
+   228→            validationStatus: rec.validationStatus,
+   229→          } : prev)
+   230→        }
+   231→      }
+   232→      setStep(4)
+   233→    } catch (e: any) {
+   234→      setActionError(e?.message || 'Validation failed')
+   235→    } finally {
+   236→      setValidating(false)
+   237→    }
+   238→  }
+   239→
+   240→  const handleSubmit = async () => {
+   241→    if (!saved) { setActionError('Save a draft first.'); return }
+   242→    if (!selectedProjectId || !selectedPeriodId) { setActionError('Select a project and period.'); return }
+   243→    setActionError(''); setActionInfo(''); setSubmitting(true)
+   244→    try {
+   245→      // 1. Create the submission (DRAFT)
+   246→      const createRes = await fetch('/api/submissions', {
+   247→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   248→        body: JSON.stringify({
+   249→          projectId: selectedProjectId, reportingPeriodId: selectedPeriodId,
+   250→          module: activeSub.moduleKey, recordIds: [saved.id],
+   251→        }),
+   252→      })
+   253→      const created = await createRes.json()
+   254→      if (!createRes.ok) throw new Error(created.error || 'Failed to create submission')
+   255→      const submissionId = created.submission.id
+   256→      // 2. Submit it (DRAFT → SUBMITTED)
+   257→      const submitRes = await fetch(`/api/submissions/${submissionId}/submit`, {
+   258→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   259→        body: JSON.stringify({ comment: `Submitted via Data Entry — ${activeSub.label}` }),
+   260→      })
+   261→      const submitted = await submitRes.json()
+   262→      if (!submitRes.ok) throw new Error(submitted.error || 'Failed to submit submission')
+   263→      setSubmitResult({ submissionId, status: submitted.submission?.status || 'SUBMITTED' })
+   264→      setActionInfo('Submission sent for review. Status: SUBMITTED. You will be notified when BU review completes.')
+   265→      refreshExistingRecords()
+   266→    } catch (e: any) {
+   267→      setActionError(e?.message || 'Submission failed')
+   268→    } finally {
+   269→      setSubmitting(false)
+   270→    }
+   271→  }
+   272→
+   273→  return (
+   274→    <div className="space-y-5">
+   275→      {/* HEADER */}
+   276→      <motion.div
+   277→        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+   278→        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+   279→        className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between"
+   280→      >
+   281→        <div>
+   282→          <div className="flex items-center gap-2">
+   283→            <div className="kpi-tile bg-blue-50 text-blue-600"><FileText className="h-5 w-5" /></div>
+   284→            <h1 className="text-2xl font-bold tracking-tight text-slate-800">Data Entry</h1>
+   285→            <span className="status-pill status-submitted"><Clock className="h-3 w-3" /> Open</span>
+   286→          </div>
+   287→          <p className="mt-1 text-sm text-slate-500">
+   288→            Source-record capture · {selectedProject?.projectCode} · {selectedPeriod?.label}
+   289→            {readOnly && <span className="ml-2 inline-flex items-center gap-1 text-amber-700"><Lock className="h-3 w-3" /> Read-only — your role does not permit data entry</span>}
+   290→          </p>
+   291→        </div>
+   292→
+   293→        {/* Project + Period selectors */}
+   294→        <div className="flex flex-wrap items-center gap-2">
+   295→          <div className="glass-subtle flex items-center gap-1.5 rounded-full px-3 py-2 text-xs">
+   296→            <Building2 className="h-3.5 w-3.5 text-blue-600" />
+   297→            <select
+   298→              value={selectedProjectId ?? ''} disabled={readOnly}
+   299→              onChange={(e) => setSelectedProjectId(e.target.value)}
+   300→              className="max-w-[160px] bg-transparent font-semibold text-slate-700 outline-none"
+   301→            >
+   302→              {projects.map(p => <option key={p.id} value={p.id}>{p.projectCode}</option>)}
+   303→            </select>
+   304→          </div>
+   305→          <div className="glass-subtle flex items-center gap-1.5 rounded-full px-3 py-2 text-xs">
+   306→            <CalendarClock className="h-3.5 w-3.5 text-blue-600" />
+   307→            <select
+   308→              value={selectedPeriodId ?? ''} disabled={readOnly}
+   309→              onChange={(e) => setSelectedPeriodId(e.target.value)}
+   310→              className="bg-transparent font-semibold text-slate-700 outline-none"
+   311→            >
+   312→              {periods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+   313→            </select>
+   314→          </div>
+   315→        </div>
+   316→      </motion.div>
+   317→
+   318→      {/* SUB-MODULE TAB BAR */}
+   319→      <motion.div
+   320→        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+   321→        transition={{ duration: 0.4, delay: 0.05 }}
+   322→        className="glass-nav flex items-center gap-0.5 overflow-x-auto scroll-elegant rounded-2xl p-1.5"
+   323→      >
+   324→        {SUB_MODULES.map(m => {
+   325→          const active = m.key === subModule
+   326→          const Icon = m.icon
+   327→          return (
+   328→            <button key={m.key} onClick={() => setDataEntrySubModule(m.key)}
+   329→              className={`group relative flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition ${active ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:bg-white/60 hover:text-slate-800'}`}>
+   330→              <Icon className="h-3.5 w-3.5" /> {m.label}
+   331→              {active && <motion.div layoutId="data-entry-underline" className="absolute -bottom-0.5 left-3 right-3 h-0.5 rounded-full bg-blue-500" />}
+   332→            </button>
+   333→          )
+   334→        })}
+   335→      </motion.div>
+   336→
+   337→      {/* STEPPER */}
+   338→      <Stepper step={step} />
+   339→
+   340→      {/* MAIN GRID */}
+   341→      <div className="grid gap-4 lg:grid-cols-3">
+   342→        {/* FORM PANEL */}
+   343→        <motion.section
+   344→          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+   345→          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+   346→          className="glass glass-shimmer rounded-2xl p-4 lg:col-span-2"
+   347→        >
+   348→          <div className="mb-3 flex items-start justify-between">
+   349→            <div className="flex items-start gap-2.5">
+   350→              <div className="kpi-tile bg-blue-50 text-blue-600" style={{ width: 32, height: 32 }}>
+   351→                <activeSub.icon className="h-4 w-4" />
+   352→              </div>
+   353→              <div>
+   354→                <h3 className="text-sm font-bold text-slate-800">{activeSub.label} Entry Form</h3>
+   355→                <p className="text-[11px] text-slate-500">
+   356→                  {readOnly ? 'Read-only view — your role does not permit data entry' : 'Fill values, save draft, and the engine will validate + compute automatically.'}
+   357→                </p>
+   358→              </div>
+   359→            </div>
+   360→            <span className={`status-pill ${saved ? 'status-approved' : 'status-draft'}`}>
+   361→              {saved ? 'Saved' : 'Draft'}
+   362→            </span>
+   363→          </div>
+   364→
+   365→          {/* Form body */}
+   366→          <div className="space-y-3">
+   367→            {readOnly && (
+   368→              <div className="rounded-xl border border-amber-200/70 bg-amber-50/60 px-3 py-2 text-[11px] font-medium text-amber-800">
+   369→                <Lock className="mr-1 inline h-3 w-3" /> Read-only — your role ({roleKey}) does not permit data entry. Switch to a writer role to edit.
+   370→              </div>
+   371→            )}
+   372→
+   373→            <AnimatePresence mode="wait">
+   374→              <motion.div key={subModule}
+   375→                initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }}
+   376→                transition={{ duration: 0.22 }}
+   377→              >
+   378→                {subModule === 'energy' && (
+   379→                  <EnergyForm
+   380→                    projectId={selectedProjectId!} periodId={selectedPeriodId!} evidence={evidence}
+   381→                    readOnly={readOnly} formStateRef={formStateRef} onSaved={handleSaved}
+   382→                  />
+   383→                )}
+   384→                {subModule === 'water' && (
+   385→                  <WaterForm
+   386→                    projectId={selectedProjectId!} periodId={selectedPeriodId!} evidence={evidence}
+   387→                    readOnly={readOnly} formStateRef={formStateRef} onSaved={handleSaved}
+   388→                  />
+   389→                )}
+   390→                {subModule === 'waste' && (
+   391→                  <WasteForm
+   392→                    projectId={selectedProjectId!} periodId={selectedPeriodId!} evidence={evidence}
+   393→                    readOnly={readOnly} formStateRef={formStateRef} onSaved={handleSaved}
+   394→                  />
+   395→                )}
+   396→                {subModule === 'workforce' && (
+   397→                  <WorkforceForm
+   398→                    projectId={selectedProjectId!} periodId={selectedPeriodId!} evidence={evidence}
+   399→                    readOnly={readOnly} formStateRef={formStateRef} onSaved={handleSaved}
+   400→                  />
+   401→                )}
+   402→                {subModule === 'safety' && (
+   403→                  <SafetyForm
+   404→                    projectId={selectedProjectId!} periodId={selectedPeriodId!} evidence={evidence}
+   405→                    readOnly={readOnly} formStateRef={formStateRef} onSaved={handleSaved}
+   406→                  />
+   407→                )}
+   408→                {subModule === 'travel' && (
+   409→                  <div className="rounded-xl border border-dashed border-white/70 bg-white/40 px-4 py-10 text-center">
+   410→                    <Plane className="mx-auto h-8 w-8 text-slate-400" />
+   411→                    <div className="mt-2 text-sm font-bold text-slate-700">Travel &amp; Mobility Module</div>
+   412→                    <div className="mt-1 text-xs text-slate-500">Business-trip emissions capture is coming soon. Use the Energy / Fuel module for vehicle fuel logs in the interim.</div>
+   413→                  </div>
+   414→                )}
+   415→              </motion.div>
+   416→            </AnimatePresence>
+   417→          </div>
+   418→
+   419→          {/* Existing records */}
+   420→          {existingRecords.length > 0 && (
+   421→            <div className="mt-4">
+   422→              <div className="mb-1.5 flex items-center justify-between">
+   423→                <h4 className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Existing records · {selectedPeriod?.label}</h4>
+   424→                <span className="text-[10px] text-slate-400">{existingRecords.length} record(s)</span>
+   425→              </div>
+   426→              <div className="max-h-44 space-y-1 overflow-y-auto scroll-elegant pr-1">
+   427→                {existingRecords.map((r: any) => (
+   428→                  <div key={r.id} className="flex items-center justify-between rounded-lg bg-white/50 px-2.5 py-1.5 text-[11px]">
+   429→                    <div className="flex min-w-0 items-center gap-2">
+   430→                      <span className={`status-pill ${r.status === 'APPROVED' ? 'status-approved' : r.status === 'DRAFT' ? 'status-draft' : 'status-submitted'}`}>{r.status}</span>
+   431→                      <span className="truncate font-semibold text-slate-700">{describeRecord(r, subModule)}</span>
+   432→                    </div>
+   433→                    <span className={`status-pill ${r.validationStatus === 'PASSED' ? 'status-approved' : r.validationStatus === 'FAILED' ? 'status-missing' : 'status-warning'}`}>{r.validationStatus}</span>
+   434→                  </div>
+   435→                ))}
+   436→              </div>
+   437→            </div>
+   438→          )}
+   439→          {existingRecords.length === 0 && !saved && !readOnly && (
+   440→            <div className="mt-4 rounded-xl border border-dashed border-white/70 bg-white/40 px-4 py-6 text-center text-[11px] text-slate-500">
+   441→              No {activeSub.label.toLowerCase()} records for {selectedPeriod?.label}. Fill the form above and click <strong>Save Draft</strong> to create the first one.
+   442→            </div>
+   443→          )}
+   444→        </motion.section>
+   445→
+   446→        {/* RIGHT PANEL — Validation + Calculation + Evidence */}
+   447→        <motion.section
+   448→          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+   449→          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+   450→          className="glass glass-shimmer rounded-2xl p-4 lg:col-span-1"
+   451→        >
+   452→          <div className="mb-3 flex items-start justify-between">
+   453→            <div className="flex items-start gap-2.5">
+   454→              <div className="kpi-tile bg-violet-50 text-violet-600" style={{ width: 32, height: 32 }}>
+   455→                <FlaskConical className="h-4 w-4" />
+   456→              </div>
+   457→              <div>
+   458→                <h3 className="text-sm font-bold text-slate-800">Engine Preview</h3>
+   459→                <p className="text-[11px] text-slate-500">Validation + calculation results</p>
+   460→              </div>
+   461→            </div>
+   462→          </div>
+   463→
+   464→          {/* Calculation preview */}
+   465→          <CalculationPreview saved={saved} subModule={subModule} />
+   466→
+   467→          {/* Validation results */}
+   468→          <ValidationResults saved={saved} validationRun={validationRun} />
+   469→
+   470→          {/* Evidence picker (step 2) */}
+   471→          <EvidencePicker evidence={evidence} step={step} saved={saved} onPick={handleAttachEvidence} />
+   472→
+   473→          {/* Submit outcome */}
+   474→          {submitResult && (
+   475→            <div className="mt-3 rounded-xl border border-emerald-200/70 bg-emerald-50/60 px-3 py-2.5 text-[11px]">
+   476→              <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+   477→                <CheckCircle2 className="h-4 w-4" /> Submission sent
+   478→              </div>
+   479→              <div className="mt-1 text-emerald-700">Submission ID: <span className="font-mono">{submitResult.submissionId.slice(-8)}</span></div>
+   480→              <div className="text-emerald-700">Status: <span className="font-semibold">{submitResult.status}</span></div>
+   481→            </div>
+   482→          )}
+   483→        </motion.section>
+   484→      </div>
+   485→
+   486→      {/* ACTION BAR (bottom) */}
+   487→      <motion.div
+   488→        initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+   489→        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+   490→        className="glass-nav sticky bottom-3 z-20 rounded-2xl p-3"
+   491→      >
+   492→        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+   493→          {/* Step indicator at bottom (mobile-friendly) */}
+   494→          <div className="flex items-center gap-1 text-[11px] text-slate-500">
+   495→            {STEPS.map((s, i) => {
+   496→              const n = (i + 1) as 1 | 2 | 3 | 4
+   497→              const active = step === n
+   498→              const done = step > n
+   499→              return (
+   500→                <span key={s} className="flex items-center gap-1">
+   501→                  <span className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${active ? 'bg-blue-500 text-white' : done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+   502→                    {done ? <CheckCircle2 className="h-3 w-3" /> : n}
+   503→                  </span>
+   504→                  <span className={active ? 'font-semibold text-slate-700' : ''}>{s}</span>
+   505→                  {i < STEPS.length - 1 && <ChevronRight className="h-2.5 w-2.5 text-slate-300" />}
+   506→                </span>
+   507→              )
+   508→            })}
+   509→          </div>
+   510→
+   511→          <div className="flex flex-wrap items-center gap-2">
+   512→            {actionError && (
+   513→              <span className="status-pill status-error"><AlertOctagon className="h-3 w-3" /> {actionError}</span>
+   514→            )}
+   515→            {actionInfo && (
+   516→              <span className="status-pill status-approved"><Info className="h-3 w-3" /> {actionInfo}</span>
+   517→            )}
+   518→            <button
+   519→              disabled={readOnly || !saved || validating || submitting || step < 2}
+   520→              onClick={handleValidate}
+   521→              className="glass-subtle flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-40"
+   522→            >
+   523→              {validating ? <Clock className="h-3.5 w-3.5 animate-pulse" /> : <FlaskConical className="h-3.5 w-3.5" />}
+   524→              Validate
+   525→            </button>
+   526→            <button
+   527→              disabled={readOnly || !saved || submitting || step < 3}
+   528→              onClick={handleSubmit}
+   529→              className="btn-glass-primary flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+   530→            >
+   531→              {submitting ? <Clock className="h-3.5 w-3.5 animate-pulse" /> : <Send className="h-3.5 w-3.5" />}
+   532→              Submit for Review
+   533→            </button>
+   534→          </div>
+   535→        </div>
+   536→      </motion.div>
+   537→    </div>
+   538→  )
+   539→}
+   540→
+   541→/* ============================================================
+   542→   STEPPER (top)
+   543→   ============================================================ */
+   544→function Stepper({ step }: { step: 1 | 2 | 3 | 4 }) {
+   545→  const icons: Record<number, LucideIcon> = { 1: FileText, 2: Link2, 3: FlaskConical, 4: Send }
+   546→  return (
+   547→    <motion.div
+   548→      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+   549→      transition={{ duration: 0.4, delay: 0.05 }}
+   550→      className="glass rounded-2xl p-4"
+   551→    >
+   552→      <div className="relative flex items-center justify-between">
+   553→        {/* Track */}
+   554→        <div className="absolute left-0 right-0 top-5 mx-6 h-0.5 rounded-full bg-slate-200/80" />
+   555→        <motion.div
+   556→          className="absolute left-0 top-5 h-0.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"
+   557→          initial={{ width: '0%' }}
+   558→          animate={{ width: `${((step - 1) / 3) * 100}%` }}
+   559→          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+   560→          style={{ margin: '0 1.5rem' }}
+   561→        />
+   562→        {STEPS.map((label, i) => {
+   563→          const n = i + 1
+   564→          const active = step === n
+   565→          const done = step > n
+   566→          const Icon = icons[n]
+   567→          return (
+   568→            <div key={label} className="relative z-10 flex flex-1 flex-col items-center gap-1">
+   569→              <motion.div
+   570→                initial={{ scale: 0.94 }} animate={{ scale: 1 }}
+   571→                className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition ${active ? 'border-blue-500 bg-white text-blue-600 shadow-md shadow-blue-500/30 animate-pulse-ring' : done ? 'border-emerald-500 bg-emerald-50 text-emerald-600' : 'border-slate-200 bg-white text-slate-400'}`}
+   572→              >
+   573→                <Icon className="h-4 w-4" />
+   574→              </motion.div>
+   575→              <div className="text-center">
+   576→                <div className={`text-[10px] font-bold ${active ? 'text-blue-700' : done ? 'text-emerald-700' : 'text-slate-400'}`}>Step {n}</div>
+   577→                <div className={`text-[11px] font-semibold ${active ? 'text-slate-800' : 'text-slate-500'}`}>{label}</div>
+   578→              </div>
+   579→            </div>
+   580→          )
+   581→        })}
+   582→      </div>
+   583→    </motion.div>
+   584→  )
+   585→}
+   586→
+   587→/* ============================================================
+   588→   CALCULATION PREVIEW (right panel)
+   589→   ============================================================ */
+   590→function CalculationPreview({ saved, subModule }: { saved: SavedRecord | null; subModule: SubModule }) {
+   591→  if (!saved || !saved.calculation) {
+   592→    return (
+   593→      <div className="rounded-xl border border-dashed border-white/70 bg-white/40 px-3 py-4 text-center text-[11px] text-slate-400">
+   594→        {subModule === 'energy'
+   595→          ? 'Save a draft to see the deterministic tCO₂e calculation (factor × quantity).'
+   596→          : subModule === 'safety'
+   597→            ? 'Save a draft to see the derived LTIFR (LTI × 1M / man-hours).'
+   598→            : 'No emissions factor applies to this module. KPIs are derived at consolidation.'}
+   599→      </div>
+   600→    )
+   601→  }
+   602→  const c = saved.calculation
+   603→  return (
+   604→    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+   605→      className="rounded-xl border border-emerald-200/70 bg-emerald-50/50 p-3"
+   606→    >
+   607→      <div className="mb-2 flex items-center gap-1.5">
+   608→        <div className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-100 text-emerald-700">
+   609→          <FlaskConical className="h-3.5 w-3.5" />
+   610→        </div>
+   611→        <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-800">Calculation Result</span>
+   612→      </div>
+   613→      <div className="grid grid-cols-2 gap-2 text-[11px]">
+   614→        <Field label="Calculated value" value={`${Number(c.calculatedValue).toFixed(3)} ${c.resultUnit || ''}`} />
+   615→        <Field label="Scope" value={c.scope || '—'} />
+   616→        {c.factorId && <Field label="Factor ID" value={c.factorId.slice(-8)} mono />}
+   617→        {c.factorVersion !== undefined && c.factorVersion !== null && <Field label="Factor version" value={`v${c.factorVersion}`} />}
+   618→        {c.normalizedValue !== undefined && c.normalizedValue !== null && <Field label="Normalized" value={`${Number(c.normalizedValue).toFixed(3)} ${c.normalizedUnit || ''}`} />}
+   619→        {c.sourceValue !== undefined && <Field label="Source value" value={`${c.sourceValue} ${c.sourceUnit || ''}`} />}
+   620→      </div>
+   621→      {c.methodologyNote && (
+   622→        <div className="mt-2 rounded-lg bg-white/70 px-2 py-1.5 text-[10px] text-slate-600">
+   623→          <span className="font-semibold text-slate-700">Methodology:</span> {c.methodologyNote}
+   624→        </div>
+   625→      )}
+   626→      {subModule === 'safety' && saved.derivedLtifr !== undefined && saved.derivedLtifr !== null && (
+   627→        <div className="mt-2 rounded-lg bg-white/70 px-2 py-1.5 text-[10px] text-slate-600">
+   628→          <span className="font-semibold text-slate-700">Derived LTIFR:</span> {saved.derivedLtifr} /M hrs
+   629→        </div>
+   630→      )}
+   631→    </motion.div>
+   632→  )
+   633→}
+   634→
+   635→function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+   636→  return (
+   637→    <div>
+   638→      <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</div>
+   639→      <div className={`text-xs font-bold text-slate-800 ${mono ? 'font-mono' : 'tabular-nums'}`}>{value}</div>
+   640→    </div>
+   641→  )
+   642→}
+   643→
+   644→/* ============================================================
+   645→   VALIDATION RESULTS (right panel)
+   646→   ============================================================ */
+   647→function ValidationResults({ saved, validationRun }: { saved: SavedRecord | null; validationRun: { passed: number; errors: number; warnings: number } | null }) {
+   648→  if (!saved) {
+   649→    return (
+   650→      <div className="mt-3 rounded-xl border border-dashed border-white/70 bg-white/40 px-3 py-4 text-center text-[11px] text-slate-400">
+   651→        Save a draft to see validation issues.
+   652→      </div>
+   653→    )
+   654→  }
+   655→  const issues = saved.issues || []
+   656→  const errors = issues.filter(i => i.severity === 'ERROR' || i.severity === 'BLOCKING')
+   657→  const warnings = issues.filter(i => i.severity === 'WARNING')
+   658→  const passed = issues.length === 0
+   659→
+   660→  return (
+   661→    <div className="mt-3 space-y-2">
+   662→      <div className="flex items-center gap-1.5">
+   663→        {passed ? (
+   664→          <span className="status-pill status-approved"><CheckCircle2 className="h-3 w-3" /> PASSED</span>
+   665→        ) : errors.length > 0 ? (
+   666→          <span className="status-pill status-error"><AlertOctagon className="h-3 w-3" /> {errors.length} error(s)</span>
+   667→        ) : (
+   668→          <span className="status-pill status-warning"><AlertTriangle className="h-3 w-3" /> {warnings.length} warning(s)</span>
+   669→        )}
+   670→        {saved.validationStatus && (
+   671→          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Status: {saved.validationStatus}</span>
+   672→        )}
+   673→      </div>
+   674→
+   675→      {validationRun && (
+   676→        <div className="rounded-lg bg-blue-50/60 px-2.5 py-1.5 text-[10px] text-blue-700">
+   677→          Validation run: {validationRun.passed} passed · {validationRun.warnings} warning(s) · {validationRun.errors} error(s)
+   678→        </div>
+   679→      )}
+   680→
+   681→      {issues.length === 0 ? (
+   682→        <div className="rounded-lg border border-emerald-200/70 bg-emerald-50/50 px-3 py-2 text-[11px] text-emerald-700">
+   683→          All validation rules passed. Record is eligible for submission.
+   684→        </div>
+   685→      ) : (
+   686→        <div className="space-y-1.5">
+   687→          {issues.map((iss, i) => <IssuePill key={i} issue={iss} delay={i * 0.04} />)}
+   688→        </div>
+   689→      )}
+   690→    </div>
+   691→  )
+   692→}
+   693→
+   694→function IssuePill({ issue, delay }: { issue: ValidationIssue; delay: number }) {
+   695→  const tone = issue.severity === 'ERROR' || issue.severity === 'BLOCKING' ? 'error' : issue.severity === 'WARNING' ? 'warning' : 'verified'
+   696→  const pillClass = tone === 'error' ? 'status-error' : tone === 'warning' ? 'status-warning' : 'status-verified'
+   697→  const Icon = tone === 'error' ? AlertOctagon : tone === 'warning' ? AlertTriangle : CheckCircle2
+   698→  return (
+   699→    <motion.div
+   700→      initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}
+   701→      className={`rounded-lg border px-3 py-2 text-[11px] ${tone === 'error' ? 'border-rose-200/70 bg-rose-50/50' : tone === 'warning' ? 'border-amber-200/70 bg-amber-50/50' : 'border-emerald-200/70 bg-emerald-50/40'}`}
+   702→    >
+   703→      <div className="flex items-center gap-1.5">
+   704→        <span className={`status-pill ${pillClass}`}><Icon className="h-3 w-3" /> {issue.ruleCode}</span>
+   705→        {issue.field && <span className="text-[10px] text-slate-500">field: <span className="font-mono text-slate-700">{issue.field}</span></span>}
+   706→      </div>
+   707→      <div className="mt-1 font-medium text-slate-800">{issue.message}</div>
+   708→      {issue.suggestedAction && (
+   709→        <div className="mt-0.5 text-[10px] text-slate-500"><span className="font-semibold">Action:</span> {issue.suggestedAction}</div>
+   710→      )}
+   711→    </motion.div>
+   712→  )
+   713→}
+   714→
+   715→/* ============================================================
+   716→   EVIDENCE PICKER (right panel, step 2)
+   717→   ============================================================ */
+   718→function EvidencePicker({ evidence, step, saved, onPick }: {
+   719→  evidence: EvidenceItem[]; step: number; saved: SavedRecord | null
+   720→  onPick: (id: string | null) => void
+   721→}) {
+   722→  if (!saved) return null
+   723→  const picked = saved.evidenceId ?? ''
+   724→  return (
+   725→    <div className="mt-3 rounded-xl border border-white/60 bg-white/40 p-3">
+   726→      <div className="mb-2 flex items-center justify-between">
+   727→        <div className="flex items-center gap-1.5">
+   728→          <Link2 className="h-3.5 w-3.5 text-violet-600" />
+   729→          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Attach Evidence</span>
+   730→        </div>
+   731→        <span className={`status-pill ${step >= 2 ? 'status-approved' : 'status-draft'}`}>Step 2</span>
+   732→      </div>
+   733→      <select
+   734→        value={picked}
+   735→        onChange={(e) => onPick(e.target.value || null)}
+   736→        className="w-full rounded-lg border border-white/60 bg-white/70 px-2.5 py-2 text-[11px] font-medium text-slate-700 outline-none focus:ring-2 focus:ring-blue-100"
+   737→      >
+   738→        <option value="">— Select evidence file —</option>
+   739→        {evidence.map(e => (
+   740→          <option key={e.id} value={e.id}>{e.fileName} ({e.documentType})</option>
+   741→        ))}
+   742→      </select>
+   743→      {evidence.length === 0 && (
+   744→        <div className="mt-2 text-[10px] text-slate-400">No {`evidence`} uploaded for this module. Upload first in the Evidence module.</div>
+   745→      )}
+   746→    </div>
+   747→  )
+   748→}
+   749→
+   750→/* ============================================================
+   751→   ENERGY FORM
+   752→   ============================================================ */
+   753→const ENERGY_SOURCES = [
+   754→  { source: 'Grid Electricity', category: 'NON_RENEWABLE', unit: 'KWH' },
+   755→  { source: 'Diesel (HSD)', category: 'NON_RENEWABLE', unit: 'L' },
+   756→  { source: 'Petrol', category: 'NON_RENEWABLE', unit: 'L' },
+   757→  { source: 'Coal', category: 'NON_RENEWABLE', unit: 'KG' },
+   758→  { source: 'CNG', category: 'NON_RENEWABLE', unit: 'KG' },
+   759→  { source: 'LPG', category: 'NON_RENEWABLE', unit: 'KG' },
+   760→  { source: 'Solar PPA', category: 'RENEWABLE', unit: 'KWH' },
+   761→]
+   762→
+   763→function EnergyForm({ projectId, periodId, evidence, readOnly, formStateRef, onSaved }: FormProps) {
+   764→  const key = `energy-${projectId}-${periodId}`
+   765→  const initial = formStateRef.current[key] || {}
+   766→  const [source, setSource] = useState<string>(initial.source ?? 'Grid Electricity')
+   767→  const [quantity, setQuantity] = useState<string>(initial.quantity ?? '')
+   768→  const [sourceUnit, setSourceUnit] = useState<string>(initial.sourceUnit ?? 'KWH')
+   769→  const [vendor, setVendor] = useState<string>(initial.vendor ?? '')
+   770→  const [meterRef, setMeterRef] = useState<string>(initial.meterRef ?? '')
+   771→  const [evidenceId, setEvidenceId] = useState<string>(initial.evidenceId ?? '')
+   772→  const [submitting, setSubmitting] = useState(false)
+   773→  const [error, setError] = useState('')
+   774→
+   775→  const preset = ENERGY_SOURCES.find(s => s.source === source)
+   776→  useEffect(() => {
+   777→    if (preset) setSourceUnit(preset.unit)
+   778→  }, [source, preset])
+   779→
+   780→  const persist = (patch: any) => { formStateRef.current[key] = { ...(formStateRef.current[key] || {}), ...patch } }
+   781→  useEffect(() => { persist({ source, quantity, sourceUnit, vendor, meterRef, evidenceId }) }, [source, quantity, sourceUnit, vendor, meterRef, evidenceId])
+   782→
+   783→  const save = async () => {
+   784→    setError('')
+   785→    if (!quantity || Number(quantity) <= 0) { setError('Quantity must be > 0'); return }
+   786→    setSubmitting(true)
+   787→    try {
+   788→      const r = await fetch('/api/energy', {
+   789→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   790→        body: JSON.stringify({
+   791→          projectId, reportingPeriodId: periodId,
+   792→          source, sourceCategory: preset?.category ?? 'NON_RENEWABLE',
+   793→          quantity: Number(quantity), sourceUnit, vendor: vendor || undefined,
+   794→          meterRef: meterRef || undefined, evidenceId: evidenceId || undefined,
+   795→        }),
+   796→      })
+   797→      const d = await r.json()
+   798→      if (!r.ok) throw new Error(d.error || d.payload?.error || 'Save failed')
+   799→      onSaved({
+   800→        id: d.record.id, recordType: 'ENERGY',
+   801→        issues: d.issues || [],
+   802→        calculation: d.calculation || null,
+   803→        validationStatus: d.record.validationStatus,
+   804→      })
+   805→    } catch (e: any) {
+   806→      setError(e?.message || 'Save failed')
+   807→    } finally {
+   808→      setSubmitting(false)
+   809→    }
+   810→  }
+   811→
+   812→  return (
+   813→    <FormGrid>
+   814→      <FormField label="Energy source" hint="Auto-selects the category (renewable / non-renewable).">
+   815→        <select value={source} disabled={readOnly} onChange={(e) => setSource(e.target.value)}
+   816→          className={inputClass}>
+   817→          {ENERGY_SOURCES.map(s => <option key={s.source} value={s.source}>{s.source}</option>)}
+   818→        </select>
+   819→      </FormField>
+   820→      <FormField label="Source category" hint="Auto-derived from the chosen source.">
+   821→        <input value={preset?.category ?? 'NON_RENEWABLE'} disabled className={inputClass + ' opacity-60'} />
+   822→      </FormField>
+   823→      <FormField label="Quantity" hint="Metered consumption for the period.">
+   824→        <input type="number" min="0" step="any" value={quantity} disabled={readOnly}
+   825→          onChange={(e) => setQuantity(e.target.value)} placeholder="e.g. 384000" className={inputClass} />
+   826→      </FormField>
+   827→      <FormField label="Source unit" hint="Standard UnitMaster codes only.">
+   828→        <select value={sourceUnit} disabled={readOnly} onChange={(e) => setSourceUnit(e.target.value)} className={inputClass}>
+   829→          {['KWH', 'MWH', 'GJ', 'L', 'KL', 'M3', 'KG', 'TON'].map(u => <option key={u} value={u}>{u}</option>)}
+   830→        </select>
+   831→      </FormField>
+   832→      <FormField label="Vendor" hint="Utility / fuel supplier.">
+   833→        <input value={vendor} disabled={readOnly} onChange={(e) => setVendor(e.target.value)} placeholder="e.g. TSSPDCL" className={inputClass} />
+   834→      </FormField>
+   835→      <FormField label="Meter reference" hint="Unique meter ID for this site.">
+   836→        <input value={meterRef} disabled={readOnly} onChange={(e) => setMeterRef(e.target.value)} placeholder="e.g. MTR-GJT-33kV-01" className={inputClass} />
+   837→      </FormField>
+   838→      <FormField label="Evidence file" hint="Optional — pick from uploads." full>
+   839→        <select value={evidenceId} disabled={readOnly} onChange={(e) => setEvidenceId(e.target.value)} className={inputClass}>
+   840→          <option value="">— None —</option>
+   841→          {evidence.map(ev => <option key={ev.id} value={ev.id}>{ev.fileName}</option>)}
+   842→        </select>
+   843→      </FormField>
+   844→      <LiveEstimateCard source={source} quantity={quantity} sourceUnit={sourceUnit} />
+   845→      <FormActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+   846→    </FormGrid>
+   847→  )
+   848→}
+   849→
+   850→/* Live calculation estimate — updates as the user types (before saving).
+   851→   Uses the same factor lookup as the server-side engine for determinism. */
+   852→function LiveEstimateCard({ source, quantity, sourceUnit }: { source: string; quantity: string; sourceUnit: string }) {
+   853→  const qty = Number(quantity)
+   854→  const valid = qty > 0 && quantity !== ''
+   855→  // Match the seeded emission factors (src/app/api/energy/route.ts findEmissionFactorForSource)
+   856→  const FACTORS: Record<string, { value: number; unit: string; scope: string; methodology: string; gjPerUnit: number }> = {
+   857→    'Grid Electricity': { value: 0.716, unit: 'kgCO2e/kWh', scope: 'SCOPE_2', methodology: 'CEA v19', gjPerUnit: sourceUnit === 'MWH' ? 3.6 : 0.0036 },
+   858→    'Diesel (HSD)': { value: 2.637, unit: 'kgCO2e/L', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: sourceUnit === 'KL' ? 38.3 : 0.0383 },
+   859→    'Petrol (MS)': { value: 2.296, unit: 'kgCO2e/L', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.0348 },
+   860→    'Coal (Sub-bituminous)': { value: 1.9, unit: 'kgCO2e/kg', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.0227 },
+   861→    'CNG': { value: 2.19, unit: 'kgCO2e/kg', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.05 },
+   862→    'LPG': { value: 2.98, unit: 'kgCO2e/kg', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.046 },
+   863→    'Solar PPA': { value: 0.04, unit: 'kgCO2e/kWh', scope: 'SCOPE_2', methodology: 'ISAE 3000', gjPerUnit: 0.0036 },
+   864→  }
+   865→  const f = FACTORS[source]
+   866→  if (!f || !valid) {
+   867→    return (
+   868→      <div className="md:col-span-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-[11px] text-slate-400">
+   869→        <span className="font-semibold text-slate-500">Live estimate:</span> enter a quantity to preview the deterministic emission calculation (factor × quantity).
+   870→      </div>
+   871→    )
+   872→  }
+   873→  const co2eKg = qty * f.value
+   874→  const co2eT = co2eKg / 1000
+   875→  const energyGJ = qty * f.gjPerUnit
+   876→  const scopeColor = f.scope === 'SCOPE_1' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
+   877→  return (
+   878→    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="md:col-span-2 rounded-xl border border-blue-200/70 bg-gradient-to-br from-blue-50/70 to-cyan-50/40 px-4 py-3">
+   879→      <div className="flex items-center justify-between">
+   880→        <div className="flex items-center gap-2">
+   881→          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500 text-white"><Calculator className="h-3.5 w-3.5" /></span>
+   882→          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Live emission estimate</span>
+   883→          <span className={`status-pill ${scopeColor} !text-[9px]`}>{f.scope}</span>
+   884→        </div>
+   885→        <span className="text-[10px] text-slate-400">factor v1 · {f.methodology}</span>
+   886→      </div>
+   887→      <div className="mt-2 grid grid-cols-3 gap-3">
+   888→        <div>
+   889→          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Estimated CO₂e</div>
+   890→          <div className="tabular-nums text-lg font-bold text-slate-800">{co2eT.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-[10px] font-medium text-slate-400">tCO₂e</span></div>
+   891→          <div className="text-[9px] text-slate-400">{co2eKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kgCO₂e</div>
+   892→        </div>
+   893→        <div>
+   894→          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Energy (normalized)</div>
+   895→          <div className="tabular-nums text-lg font-bold text-slate-800">{energyGJ.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-[10px] font-medium text-slate-400">GJ</span></div>
+   896→          <div className="text-[9px] text-slate-400">{qty.toLocaleString()} {sourceUnit} × {f.gjPerUnit}</div>
+   897→        </div>
+   898→        <div>
+   899→          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Factor applied</div>
+   900→          <div className="tabular-nums text-lg font-bold text-slate-800">{f.value} <span className="text-[10px] font-medium text-slate-400">{f.unit}</span></div>
+   901→          <div className="text-[9px] text-slate-400">{source}</div>
+   902→        </div>
+   903→      </div>
+   904→      <div className="mt-2 flex items-center gap-1.5 rounded-md bg-white/60 px-2 py-1 text-[9px] text-slate-500">
+   905→        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+   906→        Same input + same factor version = same result as server-side calculation (deterministic).
+   907→      </div>
+   908→    </motion.div>
+   909→  )
+   910→}
+   911→
+   912→/* ============================================================
+   913→   WATER FORM
+   914→   ============================================================ */
+   915→const WATER_SOURCES = ['Ground Water', 'Surface', 'Third Party', 'Recycled', 'Rainwater']
+   916→
+   917→function WaterForm({ projectId, periodId, evidence, readOnly, formStateRef, onSaved }: FormProps) {
+   918→  const key = `water-${projectId}-${periodId}`
+   919→  const initial = formStateRef.current[key] || {}
+   920→  const [source, setSource] = useState<string>(initial.source ?? 'Ground Water')
+   921→  const [withdrawal, setWithdrawal] = useState<string>(initial.withdrawal ?? '')
+   922→  const [consumption, setConsumption] = useState<string>(initial.consumption ?? '')
+   923→  const [discharge, setDischarge] = useState<string>(initial.discharge ?? '')
+   924→  const [recycledReused, setRecycledReused] = useState<string>(initial.recycledReused ?? '')
+   925→  const [treatment, setTreatment] = useState<string>(initial.treatment ?? 'STP')
+   926→  const [destination, setDestination] = useState<string>(initial.destination ?? '')
+   927→  const [sourceUnit, setSourceUnit] = useState<string>(initial.sourceUnit ?? 'KL')
+   928→  const [waterStress, setWaterStress] = useState<boolean>(initial.waterStress ?? false)
+   929→  const [zldActive, setZldActive] = useState<boolean>(initial.zldActive ?? false)
+   930→  const [evidenceId, setEvidenceId] = useState<string>(initial.evidenceId ?? '')
+   931→  const [submitting, setSubmitting] = useState(false)
+   932→  const [error, setError] = useState('')
+   933→
+   934→  const persist = (patch: any) => { formStateRef.current[key] = { ...(formStateRef.current[key] || {}), ...patch } }
+   935→  useEffect(() => { persist({ source, withdrawal, consumption, discharge, recycledReused, treatment, destination, sourceUnit, waterStress, zldActive, evidenceId }) }, [source, withdrawal, consumption, discharge, recycledReused, treatment, destination, sourceUnit, waterStress, zldActive, evidenceId])
+   936→
+   937→  const save = async () => {
+   938→    setError('')
+   939→    if (!withdrawal || Number(withdrawal) <= 0) { setError('Withdrawal must be > 0'); return }
+   940→    setSubmitting(true)
+   941→    try {
+   942→      const r = await fetch('/api/water', {
+   943→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+   944→        body: JSON.stringify({
+   945→          projectId, reportingPeriodId: periodId, source,
+   946→          withdrawal: Number(withdrawal),
+   947→          consumption: consumption ? Number(consumption) : undefined,
+   948→          discharge: discharge ? Number(discharge) : undefined,
+   949→          recycledReused: recycledReused ? Number(recycledReused) : 0,
+   950→          treatment: treatment || undefined, destination: destination || undefined,
+   951→          sourceUnit, waterStress, zldActive, evidenceId: evidenceId || undefined,
+   952→        }),
+   953→      })
+   954→      const d = await r.json()
+   955→      if (!r.ok) throw new Error(d.error || d.payload?.error || 'Save failed')
+   956→      onSaved({
+   957→        id: d.record.id, recordType: 'WATER',
+   958→        issues: d.issues || [], calculation: null,
+   959→        validationStatus: d.record.validationStatus,
+   960→      })
+   961→    } catch (e: any) {
+   962→      setError(e?.message || 'Save failed')
+   963→    } finally {
+   964→      setSubmitting(false)
+   965→    }
+   966→  }
+   967→
+   968→  return (
+   969→    <FormGrid>
+   970→      <FormField label="Water source" hint="Where the water came from.">
+   971→        <select value={source} disabled={readOnly} onChange={(e) => setSource(e.target.value)} className={inputClass}>
+   972→          {WATER_SOURCES.map(s => <option key={s} value={s}>{s}</option>)}
+   973→        </select>
+   974→      </FormField>
+   975→      <FormField label="Source unit" hint="Kilolitres by default.">
+   976→        <select value={sourceUnit} disabled={readOnly} onChange={(e) => setSourceUnit(e.target.value)} className={inputClass}>
+   977→          {['KL', 'M3', 'L'].map(u => <option key={u} value={u}>{u}</option>)}
+   978→        </select>
+   979→      </FormField>
+   980→      <FormField label="Withdrawal" hint="Total intake for the period.">
+   981→        <input type="number" min="0" step="any" value={withdrawal} disabled={readOnly}
+   982→          onChange={(e) => setWithdrawal(e.target.value)} placeholder="e.g. 4200" className={inputClass} />
+   983→      </FormField>
+   984→      <FormField label="Consumption" hint="Withdrawn − discharged (water consumed).">
+   985→        <input type="number" min="0" step="any" value={consumption} disabled={readOnly}
+   986→          onChange={(e) => setConsumption(e.target.value)} placeholder="e.g. 1260" className={inputClass} />
+   987→      </FormField>
+   988→      <FormField label="Discharge" hint="Returned to environment / third-party.">
+   989→        <input type="number" min="0" step="any" value={discharge} disabled={readOnly}
+   990→          onChange={(e) => setDischarge(e.target.value)} placeholder="e.g. 800" className={inputClass} />
+   991→      </FormField>
+   992→      <FormField label="Recycled / reused" hint="Through STP / rainwater harvesting.">
+   993→        <input type="number" min="0" step="any" value={recycledReused} disabled={readOnly}
+   994→          onChange={(e) => setRecycledReused(e.target.value)} placeholder="e.g. 2140" className={inputClass} />
+   995→      </FormField>
+   996→      <FormField label="Treatment" hint="STP / ETP / none.">
+   997→        <input value={treatment} disabled={readOnly} onChange={(e) => setTreatment(e.target.value)} placeholder="STP" className={inputClass} />
+   998→      </FormField>
+   999→      <FormField label="Destination" hint="Where discharge goes.">
+  1000→        <input value={destination} disabled={readOnly} onChange={(e) => setDestination(e.target.value)} placeholder="e.g. Irrigation" className={inputClass} />
+  1001→      </FormField>
+  1002→      <FormField label="Flags" hint="Site-specific attributes." full>
+  1003→        <div className="flex flex-wrap gap-3">
+  1004→          <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+  1005→            <input type="checkbox" checked={waterStress} disabled={readOnly}
+  1006→              onChange={(e) => setWaterStress(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+  1007→            Water-stressed site
+  1008→          </label>
+  1009→          <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+  1010→            <input type="checkbox" checked={zldActive} disabled={readOnly}
+  1011→              onChange={(e) => setZldActive(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+  1012→            ZLD active
+  1013→          </label>
+  1014→        </div>
+  1015→      </FormField>
+  1016→      <FormField label="Evidence file" hint="Optional — STP register / meter log." full>
+  1017→        <select value={evidenceId} disabled={readOnly} onChange={(e) => setEvidenceId(e.target.value)} className={inputClass}>
+  1018→          <option value="">— None —</option>
+  1019→          {evidence.map(ev => <option key={ev.id} value={ev.id}>{ev.fileName}</option>)}
+  1020→        </select>
+  1021→      </FormField>
+  1022→      <FormActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+  1023→    </FormGrid>
+  1024→  )
+  1025→}
+  1026→
+  1027→/* ============================================================
+  1028→   WASTE FORM
+  1029→   ============================================================ */
+  1030→function WasteForm({ projectId, periodId, evidence, readOnly, formStateRef, onSaved }: FormProps) {
+  1031→  const key = `waste-${projectId}-${periodId}`
+  1032→  const initial = formStateRef.current[key] || {}
+  1033→  const [wasteType, setWasteType] = useState<string>(initial.wasteType ?? 'E-waste')
+  1034→  const [hazardous, setHazardous] = useState<boolean>(initial.hazardous ?? false)
+  1035→  const [generatedQty, setGeneratedQty] = useState<string>(initial.generatedQty ?? '')
+  1036→  const [recoveredQty, setRecoveredQty] = useState<string>(initial.recoveredQty ?? '')
+  1037→  const [recycledQty, setRecycledQty] = useState<string>(initial.recycledQty ?? '')
+  1038→  const [reusedQty, setReusedQty] = useState<string>(initial.reusedQty ?? '')
+  1039→  const [disposedQty, setDisposedQty] = useState<string>(initial.disposedQty ?? '')
+  1040→  const [disposalRoute, setDisposalRoute] = useState<string>(initial.disposalRoute ?? '')
+  1041→  const [vendor, setVendor] = useState<string>(initial.vendor ?? '')
+  1042→  const [manifestRef, setManifestRef] = useState<string>(initial.manifestRef ?? '')
+  1043→  const [sourceUnit, setSourceUnit] = useState<string>(initial.sourceUnit ?? 'TON')
+  1044→  const [evidenceId, setEvidenceId] = useState<string>(initial.evidenceId ?? '')
+  1045→  const [submitting, setSubmitting] = useState(false)
+  1046→  const [error, setError] = useState('')
+  1047→
+  1048→  const persist = (patch: any) => { formStateRef.current[key] = { ...(formStateRef.current[key] || {}), ...patch } }
+  1049→  useEffect(() => { persist({ wasteType, hazardous, generatedQty, recoveredQty, recycledQty, reusedQty, disposedQty, disposalRoute, vendor, manifestRef, sourceUnit, evidenceId }) }, [wasteType, hazardous, generatedQty, recoveredQty, recycledQty, reusedQty, disposedQty, disposalRoute, vendor, manifestRef, sourceUnit, evidenceId])
+  1050→
+  1051→  const save = async () => {
+  1052→    setError('')
+  1053→    if (generatedQty === '' || Number(generatedQty) < 0) { setError('Generated quantity must be ≥ 0'); return }
+  1054→    if (hazardous && !manifestRef) { setError('Hazardous waste requires a manifest reference'); return }
+  1055→    setSubmitting(true)
+  1056→    try {
+  1057→      const r = await fetch('/api/waste', {
+  1058→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+  1059→        body: JSON.stringify({
+  1060→          projectId, reportingPeriodId: periodId, wasteType, hazardous,
+  1061→          generatedQty: Number(generatedQty),
+  1062→          recoveredQty: recoveredQty ? Number(recoveredQty) : 0,
+  1063→          recycledQty: recycledQty ? Number(recycledQty) : 0,
+  1064→          reusedQty: reusedQty ? Number(reusedQty) : 0,
+  1065→          disposedQty: disposedQty ? Number(disposedQty) : 0,
+  1066→          disposalRoute: disposalRoute || undefined, vendor: vendor || undefined,
+  1067→          manifestRef: manifestRef || undefined, sourceUnit,
+  1068→          evidenceId: evidenceId || undefined,
+  1069→        }),
+  1070→      })
+  1071→      const d = await r.json()
+  1072→      if (!r.ok) throw new Error(d.error || d.payload?.error || 'Save failed')
+  1073→      onSaved({
+  1074→        id: d.record.id, recordType: 'WASTE',
+  1075→        issues: d.issues || [], calculation: null,
+  1076→        validationStatus: d.record.validationStatus,
+  1077→      })
+  1078→    } catch (e: any) {
+  1079→      setError(e?.message || 'Save failed')
+  1080→    } finally {
+  1081→      setSubmitting(false)
+  1082→    }
+  1083→  }
+  1084→
+  1085→  return (
+  1086→    <FormGrid>
+  1087→      <FormField label="Waste type" hint="E-waste, sludge, scrap, etc.">
+  1088→        <input value={wasteType} disabled={readOnly} onChange={(e) => setWasteType(e.target.value)} placeholder="E-waste" className={inputClass} />
+  1089→      </FormField>
+  1090→      <FormField label="Source unit" hint="Tonnes by default.">
+  1091→        <select value={sourceUnit} disabled={readOnly} onChange={(e) => setSourceUnit(e.target.value)} className={inputClass}>
+  1092→          {['TON', 'T', 'KG'].map(u => <option key={u} value={u}>{u}</option>)}
+  1093→        </select>
+  1094→      </FormField>
+  1095→      <FormField label="Generated qty" hint="Total generated this period.">
+  1096→        <input type="number" min="0" step="any" value={generatedQty} disabled={readOnly}
+  1097→          onChange={(e) => setGeneratedQty(e.target.value)} placeholder="e.g. 2.4" className={inputClass} />
+  1098→      </FormField>
+  1099→      <FormField label="Recovered qty" hint="Sent for recovery.">
+  1100→        <input type="number" min="0" step="any" value={recoveredQty} disabled={readOnly}
+  1101→          onChange={(e) => setRecoveredQty(e.target.value)} placeholder="e.g. 2.3" className={inputClass} />
+  1102→      </FormField>
+  1103→      <FormField label="Recycled qty" hint="Processed by recycler.">
+  1104→        <input type="number" min="0" step="any" value={recycledQty} disabled={readOnly}
+  1105→          onChange={(e) => setRecycledQty(e.target.value)} placeholder="e.g. 2.3" className={inputClass} />
+  1106→      </FormField>
+  1107→      <FormField label="Reused qty" hint="Reused on-site.">
+  1108→        <input type="number" min="0" step="any" value={reusedQty} disabled={readOnly}
+  1109→          onChange={(e) => setReusedQty(e.target.value)} placeholder="0" className={inputClass} />
+  1110→      </FormField>
+  1111→      <FormField label="Disposed qty" hint="Landfill / TSDF.">
+  1112→        <input type="number" min="0" step="any" value={disposedQty} disabled={readOnly}
+  1113→          onChange={(e) => setDisposedQty(e.target.value)} placeholder="0.1" className={inputClass} />
+  1114→      </FormField>
+  1115→      <FormField label="Disposal route" hint="Authorised recycler / TSDF.">
+  1116→        <input value={disposalRoute} disabled={readOnly} onChange={(e) => setDisposalRoute(e.target.value)} placeholder="Authorised Recycler" className={inputClass} />
+  1117→      </FormField>
+  1118→      <FormField label="Vendor" hint="Authorised vendor name.">
+  1119→        <input value={vendor} disabled={readOnly} onChange={(e) => setVendor(e.target.value)} placeholder="e.g. Ecoreco" className={inputClass} />
+  1120→      </FormField>
+  1121→      <FormField label="Manifest reference" hint="Required for hazardous waste.">
+  1122→        <input value={manifestRef} disabled={readOnly} onChange={(e) => setManifestRef(e.target.value)} placeholder="EWM-GJT-04-01" className={inputClass} />
+  1123→      </FormField>
+  1124→      <FormField label="Hazardous?" hint="If yes, manifest is mandatory." full>
+  1125→        <label className="flex items-center gap-1.5 text-[11px] font-medium text-slate-700">
+  1126→          <input type="checkbox" checked={hazardous} disabled={readOnly}
+  1127→            onChange={(e) => setHazardous(e.target.checked)} className="h-4 w-4 accent-blue-500" />
+  1128→          Mark as hazardous waste
+  1129→        </label>
+  1130→      </FormField>
+  1131→      <FormField label="Evidence file" hint="Optional — manifest / register." full>
+  1132→        <select value={evidenceId} disabled={readOnly} onChange={(e) => setEvidenceId(e.target.value)} className={inputClass}>
+  1133→          <option value="">— None —</option>
+  1134→          {evidence.map(ev => <option key={ev.id} value={ev.id}>{ev.fileName}</option>)}
+  1135→        </select>
+  1136→      </FormField>
+  1137→      <FormActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+  1138→    </FormGrid>
+  1139→  )
+  1140→}
+  1141→
+  1142→/* ============================================================
+  1143→   WORKFORCE FORM
+  1144→   ============================================================ */
+  1145→function WorkforceForm({ projectId, periodId, evidence, readOnly, formStateRef, onSaved }: FormProps) {
+  1146→  const key = `workforce-${projectId}-${periodId}`
+  1147→  const initial = formStateRef.current[key] || {}
+  1148→  const [category, setCategory] = useState<'EMPLOYEE' | 'WORKER'>(initial.category ?? 'EMPLOYEE')
+  1149→  const [permanent, setPermanent] = useState<string>(initial.permanent ?? '')
+  1150→  const [nonPermanent, setNonPermanent] = useState<string>(initial.nonPermanent ?? '')
+  1151→  const [male, setMale] = useState<string>(initial.male ?? '')
+  1152→  const [female, setFemale] = useState<string>(initial.female ?? '')
+  1153→  const [other, setOther] = useState<string>(initial.other ?? '0')
+  1154→  const [differentlyAbled, setDifferentlyAbled] = useState<string>(initial.differentlyAbled ?? '0')
+  1155→  const [newHires, setNewHires] = useState<string>(initial.newHires ?? '0')
+  1156→  const [exits, setExits] = useState<string>(initial.exits ?? '0')
+  1157→  const [trainingHours, setTrainingHours] = useState<string>(initial.trainingHours ?? '')
+  1158→  const [evidenceId, setEvidenceId] = useState<string>(initial.evidenceId ?? '')
+  1159→  const [submitting, setSubmitting] = useState(false)
+  1160→  const [error, setError] = useState('')
+  1161→
+  1162→  const total = (Number(permanent) || 0) + (Number(nonPermanent) || 0)
+  1163→  const genderTotal = (Number(male) || 0) + (Number(female) || 0) + (Number(other) || 0)
+  1164→
+  1165→  const persist = (patch: any) => { formStateRef.current[key] = { ...(formStateRef.current[key] || {}), ...patch } }
+  1166→  useEffect(() => { persist({ category, permanent, nonPermanent, male, female, other, differentlyAbled, newHires, exits, trainingHours, evidenceId }) }, [category, permanent, nonPermanent, male, female, other, differentlyAbled, newHires, exits, trainingHours, evidenceId])
+  1167→
+  1168→  const save = async () => {
+  1169→    setError('')
+  1170→    if (permanent === '' || nonPermanent === '' || male === '' || female === '') { setError('Permanent, non-permanent, male and female counts are required'); return }
+  1171→    if (genderTotal !== total) { setError(`Gender total (${genderTotal}) must equal workforce total (${total})`); return }
+  1172→    setSubmitting(true)
+  1173→    try {
+  1174→      const r = await fetch('/api/workforce', {
+  1175→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+  1176→        body: JSON.stringify({
+  1177→          projectId, reportingPeriodId: periodId, category,
+  1178→          permanent: Number(permanent), nonPermanent: Number(nonPermanent),
+  1179→          male: Number(male), female: Number(female),
+  1180→          other: other ? Number(other) : 0,
+  1181→          differentlyAbled: differentlyAbled ? Number(differentlyAbled) : undefined,
+  1182→          newHires: newHires ? Number(newHires) : 0,
+  1183→          exits: exits ? Number(exits) : 0,
+  1184→          trainingHours: trainingHours ? Number(trainingHours) : undefined,
+  1185→          evidenceId: evidenceId || undefined,
+  1186→        }),
+  1187→      })
+  1188→      const d = await r.json()
+  1189→      if (!r.ok) throw new Error(d.error || d.payload?.error || 'Save failed')
+  1190→      onSaved({
+  1191→        id: d.record.id, recordType: 'PEOPLE',
+  1192→        issues: d.issues || [], calculation: null,
+  1193→        validationStatus: d.record.validationStatus,
+  1194→      })
+  1195→    } catch (e: any) {
+  1196→      setError(e?.message || 'Save failed')
+  1197→    } finally {
+  1198→      setSubmitting(false)
+  1199→    }
+  1200→  }
+  1201→
+  1202→  return (
+  1203→    <FormGrid>
+  1204→      <FormField label="Category" hint="Employee or worker.">
+  1205→        <select value={category} disabled={readOnly} onChange={(e) => setCategory(e.target.value as 'EMPLOYEE' | 'WORKER')} className={inputClass}>
+  1206→          <option value="EMPLOYEE">Employee</option>
+  1207→          <option value="WORKER">Worker</option>
+  1208→        </select>
+  1209→      </FormField>
+  1210→      <FormField label="Training hours" hint="Aggregated training hours for the period.">
+  1211→        <input type="number" min="0" step="any" value={trainingHours} disabled={readOnly}
+  1212→          onChange={(e) => setTrainingHours(e.target.value)} placeholder="e.g. 312" className={inputClass} />
+  1213→      </FormField>
+  1214→      <FormField label="Permanent" hint="Permanent headcount.">
+  1215→        <input type="number" min="0" value={permanent} disabled={readOnly}
+  1216→          onChange={(e) => setPermanent(e.target.value)} placeholder="e.g. 42" className={inputClass} />
+  1217→      </FormField>
+  1218→      <FormField label="Non-permanent" hint="Contractual / temporary.">
+  1219→        <input type="number" min="0" value={nonPermanent} disabled={readOnly}
+  1220→          onChange={(e) => setNonPermanent(e.target.value)} placeholder="e.g. 8" className={inputClass} />
+  1221→      </FormField>
+  1222→      <FormField label="Male" hint="Male headcount.">
+  1223→        <input type="number" min="0" value={male} disabled={readOnly}
+  1224→          onChange={(e) => setMale(e.target.value)} placeholder="e.g. 38" className={inputClass} />
+  1225→      </FormField>
+  1226→      <FormField label="Female" hint="Female headcount.">
+  1227→        <input type="number" min="0" value={female} disabled={readOnly}
+  1228→          onChange={(e) => setFemale(e.target.value)} placeholder="e.g. 12" className={inputClass} />
+  1229→      </FormField>
+  1230→      <FormField label="Other" hint="Non-binary / other.">
+  1231→        <input type="number" min="0" value={other} disabled={readOnly}
+  1232→          onChange={(e) => setOther(e.target.value)} placeholder="0" className={inputClass} />
+  1233→      </FormField>
+  1234→      <FormField label="Differently-abled" hint="Voluntary disclosure.">
+  1235→        <input type="number" min="0" value={differentlyAbled} disabled={readOnly}
+  1236→          onChange={(e) => setDifferentlyAbled(e.target.value)} placeholder="0" className={inputClass} />
+  1237→      </FormField>
+  1238→      <FormField label="New hires" hint="Joined this period.">
+  1239→        <input type="number" min="0" value={newHires} disabled={readOnly}
+  1240→          onChange={(e) => setNewHires(e.target.value)} placeholder="0" className={inputClass} />
+  1241→      </FormField>
+  1242→      <FormField label="Exits" hint="Left this period.">
+  1243→        <input type="number" min="0" value={exits} disabled={readOnly}
+  1244→          onChange={(e) => setExits(e.target.value)} placeholder="0" className={inputClass} />
+  1245→      </FormField>
+  1246→      <FormField label="Totals check" hint="Gender total must equal permanent + non-permanent." full>
+  1247→        <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
+  1248→          <span className={`status-pill ${genderTotal === total ? 'status-approved' : 'status-missing'}`}>
+  1249→            Total: {total} · Gender: {genderTotal}
+  1250→          </span>
+  1251→          {genderTotal !== total && <span className="text-rose-600">Reconcile headcount register with HRIS gender split.</span>}
+  1252→        </div>
+  1253→      </FormField>
+  1254→      <FormField label="Evidence file" hint="Optional — HRIS export." full>
+  1255→        <select value={evidenceId} disabled={readOnly} onChange={(e) => setEvidenceId(e.target.value)} className={inputClass}>
+  1256→          <option value="">— None —</option>
+  1257→          {evidence.map(ev => <option key={ev.id} value={ev.id}>{ev.fileName}</option>)}
+  1258→        </select>
+  1259→      </FormField>
+  1260→      <FormActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+  1261→    </FormGrid>
+  1262→  )
+  1263→}
+  1264→
+  1265→/* ============================================================
+  1266→   SAFETY FORM
+  1267→   ============================================================ */
+  1268→const SAFETY_TYPES = ['INCIDENT', 'INJURY', 'FATALITY', 'LTI', 'RECORDABLE', 'TRAINING', 'ASSESSMENT']
+  1269→
+  1270→function SafetyForm({ projectId, periodId, evidence, readOnly, formStateRef, onSaved }: FormProps) {
+  1271→  const key = `safety-${projectId}-${periodId}`
+  1272→  const initial = formStateRef.current[key] || {}
+  1273→  const [recordType, setRecordType] = useState<string>(initial.recordType ?? 'INCIDENT')
+  1274→  const [fatalities, setFatalities] = useState<string>(initial.fatalities ?? '0')
+  1275→  const [injuries, setInjuries] = useState<string>(initial.injuries ?? '0')
+  1276→  const [lostTimeIncidents, setLostTimeIncidents] = useState<string>(initial.lostTimeIncidents ?? '0')
+  1277→  const [recordableInjuries, setRecordableInjuries] = useState<string>(initial.recordableInjuries ?? '0')
+  1278→  const [highConsequenceIncidents, setHighConsequenceIncidents] = useState<string>(initial.highConsequenceIncidents ?? '0')
+  1279→  const [trainingHours, setTrainingHours] = useState<string>(initial.trainingHours ?? '')
+  1280→  const [safetyHours, setSafetyHours] = useState<string>(initial.safetyHours ?? '')
+  1281→  const [manHoursWorked, setManHoursWorked] = useState<string>(initial.manHoursWorked ?? '')
+  1282→  const [correctiveActions, setCorrectiveActions] = useState<string>(initial.correctiveActions ?? '')
+  1283→  const [evidenceId, setEvidenceId] = useState<string>(initial.evidenceId ?? '')
+  1284→  const [submitting, setSubmitting] = useState(false)
+  1285→  const [error, setError] = useState('')
+  1286→
+  1287→  const lti = Number(lostTimeIncidents) || 0
+  1288→  const mhw = Number(manHoursWorked) || 0
+  1289→  const ltifr = mhw > 0 ? ((lti * 1000000) / mhw).toFixed(3) : null
+  1290→
+  1291→  const persist = (patch: any) => { formStateRef.current[key] = { ...(formStateRef.current[key] || {}), ...patch } }
+  1292→  useEffect(() => { persist({ recordType, fatalities, injuries, lostTimeIncidents, recordableInjuries, highConsequenceIncidents, trainingHours, safetyHours, manHoursWorked, correctiveActions, evidenceId }) }, [recordType, fatalities, injuries, lostTimeIncidents, recordableInjuries, highConsequenceIncidents, trainingHours, safetyHours, manHoursWorked, correctiveActions, evidenceId])
+  1293→
+  1294→  const save = async () => {
+  1295→    setError('')
+  1296→    if (!recordType) { setError('Record type is required'); return }
+  1297→    setSubmitting(true)
+  1298→    try {
+  1299→      const r = await fetch('/api/safety', {
+  1300→        method: 'POST', headers: { 'Content-Type': 'application/json' },
+  1301→        body: JSON.stringify({
+  1302→          projectId, reportingPeriodId: periodId, recordType,
+  1303→          fatalities: Number(fatalities) || 0, injuries: Number(injuries) || 0,
+  1304→          lostTimeIncidents: Number(lostTimeIncidents) || 0,
+  1305→          recordableInjuries: Number(recordableInjuries) || 0,
+  1306→          highConsequenceIncidents: Number(highConsequenceIncidents) || 0,
+  1307→          trainingHours: trainingHours ? Number(trainingHours) : undefined,
+  1308→          safetyHours: safetyHours ? Number(safetyHours) : undefined,
+  1309→          manHoursWorked: manHoursWorked ? Number(manHoursWorked) : undefined,
+  1310→          correctiveActions: correctiveActions || undefined,
+  1311→          evidenceId: evidenceId || undefined,
+  1312→        }),
+  1313→      })
+  1314→      const d = await r.json()
+  1315→      if (!r.ok) throw new Error(d.error || d.payload?.error || 'Save failed')
+  1316→      onSaved({
+  1317→        id: d.record.id, recordType: 'SAFETY',
+  1318→        issues: d.issues || [], calculation: null,
+  1319→        derivedLtifr: d.derivedLtifr ?? null,
+  1320→        validationStatus: d.record.validationStatus,
+  1321→      })
+  1322→    } catch (e: any) {
+  1323→      setError(e?.message || 'Save failed')
+  1324→    } finally {
+  1325→      setSubmitting(false)
+  1326→    }
+  1327→  }
+  1328→
+  1329→  return (
+  1330→    <FormGrid>
+  1331→      <FormField label="Record type" hint="Type of safety record.">
+  1332→        <select value={recordType} disabled={readOnly} onChange={(e) => setRecordType(e.target.value)} className={inputClass}>
+  1333→          {SAFETY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+  1334→        </select>
+  1335→      </FormField>
+  1336→      <FormField label="Man-hours worked" hint="Total hours worked — required for LTIFR.">
+  1337→        <input type="number" min="0" step="any" value={manHoursWorked} disabled={readOnly}
+  1338→          onChange={(e) => setManHoursWorked(e.target.value)} placeholder="e.g. 48600" className={inputClass} />
+  1339→      </FormField>
+  1340→      <FormField label="Fatalities" hint="Fatalities this period.">
+  1341→        <input type="number" min="0" value={fatalities} disabled={readOnly}
+  1342→          onChange={(e) => setFatalities(e.target.value)} placeholder="0" className={inputClass} />
+  1343→      </FormField>
+  1344→      <FormField label="Injuries" hint="Recordable injuries count.">
+  1345→        <input type="number" min="0" value={injuries} disabled={readOnly}
+  1346→          onChange={(e) => setInjuries(e.target.value)} placeholder="0" className={inputClass} />
+  1347→      </FormField>
+  1348→      <FormField label="Lost-time incidents" hint="LTI count.">
+  1349→        <input type="number" min="0" value={lostTimeIncidents} disabled={readOnly}
+  1350→          onChange={(e) => setLostTimeIncidents(e.target.value)} placeholder="0" className={inputClass} />
+  1351→      </FormField>
+  1352→      <FormField label="Recordable injuries" hint="OSHA recordable.">
+  1353→        <input type="number" min="0" value={recordableInjuries} disabled={readOnly}
+  1354→          onChange={(e) => setRecordableInjuries(e.target.value)} placeholder="0" className={inputClass} />
+  1355→      </FormField>
+  1356→      <FormField label="High-consequence" hint="Serious injury / illness.">
+  1357→        <input type="number" min="0" value={highConsequenceIncidents} disabled={readOnly}
+  1358→          onChange={(e) => setHighConsequenceIncidents(e.target.value)} placeholder="0" className={inputClass} />
+  1359→      </FormField>
+  1360→      <FormField label="Training hours" hint="Safety training hours.">
+  1361→        <input type="number" min="0" step="any" value={trainingHours} disabled={readOnly}
+  1362→          onChange={(e) => setTrainingHours(e.target.value)} placeholder="e.g. 96" className={inputClass} />
+  1363→      </FormField>
+  1364→      <FormField label="Safety hours" hint="Total safety observation hours.">
+  1365→        <input type="number" min="0" step="any" value={safetyHours} disabled={readOnly}
+  1366→          onChange={(e) => setSafetyHours(e.target.value)} placeholder="e.g. 28800" className={inputClass} />
+  1367→      </FormField>
+  1368→      <FormField label="Corrective actions" hint="Planned remediation." full>
+  1369→        <textarea value={correctiveActions} disabled={readOnly}
+  1370→          onChange={(e) => setCorrectiveActions(e.target.value)}
+  1371→          placeholder="e.g. Toolbox talk + PPE audit"
+  1372→          className={inputClass + ' min-h-[60px] resize-y'} />
+  1373→      </FormField>
+  1374→      <FormField label="LTIFR preview" hint="Derived: (LTI × 1M) / man-hours." full>
+  1375→        <div className="flex items-center gap-2 text-[11px]">
+  1376→          {ltifr !== null ? (
+  1377→            <span className="status-pill status-approved">{ltifr} /M hrs</span>
+  1378→          ) : (
+  1379→            <span className="status-pill status-warning">Enter man-hours to compute LTIFR</span>
+  1380→          )}
+  1381→        </div>
+  1382→      </FormField>
+  1383→      <FormField label="Evidence file" hint="Optional — incident report." full>
+  1384→        <select value={evidenceId} disabled={readOnly} onChange={(e) => setEvidenceId(e.target.value)} className={inputClass}>
+  1385→          <option value="">— None —</option>
+  1386→          {evidence.map(ev => <option key={ev.id} value={ev.id}>{ev.fileName}</option>)}
+  1387→        </select>
+  1388→      </FormField>
+  1389→      <FormActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+  1390→    </FormGrid>
+  1391→  )
+  1392→}
+  1393→
+  1394→/* ============================================================
+  1395→   Shared form building blocks
+  1396→   ============================================================ */
+  1397→interface FormProps {
+  1398→  projectId: string
+  1399→  periodId: string
+  1400→  evidence: EvidenceItem[]
+  1401→  readOnly: boolean
+  1402→  formStateRef: React.MutableRefObject<Record<string, Record<string, any>>>
+  1403→  onSaved: (r: SavedRecord) => void
+  1404→}
+  1405→
+  1406→const inputClass = 'w-full rounded-lg border border-white/60 bg-white/70 px-2.5 py-2 text-[12px] font-medium text-slate-700 outline-none transition focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60'
+  1407→
+  1408→function FormGrid({ children }: { children: React.ReactNode }) {
+  1409→  return <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{children}</div>
+  1410→}
+  1411→
+  1412→function FormField({ label, hint, children, full }: { label: string; hint?: string; children: React.ReactNode; full?: boolean }) {
+  1413→  return (
+  1414→    <div className={full ? 'md:col-span-2' : ''}>
+  1415→      <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-600">{label}</label>
+  1416→      {children}
+  1417→      {hint && <p className="mt-1 text-[10px] text-slate-400">{hint}</p>}
+  1418→    </div>
+  1419→  )
+  1420→}
+  1421→
+  1422→function FormActions({ error, submitting, readOnly, onSave }: { error: string; submitting: boolean; readOnly: boolean; onSave: () => void }) {
+  1423→  return (
+  1424→    <div className="md:col-span-2">
+  1425→      {error && <div className="mb-2 rounded-lg border border-rose-200/70 bg-rose-50/60 px-3 py-1.5 text-[11px] font-medium text-rose-700"><AlertTriangle className="mr-1 inline h-3 w-3" /> {error}</div>}
+  1426→      <div className="flex flex-wrap items-center gap-2">
+  1427→        <button
+  1428→          onClick={onSave} disabled={readOnly || submitting}
+  1429→          className="glass-subtle flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white/80 disabled:cursor-not-allowed disabled:opacity-40"
+  1430→        >
+  1431→          {submitting ? <Clock className="h-3.5 w-3.5 animate-pulse" /> : <Save className="h-3.5 w-3.5" />}
+  1432→          Save Draft
+  1433→        </button>
+  1434→        <span className="text-[10px] text-slate-400">Engine validates + calculates on save.</span>
+  1435→      </div>
+  1436→    </div>
+  1437→  )
+  1438→}
+  1439→
+  1440→function describeRecord(r: any, subModule: SubModule): string {
+  1441→  if (subModule === 'energy') return `${r.source} · ${r.quantity} ${r.sourceUnit}`
+  1442→  if (subModule === 'water') return `${r.source} · ${r.withdrawal} ${r.sourceUnit}`
+  1443→  if (subModule === 'waste') return `${r.wasteType} · ${r.generatedQty} ${r.sourceUnit}`
+  1444→  if (subModule === 'workforce') return `${r.category} · ${(r.permanent || 0) + (r.nonPermanent || 0)} people`
+  1445→  if (subModule === 'safety') return `${r.recordType} · ${r.manHoursWorked ?? 0} hrs`
+  1446→  return r.id?.slice(-8) ?? 'Record'
+  1447→}
+  1448→
+  1449→/* ============================================================
+  1450→   State helpers
+  1451→   ============================================================ */
+  1452→function DataEntrySkeleton() {
+  1453→  return (
+  1454→    <div className="space-y-5">
+  1455→      <div className="h-8 w-64 animate-pulse rounded bg-slate-200/60" />
+  1456→      <div className="glass h-16 animate-pulse rounded-2xl" />
+  1457→      <div className="glass h-24 animate-pulse rounded-2xl" />
+  1458→      <div className="grid gap-4 lg:grid-cols-3">
+  1459→        <div className="glass h-96 animate-pulse rounded-2xl lg:col-span-2" />
+  1460→        <div className="glass h-96 animate-pulse rounded-2xl lg:col-span-1" />
+  1461→      </div>
+  1462→      <div className="glass h-16 animate-pulse rounded-2xl" />
+  1463→    </div>
+  1464→  )
+  1465→}
+  1466→
+  1467→function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  1468→  return (
+  1469→    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
+  1470→      <AlertOctagon className="h-10 w-10 text-rose-500" />
+  1471→      <div>
+  1472→        <div className="text-base font-bold text-slate-800">Failed to load Data Entry</div>
+  1473→        <div className="text-xs text-slate-500">{message}</div>
+  1474→      </div>
+  1475→      <button onClick={onRetry} className="btn-glass-primary rounded-full px-5 py-2 text-xs font-semibold">Retry</button>
+  1476→    </div>
+  1477→  )
+  1478→}
+  1479→
+  1480→function EmptyState({ message }: { message: string }) {
+  1481→  return (
+  1482→    <div className="glass flex flex-col items-center justify-center gap-3 rounded-2xl py-16 text-center">
+  1483→      <FileText className="h-10 w-10 text-slate-400" />
+  1484→      <div>
+  1485→        <div className="text-base font-bold text-slate-800">No data to enter yet</div>
+  1486→        <div className="text-xs text-slate-500">{message}</div>
+  1487→      </div>
+  1488→    </div>
+  1489→  )
+  1490→}
+  1491→

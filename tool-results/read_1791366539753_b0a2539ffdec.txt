@@ -1,0 +1,197 @@
+   300→- Both components are `'use client'`, strict TypeScript, use framer-motion for staggered card entrance + step transitions + bar-chart animations, and fetch 100% from real APIs (no hardcoded KPIs).
+   301→- The full data control chain is wired end-to-end at the UI: SOURCE capture → VALIDATION (rules rendered as colored pills with ruleCode + field + message + suggestedAction) → CALCULATION preview (factor version + scope + methodology) → SUBMISSION (create + submit) → ready for the downstream BU/subsidiary/group review chain.
+   302→- Role-aware: reviewer roles see forms in read-only mode with an explanatory notice.
+   303→- Stepper is a real workflow state machine, not decoration: Save Draft advances to step 2; Evidence attach advances to step 3; Validate (via /api/validation/run) advances to step 4; Submit for Review (via /api/submissions + /api/submissions/[id]/submit) completes the chain.
+   304→- Both files integrate cleanly with the existing `module-router.tsx` import contract and the established shell + design system (`.glass`, `.glass-shimmer`, `.glass-subtle`, `.glass-nav`, `.kpi-tile`, `.btn-glass-primary`, `.status-pill` + status color variants, `.scroll-elegant`, `.tabular-nums`, `.animate-pulse-ring`, stagger helpers).
+   305→- Work record written to `/agent-ctx/5-data-entry-ui-builder.md`.
+   306→
+   307→---
+   308→Task ID: 8-UI
+   309→Agent: BRSR/Reports UI Builder
+   310→Task: Build frontend module screens for BRSR + Reports + Audit Trace + Analytics + Admin (5 files)
+   311→
+   312→Work Log:
+   313→- Read worklog (Tasks 1, 6, 7, 8) to align with the established design system + API shapes; read each backend route I needed to consume (`/api/brsr/*`, `/api/reports/*`, `/api/audit/*`, `/api/audit/trace/[id]`, `/api/overview`, `/api/organization/tree`) and the shared `brsr-resolver.ts` to understand exact response shapes for readiness, indicators, principles, preview, audit log, and trace tree.
+   314→- Built 5 self-contained client modules (`'use client'`, strict TypeScript, framer-motion entrance animations, recharts where applicable, sonner toast for action feedback, loading skeleton + error state with retry + empty state per master spec). Each file is self-contained — no shared helper module — to avoid colliding with parallel agents' files.
+   315→  1. `src/components/modules/brsr.tsx` — `BrsrModule`. The BRSR engine screen.
+   316→     • Header: framework/version `<select>` (live from `/api/brsr/frameworks`) + reporting year `<input>` + "Generate BRSR Report" button (POST `/api/brsr/generate`, toast on success, refreshes reports list; 403 → permission toast).
+   317→     • Readiness hero: animated radial progress SVG (framer-motion stroke-dashoffset) showing REAL `overall` % from `/api/brsr/readiness`; dimensions grid (source completeness, pending evidence, pending approvals, missing items, total questions, ready weight) — all REAL fields from the readiness API, nothing hardcoded. Clickable "Show unresolved items" reveals missing-items list (questionCode + text + section + principle + status pill).
+   318→     • Section tabs A/B/C (Section C → P1–P9 principle cards with their readiness %, ready/missing/draft counts, expand-to-reveal questions). Sections A/B → indicator table.
+   319→     • Indicator Explorer: table of `questionCode | questionText | answerType | mappingSource | resolvedValue (with unit) | status pill | evidence-required pill`. Each row clickable → right-side `Sheet` showing full source-record lineage with link to `/api/audit/trace/[id]?type=`.
+   320→     • Preview button → opens `Dialog` rendering `/api/brsr/preview/[id]` (section / question / value / source-status / evidence-status / sourceRecordIds count).
+   321→     • Report History table: live list of BRSR reports (from `/api/reports?type=BRSR`) with version, scope, year, generatedBy, status pill, createdAt, and download link.
+   322→  2. `src/components/modules/reports.tsx` — `ReportsModule`. The reporting screen.
+   323→     • Header: "Generate Report" button → opens `Dialog` with `GenerateForm` (reportType select for BRSR/ESG_SUMMARY/EMISSIONS/ENERGY/WATER/WASTE/WORKFORCE/SAFETY/EVIDENCE_PACKAGE/AUDIT_PACKAGE, reportingYear, periodLabel, scopeType, scopeId, scopeName). Submit routes to POST `/api/reports/generate` for module reports, POST `/api/brsr/generate` for BRSR (auto-resolves first framework). Toast on success/error.
+   324→     • Filters (type, year) + summary tiles (total / completed / BRSR / module counts).
+   325→     • Reports table: type, framework, year, period, scope, generatedBy, status pill (COMPLETED/PROCESSING/FAILED), version, file name+type, eye (detail) + download (`/api/reports/[id]/download`) actions.
+   326→     • Click a row → right-side `Sheet` showing report detail with parsed content (totals block, modules breakdown for ESG_SUMMARY, section/question rendering for BRSR, audit-log preview for AUDIT_PACKAGE, by-project rows for module reports).
+   327→  3. `src/components/modules/audit.tsx` — `AuditModule`. The audit & traceability screen.
+   328→     • Header: "Audit & Traceability" + "Every number is traceable to source".
+   329→     • Left panel: audit log (GET `/api/audit` with action/entityType/entityId filters, take 100, sorted desc by createdAt server-side). Each row: timestamp, actor name + role pill, action status-pill (color by action type), entityType, truncated entityId, reason. Click any row → loads its trace.
+   330→     • Right panel: Trace Tree — renders `/api/audit/trace/[id]?type=` as a vertical timeline (vertical blue gradient line + per-stage node dot icon) covering all 8 stages (SOURCE RECORDS → EVIDENCE → VALIDATION → CALCULATION → SUBMISSION → APPROVAL HISTORY → CORRECTIONS → BRSR MAPPING). Each stage node is a glass card with child item cards showing type pill + label + id + 2-4 field summary auto-derived from the data shape. Manual trace input (entityId + type) for direct lookup. Auto-traces first audit log entry on initial mount.
+   331→     • Loading skeleton + error + empty states for both panels.
+   332→  4. `src/components/modules/analytics.tsx` — `AnalyticsModule`. ESG analytics dashboard.
+   333→     • Header: scope filter (Group/Subsidiary/BU/Project — UI only) + refresh.
+   334→     • Tabs: Emissions / Energy / Water / Waste / People / Safety.
+   335→     • Emissions: Scope 1/2/3 KPIs + Scope 1 vs 2 vs 3 horizontal bar + emissions-by-source pie + monthly GHG trajectory area chart (recharts).
+   336→     • Energy: monthly energy bar + renewable vs non-renewable donut (kpis.renewableShare).
+   337→     • Water: monthly water area + recycled vs fresh donut + ZLD projects count.
+   338→     • Waste: monthly waste bar + hazardous vs non-haz donut + recovered vs disposed donut.
+   339→     • People: employees/workers bar + gender mix pie + workforce breakdown grid (training hours, differently-abled, etc.).
+   340→     • Safety: LTIFR radial bar (recharts RadialBarChart) + incident counts bar (fatalities/LTI/injuries) + training stats.
+   341→     • All KPIs come from /api/overview (computed server-side) — no hardcoded values.
+   342→  5. `src/components/modules/admin.tsx` — `AdminModule`. Admin control plane.
+   343→     • Header: role notice (SUPER_ADMIN → full control; others → read-only).
+   344→     • Tabs gated by role: SUPER_ADMIN sees all 8 (Organization, Users, Roles & Permissions, Reporting Periods, Units & Conversions, Emission Factors, BRSR Framework, System Health); other roles see only Organization + System Health.
+   345→     • Organization tab: collapsible tree of `/api/organization/tree` (Group→Subsidiary→BU→Project) with code pills, CINs, location, status pills, count chips at every level.
+   346→     • Users tab: illustrative 15-user demo roster (clearly marked) with role + scope + demo badge.
+   347→     • Roles tab: illustrative 15-role RBAC matrix with phase, description, sample permission chips.
+   348→     • Periods tab: live `/api/overview` periods (label, FY, month, status pill).
+   349→     • Units tab: illustrative unit catalogue (KWH→GJ 0.0036, diesel L→GJ 0.0383, etc.).
+   350→     • Emission Factors tab: illustrative 10-factor reference table (Grid Electricity 0.716, Diesel 2.637, Coal 1.945, etc.) with version + methodology + source.
+   351→     • BRSR Framework tab: illustrative framework summary (3 sections / 9 principles / 22+ questions, P1–P9 list).
+   352→     • System Health tab: 4 operational badges (DB / RBAC / Audit / Workflow) + 7 source-record count tiles (live from `/api/overview.sources`) + 6 engine version stats.
+   353→- Strict TypeScript throughout. Fixed two issues during the tsc pass: (1) `admin.tsx` was missing the `Calculator` icon import (used in SystemHealthView + EngineStat default); added it. (2) `audit.tsx` StageNode had `{stageIcon && <stageIcon/>}` — lowercase JSX tag treated as intrinsic element by TS; refactored to capitalize the variable as `StageIcon` (component reference) and render `<StageIcon/>`. Also removed an unused `useRef` import in audit.tsx.
+   354→- Ran `bun run lint` — passes clean (zero errors anywhere in the project). Ran `bunx tsc --noEmit` — zero TS errors in any of my 5 files. The only remaining TS errors are out-of-scope: pre-existing in `examples/` + `skills/` + `src/app/api/overview/route.ts` (Task 1 distinct arg) + `src/components/dashboard/overview-dashboard.tsx` (Task 8-UI external — Send/Link2 missing in another agent's file).
+   355→- Did NOT touch any other agent's files. Verified dev server hot-reloaded cleanly after the last file write ("✓ Compiled in 1098ms").
+   356→
+   357→Stage Summary:
+   358→- 5 new client module files delivered under `src/components/modules/` — total ~157KB of UI code: `brsr.tsx` (45KB), `reports.tsx` (32KB), `audit.tsx` (26KB), `analytics.tsx` (33KB), `admin.tsx` (46KB).
+   359→- All 5 export the exact symbols `module-router.tsx` expects (`BrsrModule`, `ReportsModule`, `AuditModule`, `AnalyticsModule`, `AdminModule`).
+   360→- Every numeric value, readiness %, indicator value, audit log entry, and trace node is fetched from real backend APIs — NEVER hardcoded. BRSR readiness % comes from `/api/brsr/readiness`; indicator values come from `/api/brsr/indicators` (resolved server-side via `mappingSource` codes); audit trace comes from `/api/audit/trace/[id]`; analytics KPIs come from `/api/overview`.
+   361→- Premium light white-blue glass aesthetic preserved throughout — `.glass` / `.glass-strong` / `.glass-subtle` / `.glass-shimmer` / `.status-pill` + variants / `.kpi-tile` / `.btn-glass-primary` / `.animate-fade-up` / `.stagger-*` / `.scroll-elegant` / `.tabular-nums` all used. No neon/dark.
+   362→- framer-motion staggered entrance on every section/card; recharts for all charts (AreaChart / BarChart / PieChart / RadialBarChart / LineChart + Tooltip / Legend / CartesianGrid / Cell gradients). sonner toast for all action feedback (generate, errors). Loading skeleton + error state with retry + empty state present in every module.
+   363→- RBAC awareness: each module surfaces a role-notice strip; admin module additionally hides tabs for non-SUPER_ADMIN roles.
+   364→- Reference tables in admin (users, roles, units, factors, BRSR framework) are explicitly marked ILLUSTRATIVE with amber banners so the user knows they reflect seeded master data, not a wired CRUD endpoint.
+   365→- Lint + TypeScript both pass clean for all 5 of my files. Dev server hot-reloaded successfully after the final write.
+   366→- Ready for end-to-end QA: log in as `admin@meil-esg.in` (Super Admin) or `rohit@meil-esg.in` (Project Data Entry) with password `esg12345`, switch to BRSR / Reports / Audit / Analytics / Admin modules in the side nav.
+   367→
+   368→---
+   369→Task ID: 9 (verification)
+   370→Agent: Lead Architect (main)
+   371→Task: End-to-end agent-browser verification + cron job setup
+   372→
+   373→Work Log:
+   374→- Started dev server on port 3000 (Next.js 16 Turbopack, Ready in 1136ms)
+   375→- Used agent-browser to verify the full user flow:
+   376→  1. Welcome screen: glassmorphism with floating orbs, ESG concept diagram, MEIL branding, welcome panel with Collect/Validate/Report steps, "Choose Role to Continue" CTA — renders cleanly, no errors
+   377→  2. Role picker: all 14 roles across 3 phases (Data Entry / Review & Consolidation / Analysis & Reporting) render as glass cards with hover fan interaction
+   378→  3. Login morph: selected role (Rohit Kumar / Project Site User) morphs into a 2-panel login (left role visual, right form), credentials pre-filled (esg12345), Sign In succeeds and sets httpOnly session cookie
+   379→  4. Application shell: glass header (branding, search, FY year selector, notifications bell with unread badge, profile dropdown with role+scope), primary nav pill bar (Overview/My Project/Data Entry/Evidence 12/Submissions 3/Reports/Analytics/Audit & Trace/BRSR), sticky footer with ESG chain summary
+   380→  5. Overview Dashboard: renders with REAL computed KPIs — Scope 1&2 Emissions 969.84 tCO2e (verified = sum of 6 calculation results: 274.94+49.18+20.4+294.99+45.36+284.97), Energy 7505.4 GJ, Water 8800 kL, Waste Recovered 89.8%, Workforce 102, LTIFR 0, BRSR Readiness 71.4% (6 items missing — real from BrsrAnswer statuses), Reporting Completion 100%. Charts render: Monthly GHG Trajectory area chart, Emissions by Source donut, Water Balance, Waste Recovered, Workforce & Safety, Data Quality Center, Recent Activities feed.
+   381→  6. My Project: project dashboard with KPIs, projects table, details panel (Overview/ESG Progress/Recent Activity/Team/Documents tabs), deadlines & progress
+   382→  7. Data Entry (FLAGSHIP): 4-step stepper (Enter Data → Attach Evidence → Validate → Submit), Energy/Water/Waste/Workforce/Safety/Travel sub-modules, project+period selectors, Engine Preview panel. Tested the full chain: filled Grid Electricity 50000 KWH → Save Draft → POST /api/energy returned 201 → validation PASSED → deterministic calculation = 35.800 tCO2e (50000 × 0.716 CEA factor / 1000). Existing records list shows Gayatri's June 2026 draft record.
+   383→  8. Evidence: Evidence Vault with table, filters, Verify/Reject/Preview/History actions, role-gated
+   384→  9. Submissions: Submissions Workflow with KPI strip, status filter chips, table, detail sheet with pipeline stepper (DRAFT→...→LOCKED) + 6-tab detail + role-gated approve/reject/lock actions
+   385→  10. BRSR: BRSR Reporting with readiness radial %, Readiness Dimensions, Indicator Explorer, BRSR Report History, A/B/C section tabs, P1-P9 principles
+   386→  11. Reports: Reports + Report History + Generate dialog (10 report types)
+   387→  12. Analytics: ESG Analytics with 6 tabbed views (Emissions/Energy/Water/Waste/People/Safety), recharts
+   388→  13. Audit & Traceability: Audit Log table + Traceability Tree (8-stage chain SOURCE→EVIDENCE→VALIDATION→CALCULATION→SUBMISSION→APPROVAL_HISTORY→CORRECTIONS→BRSR_MAPPING)
+   389→- Fixed 2 bugs found during verification:
+   390→  - overview/route.ts: `distinct` arg not valid inside Prisma `select` — replaced with JS dedup
+   391→  - overview-dashboard.tsx: missing `Send` and `Link2` icon imports — added
+   392→  - app-shell.tsx: notifications API returns `{items:[...]}` not `{notifications:[...]}` — fixed field access + added ErrorBoundary wrapper
+   393→- Added ErrorBoundary component (src/components/error-boundary.tsx) wrapping root + active module to surface real React errors during development
+   394→- Final lint: `bun run lint` clean (exit 0). `bunx tsc --noEmit` clean for all src/app, src/components, src/lib files.
+   395→- Created the mandatory cron job: Kind = webDevReview, every 15 minutes (fixed_rate 900s), with the required task description for autonomous QA + continued development.
+   396→
+   397→Stage Summary:
+   398→- ENTIRE PLATFORM VERIFIED END-TO-END IN BROWSER: welcome → role → login → dashboard → all 9 modules render & interact with real DB-backed data.
+   399→- The ESG data control chain works: source data entry → server-side validation (PASSED) → deterministic calculation (35.8 tCO2e = 50000 kWh × 0.716 CEA v19 factor) → evidence linking → submission workflow → consolidation → BRSR mapping (71.4% real readiness) → audit traceability.
+   400→- No hardcoded KPI values — every number resolves from Prisma/SQLite via the backend APIs.
+   401→- Premium light liquid-glass design language preserved throughout (NO neon/dark/cyberpunk).
+   402→- Demo login: any seeded user email + password `esg12345` (e.g. rohit@meil-esg.in, admin@meil-esg.in).
+   403→- Cron job scheduled to run every 15 minutes for autonomous QA + feature advancement.
+   404→
+   405→---
+   406→Task ID: 5
+   407→Agent: Command Palette Builder
+   408→Task: Build a premium Cmd+K / Ctrl+K Command Palette for global search + module navigation + quick actions.
+   409→
+   410→Work Log:
+   411→- Read worklog.md (Tasks 1, 6, 7, 7-UI, 8, 8-UI, 9) to absorb the glassmorphism design system (premium light white-blue glass, primary oklch(0.55 0.18 245), status pills, glass-shimmer, KPI tiles, framer-motion staggered entrance), the auth context shape (`useApp()` → `{ user, activeModule, setActiveModule, dataEntrySubModule, setDataEntrySubModule }` with `ModuleKey` union of 10 modules), the single-route SPA navigation contract (no URL changes — everything funnels through `setActiveModule()`), and the established ESLint pattern (the `react-hooks/set-state-in-effect` rule observed in earlier Task 5 work requires that no `setState` calls happen synchronously inside effect bodies).
+   412→- Inspected `src/components/shell/app-shell.tsx` (placement target — AppShell is rendered only when `user` is non-null per `src/app/page.tsx`), `src/lib/auth-context.tsx` (useApp shape + `ModuleKey` union), `src/app/globals.css` (`.glass-strong`, `.glass-subtle`, `.glass-shimmer`, `.status-pill` + variants, `.btn-glass-primary`, `.kpi-tile`, `.scroll-elegant`, `.tabular-nums`, `.animate-scale-in`, `.animate-fade-up`, `.stagger-*`), and `src/app/api/organization/tree/route.ts` (response shape: `{ groups: [{ subsidiaries: [{ businessUnits: [{ projects: [{ id, projectCode, projectName, location, status }] }] }] }] }`).
+   413→
+   414→Built `src/components/shell/command-palette.tsx` (~380 lines, exports `CommandPalette`):
+   415→- `'use client'`, strict TypeScript, framer-motion + lucide-react only.
+   416→- Trigger: global `window.addEventListener('keydown', onKey)` that handles `(e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')` → `preventDefault()` + toggle `open`. Inside the open state it also handles `Escape` (close + clear query + reset selection), `ArrowDown`/`ArrowUp` (move selection with wrap-around modulo `items.length`, `preventDefault` so the cursor doesn't move inside the search input), and `Enter` (activate `items[safeIndex]` + close).
+   417→- Overlay: full-screen `position: fixed; inset: 0; z-index: 80; background: rgba(15,23,42,0.3); backdrop-filter: blur(6px)`. Clicking the backdrop (mousedown where `e.target === e.currentTarget`) closes the palette. Centered panel: `glass-strong glass-shimmer w-full max-w-2xl rounded-3xl overflow-hidden` positioned `pt-[12vh]`. framer-motion: backdrop fades; panel `initial={opacity:0, scale:0.96, y:-8}` → `animate={opacity:1, scale:1, y:0}` with `ease=[0.22,1,0.36,1]` and `duration:0.22`; exit reverses.
+   418→- Body scroll lock + input focus effect: when `open` becomes true, `document.body.style.overflow = 'hidden'` is set and a `setTimeout(() => inputRef.current?.focus(), 30)` schedules focus; cleanup restores the previous `overflow`. Effect deps are `[open]` only — no `setState` calls in the effect body (focus + DOM mutation only), so the lint rule stays satisfied.
+   419→- Search input row: `border-b border-slate-200/60 p-4`. Left = 9×9 rounded-xl gradient tile (`from-blue-500 to-cyan-500` + `Search` icon — the gradient accent called out in the spec). Input = `flex-1 bg-transparent text-base text-slate-800 outline-none`, `placeholder="Search modules, projects, actions, or jump to…"`, `aria-label="Command palette search"`, `autoComplete="off"`, `spellCheck={false}`. Clear button (X) only renders when `query` is non-empty; clicking resets `query` + `selectedIndex` and refocuses. Right-side `kbd` "esc" badge is always present as a hint.
+   420→- Results list: `max-h-96 overflow-y-auto scroll-elegant p-2`. Three groups in fixed order: Navigation, Quick Actions, Recent Projects. Group headers are sticky `top-0` `bg-white/75 backdrop-blur-sm` uppercase `text-[10px] font-bold tracking-wider text-slate-400`.
+   421→- Navigation group: 10 modules (Overview / My Project / Data Entry / Evidence / Submissions / Reports / Analytics / Audit & Trace / BRSR / Admin) — each row has a `LucideIcon` (LayoutDashboard, Building2, FileText, Link2, Send, FileBarChart, TrendingUp, History, FileCheck2, Settings), a label, a description, and a `G <letter>` keyboard shortcut hint badge (G O / G P / G D / G E / G S / G R / G A / G T / G B / G M). Clicking → `go(m.key)` = `setActiveModule(m.key)` + close.
+   422→- Quick Actions group: 5 actions ("Enter new Energy data", "Enter new Water data", "Generate BRSR Report", "View Audit Trail", "Check Data Quality") — each with an icon (Zap, Droplet, FileCheck, History, FileBarChart). Energy/Water actions also call `setDataEntrySubModule('energy'|'water')` so the Data Entry screen opens on the right sub-form. The other three actions just `setActiveModule` to `brsr` / `audit` / `overview` respectively.
+   423→- Recent Projects group: fetched live from `GET /api/organization/tree` on mount (cancellation-safe). Flattens the group→subsidiary→BU→project tree and slices to the first 5 projects. Each row shows `projectName` + `projectCode · location`. Clicking → `go('my-project')` + close.
+   424→- Filtering: `useMemo` rebuilds the flat item list whenever `query`, `projects`, or `go` changes. Case-insensitive substring match on label + description (+ `location` for projects). Empty state: centered card with a `Search` icon tile + "No results found" + "Try a different keyword or module name."
+   425→- Keyboard navigation correctness: `safeIndex = items.length === 0 ? 0 : ((selectedIndex % items.length) + items.length) % items.length` ensures the active index never goes out-of-bounds when the result set shrinks (e.g., after typing a filter). This avoids needing a `setState`-in-effect clamp (which would trip the `react-hooks/set-state-in-effect` rule). The selected row also auto-scrolls into view via `el.scrollIntoView({ block: 'nearest' })` whenever `safeIndex` changes.
+   426→- Selected row styling: `bg-blue-50 ring-2 ring-blue-200 shadow-[0_0_0_4px_rgba(59,130,246,0.08)]` — the subtle blue glow called out in the spec. The row's icon tile flips to `bg-gradient-to-br from-blue-500 to-cyan-500 text-white` when selected. An `ArrowRight` lucide icon shows on the trailing edge of the selected row. `onMouseMove` on each row sets `selectedIndex` so hover + keyboard stay in sync.
+   427→- Staggered entrance: the results container is a `motion.div` with `variants={{ hidden:{}, show:{ transition:{ staggerChildren: 0.025 }}}}` and `initial="hidden" animate="show"`. Each item is a `motion.button` with `variants={{ hidden:{opacity:0, y:6}, show:{opacity:1, y:0} }}` — they fade-up in sequence when the palette opens. Filtering does NOT re-trigger the entrance for items that stayed mounted (their React `key` is stable).
+   428→- Footer hint bar: `border-t border-slate-200/60 bg-white/60 px-4 py-2.5 text-[11px] text-slate-500`. Three kbd groups: `↓ ↑ navigate`, `↵ select` (CornerDownLeft icon), `esc close` — each kbd is a small bordered pill. Right side (hidden on mobile): `Recycle` icon + `MEIL · Command Palette` mono caption.
+   429→
+   430→Wiring:
+   431→- Imported `CommandPalette` at the top of `src/components/shell/app-shell.tsx`.
+   432→- Rendered `<CommandPalette />` as the last child inside the shell's root `<div className="relative flex min-h-screen flex-col">`, immediately before its closing `</div>`. Because `AppShell` is only mounted when `user` is non-null (per `src/app/page.tsx`), the palette is automatically only available when authenticated — no extra guard needed.
+   433→
+   434→Lint + TypeScript:
+   435→- `cd /home/z/my-project && bun run lint 2>&1 | tail -10` → clean (`$ eslint .` exits 0 with zero output).
+   436→- `cd /home/z/my-project && bunx tsc --noEmit 2>&1 | grep -E "command-palette|app-shell" | head -10` → empty (zero TS errors in my two files). The only remaining TS errors in the project are pre-existing in other agents' files (`examples/`, `skills/`, `src/components/modules/brsr.tsx` from Task 8-UI).
+   437→
+   438→agent-browser verification:
+   439→- `agent-browser open http://localhost:3000` — already authenticated as Arjun Mehta (Super Admin).
+   440→- `agent-browser press "Control+k"` → palette opens; `agent-browser snapshot -i` confirms the `textbox "Command palette search"` plus all 10 Navigation items (each with its `G <letter>` shortcut), all 5 Quick Actions, and 4 Recent Projects fetched live from `/api/organization/tree` (Gayatri Solar Plant · MEIL-SOL-GJT · Gayatri, Telangana; Nizamabad Solar Farm · MEIL-SOL-NZR · Nizamabad, Telangana; Hyderabad 33kV Substation · MEIL-TD-HYD · Hyderabad, Telangana; Kaleshwaram Lift Irrigation · MEIL-WTR-KPR · Jayashankar, Telangana).
+   441→- Filter test: typed `water` → list collapses to just "Enter new Water data"; the "Clear search" (X) button appears.
+   442→- Empty-state test: filled `zzznomatch` → `agent-browser read` returned "No results found" (correct empty-state rendering).
+   443→- Esc test: pressed `Escape` → palette closed; subsequent snapshot no longer contains the `Command palette search` textbox.
+   444→- Keyboard-nav test: reopened with `Control+k`, pressed `ArrowDown` 6 times (Overview → … → Analytics), then `Enter`. Page heading switched from "ESG Command Center" to "ESG Analytics" — selection + activation working end-to-end.
+   445→- Quick Action test: reopened, filled `water`, pressed `Enter`. Page heading switched to "Data Entry" + sub-heading "Water Entry Form" — `setActiveModule('data-entry')` + `setDataEntrySubModule('water')` both fired.
+   446→- Click test: reopened, clicked the `Nizamabad Solar Farm` row via `@e1157`. Page heading switched to "My Project" — palette closed + navigation fired.
+   447→- Visual verification: screenshot saved to `/tmp/cmdk-palette.png`, sent to z-ai vision. VLM confirmed: "centered command palette overlay with a glassmorphism effect (white background, subtle shadow, rounded corners) floating over a blurred dashboard background", "search input with a blue search icon", "grouped results under a NAVIGATION header with items including icon, title, description, and keyboard shortcut hints (G O, G P, G D)", "selected row highlighted with a light blue background and a blue left-border accent", "footer hint bar with kbd-style badges for arrow keys, enter, esc, and the label 'Command Palette'", "clean, modern, and functional, utilizing a blue accent color".
+   448→- Dev server log: zero new errors/warnings/exceptions introduced. Only new log line is the expected `GET /api/organization/tree 200` (palette pre-fetch on first open).
+   449→
+   450→Stage Summary:
+   451→- 1 new client component delivered (`src/components/shell/command-palette.tsx`, ~380 lines) + a 2-line edit to `src/components/shell/app-shell.tsx` (import + render before closing root `</div>`).
+   452→- Premium glass-strong + glass-shimmer palette with a gradient search-icon tile, sticky group headers, blue glow on the selected row, staggered framer-motion entrance, and a kbd-style footer hint bar — fully consistent with the established MEIL ESG design system.
+   453→- Three groups, fully data-driven: 10 navigation modules (static catalog) + 5 quick actions (static catalog) + up to 5 recent projects (live from `/api/organization/tree`).
+   454→- Full keyboard support: Cmd/Ctrl+K toggle, ↑↓ wrap-around navigation, Enter to activate, Esc to close, hover syncs to keyboard selection, selected row auto-scrolls into view.
+   455→- Filtering: case-insensitive substring match on label/description/location with a clean empty state.
+   456→- Single-route SPA navigation preserved: every action funnels through `setActiveModule()` (+ `setDataEntrySubModule()` for the energy/water quick actions); no URL changes.
+   457→- Zero lint errors in my files. Zero TS errors in my files. Verified end-to-end in browser via agent-browser (open / filter / empty / Esc / arrow-nav / quick-action / click) plus VLM visual confirmation of the glassmorphism aesthetic.
+   458→- Work record written to `/agent-ctx/5-command-palette-builder.md`.
+   459→
+   460→---
+   461→Task ID: 10 (QA + Features)
+   462→Agent: Lead Architect (main) — autonomous webDevReview round 1
+   463→Task: QA testing via agent-browser, fix bugs, add new features + styling improvements
+   464→
+   465→Work Log:
+   466→- Reviewed worklog to understand prior work (full ESG/BRSR platform built + verified)
+   467→- Performed comprehensive QA testing via agent-browser: logged in as Super Admin, tested all 9 modules, used VLM to visually inspect screenshots
+   468→- Identified and fixed 4 bugs:
+   469→  1. **Submissions "Approved" chip count = 0** (should be 1): the seeded submission has status='APPROVED' but the chip counting logic only checked BU_APPROVED/SUBSIDIARY_APPROVED/HQ_REVIEW. Fixed by adding 'APPROVED' to the count + filter logic.
+   470→  2. **Submissions Reviewer column empty for approved submission**: currentReviewerId was null. Fixed by deriving the last reviewer from history[0] (history is newest-first) when currentReviewer is null. Now shows "Nisha Pillai (Subsidiary ESG Reviewer)".
+   471→  3. **BRSR "Source completeness" showed 100%** contradicting overall 71.4% readiness: the formula was answers/questions (21/21=100%) which counts all answer rows including MISSING ones. Fixed to use readyWeight/totalWeight (15/21=71.4%) which matches overall. Added "Answer coverage" as a separate dimension (100%) + "Ready / Total" (15/21).
+   472→  4. **Trend badges showed hardcoded values + wrong ESG semantics**: emissions increase was shown as green (should be amber — increasing emissions is bad). Replaced all hardcoded trends (-4.2, +1.2, etc.) with REAL month-over-month deltas computed from the trends data (April→May→June). Added `goodDirection` prop ('down' for emissions/energy/water/LTIFR, 'up' for readiness/completion/workforce). Now: emissions -5.8% → green+down (decrease is good); energy -24.7% → green+down; water -100% → green+down. Non-timeseries metrics show "current" badge.
+   473→
+   474→- Added 3 NEW FEATURES:
+   475→  5. **Command Palette (Cmd+K)** — premium enterprise feature. Global overlay triggered by Cmd+K/Ctrl+K. Search input + 3 result groups (Navigation with all 10 modules + shortcut hints G O/G P/etc, Quick Actions for common tasks, Recent Projects from /api/organization/tree). Full keyboard navigation (↑↓ to move, Enter to select, Esc to close). Glass-strong panel with shimmer, gradient search icon, staggered entrance, blue glow on selected row. Verified: opens with Cmd+K, typing filters, keyboard nav works, navigates to correct modules.
+   476→  6. **ESG Data Control Chain (Pipeline Tracker)** — visual horizontal pipeline showing the 8-stage chain (Collect→Validate→Calculate→Approve→Consolidate→BRSR Map→Report→Audit) with LIVE counts at each stage from real DB data. Each stage has a gradient icon tile, label, count, and description. Connected by arrows. Status summary bar at bottom showing records collected, calculations, approved, exceptions, BRSR readiness. This directly visualizes the master spec's core product principle: "The ESG DATA CONTROL CHAIN is the product."
+   477→  7. **Sustainability Targets Widget** — new /api/targets endpoint computes real targets as X% reduction/improvement from the previous reporting period's baseline (5% emissions reduction, 3% energy, 4% water, 20% LTIFR reduction, 15% BRSR improvement, etc.). The widget shows 8 target cards with: actual vs target values, progress bars (green if on track, amber if close, rose if off), on-track checkmarks, gap indicators. Verified: 4/8 targets on track, emissions 320.77 vs target 323.33 = on track.
+   478→
+   479→- Fixed a TypeScript error in brsr.tsx: DimensionTile value prop widened to `number | string` to accept the "Ready / Total" dimension (value = "15 / 21").
+   480→
+   481→Verification:
+   482→- `bun run lint` → clean (exit 0)
+   483→- `bunx tsc --noEmit` → clean for all src/ files
+   484→- agent-browser verified all 9 modules render without console errors
+   485→- VLM-verified all 4 bug fixes: Submissions Approved=1, Reviewer="Nisha Pillai", BRSR Source completeness=71.4%, trend badges show real deltas with ESG-aware colors
+   486→- VLM-verified all 3 new features: Pipeline tracker renders with 8 stages + live counts, Sustainability Targets shows 8 cards with progress bars, Command Palette opens with Cmd+K + keyboard nav works
+   487→
+   488→Stage Summary:
+   489→- 4 bugs fixed (Submissions count, reviewer display, BRSR readiness dimensions, trend badge semantics)
+   490→- 3 new features added (Command Palette, ESG Pipeline Tracker, Sustainability Targets widget)
+   491→- 1 new API endpoint (/api/targets)
+   492→- 3 new component files (command-palette.tsx, pipeline-tracker.tsx, targets-widget.tsx)
+   493→- All values computed from real DB data — no hardcoded KPIs
+   494→- Premium glassmorphism design language preserved throughout
+   495→- Ready for next round: could add role-specific dashboard variants, data export to CSV/Excel, real-time notifications via WebSocket, mobile-responsive refinements, or BRSR framework comparison views
+   496→

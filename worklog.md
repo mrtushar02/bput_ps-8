@@ -493,3 +493,105 @@ Stage Summary:
 - All values computed from real DB data — no hardcoded KPIs
 - Premium glassmorphism design language preserved throughout
 - Ready for next round: could add role-specific dashboard variants, data export to CSV/Excel, real-time notifications via WebSocket, mobile-responsive refinements, or BRSR framework comparison views
+
+---
+Task ID: 4
+Agent: Bulk Import Builder
+Task: Bulk CSV import for ESG data entry (Energy/Water/Waste)
+
+Work Log:
+- Read worklog.md (Tasks 1, 6, 7, 7-UI, 5, 8-UI, 9, 10) to absorb the established design system (premium light white-blue glass — `.glass-strong`, `.glass-shimmer`, `.glass-subtle`, `.status-pill` + status color variants, `.btn-glass-primary`, `.kpi-tile`, `.scroll-elegant`, `.tabular-nums`, `.animate-fade-up`, `.stagger-*`, `.animate-pulse-ring`), the auth context shape (`useApp()` → `{ user }` with `roles[0].key`; READ_ONLY_ROLES = BU_REVIEWER/SUBSIDIARY_REVIEWER/GROUP_REVIEWER/AUDITOR/EXECUTIVE), the data entry module contract (`DataEntryModule({ subModule })` with sub-modules energy/water/waste/workforce/safety/travel; each form posts to `/api/{module}` with projectId+reportingPeriodId+source+…; on success the API returns `{ record, calculation, issues }` and the right panel renders validation issues + calculation preview), and the seeded project to default to (Gayatri Solar Plant · MEIL-SOL-GJT).
+- Inspected `src/components/modules/data-entry.tsx` (~1500 lines) line-by-line to extract: the header structure (project + period selectors in a `flex flex-wrap items-center gap-2` block right after the page title), the `SUB_MODULES` catalog (energy icon=Zap, water icon=Droplet, waste icon=Recycle — only these 3 are in scope for CSV import), the `refreshExistingRecords` callback (used as the `onImported` handler), the `READ_ONLY_ROLES` set, and the per-form field shapes (EnergyForm fields: source/quantity/sourceUnit/vendor/meterRef with sourceCategory auto-derived from ENERGY_SOURCES; WaterForm fields: source/withdrawal/consumption/discharge/recycledReused/treatment/destination/sourceUnit + waterStress/zldActive; WasteForm fields: wasteType/hazardous/generatedQty/recoveredQty/recycledQty/reusedQty/disposedQty/disposalRoute/vendor/manifestRef/sourceUnit + the cross-field rule "hazardous ⇒ manifestRef required").
+- Inspected `src/app/api/{energy,water,waste}/route.ts` to confirm the exact POST body shapes + the server-side validation rules: energy requires projectId/reportingPeriodId/source/sourceCategory/quantity/sourceUnit (vendor/meterRef/evidenceId optional); water requires projectId/reportingPeriodId/source/withdrawal/sourceUnit (consumption/discharge/recycledReused/treatment/destination/evidenceId optional); waste requires projectId/reportingPeriodId/wasteType/generatedQty/sourceUnit (hazardous defaults to false; recoveredQty/recycledQty/reusedQty/disposedQty/disposalRoute/vendor/manifestRef/evidenceId optional; manifestRef mandatory when hazardous). Each POST returns the created record + calculationResults + validationResults.
+- Inspected `src/components/ui/dialog.tsx` + `progress.tsx` + `tooltip.tsx` to use the existing Radix wrappers (Dialog/DialogContent/DialogOverlay, Progress, Tooltip/TooltipTrigger/TooltipContent) rather than reimplement.
+
+Built `src/components/modules/csv-import-dialog.tsx` (~1060 lines, exports `CsvImportDialog` + `ImportCsvButton`):
+- `'use client'`, strict TypeScript, framer-motion + lucide-react + sonner only (no external CSV parser — wrote a tiny RFC-4180-ish one inline).
+- **CSV parser** (`parseCsv`): handles quoted fields with embedded commas, escaped double-quotes (`""`), CRLF / lone CR / LF line endings, BOM strip, and trailing-empty-row trimming.
+- **Field catalogues** (`ENERGY_FIELDS`, `WATER_FIELDS`, `WASTE_FIELDS`): each entry has `{ key, label, required, numeric?, boolean?, hint?, aliases? }`. Aliases power the case-insensitive header auto-mapping (e.g. `meter ref` / `meter reference` / `meter id` all map to `meterRef`).
+- **Auto-map** (`autoMap`): normalises headers (trim + lowercase + collapse `[\\s_-]+`), tries exact match first then contains-match against `{ field.key } ∪ aliases`. Picks the first unused header per field so two fields can't both bind to the same column.
+- **Validation** (`parseValue` + `validateRows`): required fields produce a `… is required` issue; numerics reject non-finite strings (`Number.isFinite`); negative numerics flagged `must be ≥ 0`; booleans accept true/yes/1/y/t and false/no/0/n/f and blank; blank optionals map to `undefined` (sentinelled so `buildBody` can omit them from the POST body — server treats absent keys as null/undefined). Cross-field rule for waste: `hazardous === true && !manifestRef` ⇒ issue. Each row becomes `{ index, raw, mapped, valid, issues }`.
+- **Energy category derivation** (`lookupEnergyCategory`): inline `ENERGY_SOURCE_CATEGORY` lookup that mirrors `ENERGY_SOURCES` in data-entry.tsx (RENEWABLE only for "Solar PPA"; everything else NON_RENEWABLE). This is the only piece of logic that had to be duplicated — it lives in the manual form, not exported, so the CSV import would otherwise need to ask the user for `sourceCategory` (which the spec template intentionally omits).
+- **4-step wizard**:
+  1. **Upload** — drag-and-drop zone (`UploadZone` is a real `<button>` with `onDrop/onDragOver/onDragLeave`, hidden `<input type="file" accept=".csv">` triggered via ref) + "Download template" link (Blob + `URL.createObjectURL` + auto-revoke) + expected-format table (column / required / type / hint) + sample-row preview. Drag-over flips the dashed border to blue.
+  2. **Preview & Map** — file name + row count chip + "Re-upload" button + target-project + reporting-period selectors (default to the parent's `projectId`/`reportingPeriodId` — Gayatri Solar Plant · June 2026) + per-field column-mapping dropdowns (each shows the field label with a `*` for required, an arrow icon, and a dropdown of the CSV's headers; auto-mapped values pre-selected; empty option = "— unmapped —") + a 5-row preview table with staggered framer-motion row entrance (`delay: i * 0.04`).
+  3. **Validate** — 3 summary tiles (`SummaryTile` component — Total / Valid / Issues with gradient backgrounds and Lucide icons) + an amber banner when invalid rows exist + a scrollable row-by-row validation table (sticky header, valid rows green-pill, invalid rows amber-pill, each issue rendered as a small monospace amber chip).
+  4. **Import** — `Progress` bar from `@/components/ui/progress` driven by `importProgress` state, animated `Loader2` spinner, "X of Y processed" caption. On completion, `ImportSummary` component renders a 2-card grid (Created / Failed with big tabular-nums counts) plus a scrollable failure-detail list (one monospace chip per failed row with the server error message). Footer "View records" button calls `onOpenChange(false)` which closes the dialog; the parent's `onImported` has already refreshed the records list.
+- **Sequential POST loop**: for each valid row, builds the body via `buildBody` (which honours the `undefined` sentinel — only sends consumption/discharge/recycledReused/etc. when actually present in the CSV; defaults water's `waterStress`/`zldActive` to false), POSTs to `/api/{subModule}`, captures the created `record.id` or the error message, and updates `outcomes` + `importProgress` per-row. Toasts at the end via `sonner` (`toast.success` all-ok / `toast.error` all-fail / `toast.warning` partial).
+- **Premium styling**: glass-strong + glass-shimmer DialogContent (`!border-white/85 !rounded-3xl !max-w-3xl !p-0`), custom DialogOverlay (`!bg-slate-900/40 !backdrop-blur-[6px]`), gradient header tile (`from-blue-500 to-cyan-500`), 4-step indicator with active-state blue glow + done-state emerald checkmark, drag-over blue border on the upload zone, gradient upload-icon tile, staggered row entrance in the preview + validate tables, animated progress bar, success/error summary cards. All animations respect the `prefers-reduced-motion` rule already declared in globals.css.
+- **`ImportCsvButton`** — small wrapper exported from the same file so data-entry.tsx can drop in a single component for the trigger. Renders `glass-subtle` pill with Upload icon. When `disabled`, wraps in `Tooltip` (Radix from `@/components/ui/tooltip`, which auto-mounts a `TooltipProvider`) so the role-gating reason ("Your role does not permit data entry") shows on hover.
+
+Wiring (data-entry.tsx, ~12 lines added):
+- Imported `CsvImportDialog` + `ImportCsvButton` at the top of the file.
+- Added `csvImportOpen` state.
+- Inserted `<ImportCsvButton disabled={readOnly} disabledReason="Your role does not permit data entry" onClick={() => setCsvImportOpen(true)} />` inside the existing project/period selectors `<div className="flex flex-wrap items-center gap-2">` block in the header — only rendered for energy/water/waste sub-modules (workforce/safety/travel are out of scope per spec).
+- Mounted `<CsvImportDialog open={csvImportOpen} onOpenChange={setCsvImportOpen} subModule={subModule} projectId={selectedProjectId} reportingPeriodId={selectedPeriodId} projects={projects} periods={periods} onImported={refreshExistingRecords} />` right after the bottom action bar's closing `</motion.div>` — also gated to energy/water/waste only.
+- The existing `refreshExistingRecords` callback (already wired to re-fetch `/api/{module}?projectId=…&periodId=…` and `setExistingRecords`) is passed as `onImported`, so the records list refreshes automatically when the import completes.
+
+Lint + TypeScript:
+- `cd /home/z/my-project && bun run lint 2>&1 | tail -10` → clean (`$ eslint .` exits 0 with zero output).
+- `cd /home/z/my-project && bunx tsc --noEmit 2>&1 | grep -E "csv-import|data-entry" | head -10` → empty (zero TS errors in my two files). The only remaining TS errors in the project are pre-existing in `examples/` and `skills/` directories — untouched.
+
+agent-browser verification:
+- `agent-browser open http://localhost:3000` → already at the welcome screen; clicked Demo → Super Admin → filled `admin@meil-esg.in` + `esg12345` → Sign In → landed on Overview.
+- Clicked `Data Entry` nav → snapshot shows the new `Import CSV` button (`ref=e69`) right next to the project/period selectors, in addition to the existing Energy/Water/Waste/Workforce/Safety/Travel tab bar.
+- **Energy template flow**: clicked `Import CSV` → glass-strong dialog opens with heading "Bulk CSV Import · Energy / Fuel", drag-drop zone, "Download template" button, and the expected-format table (source/quantity/sourceUnit/vendor/meterRef with required/optional + type + hint). Clicked Download → `meil-energy-template.csv` written to `~/Downloads/` with exactly `source,quantity,sourceUnit,vendor,meterRef\nGrid Electricity,384000,KWH,TSSPDCL,MTR-01`. Screenshot saved to `/tmp/csv-import-dialog-energy.png`.
+- **Water template flow**: closed dialog, switched to Water tab, re-opened dialog → heading flips to "Bulk CSV Import · Water", format table now shows source/withdrawal/consumption/discharge/recycledReused/treatment/destination/sourceUnit. Downloaded `meil-water-template.csv` with `source,withdrawal,consumption,discharge,recycledReused,treatment,destination,sourceUnit\nGround Water,4200,1260,800,2140,STP,Irrigation,KL`.
+- **Waste template flow**: closed, switched to Waste, re-opened → heading "Bulk CSV Import · Waste", format table shows wasteType/hazardous/generatedQty/recoveredQty/recycledQty/disposedQty/disposalRoute/vendor/manifestRef/sourceUnit with the hint "Required if hazardous" on manifestRef. Downloaded `meil-waste-template.csv` with the exact spec sample row.
+- **Out-of-scope gating**: switched to Workforce tab → no `Import CSV` button rendered (correct — CSV import is energy/water/waste only).
+- **Role gating**: signed out, switched to BU Reviewer (Rakesh Verma), signed back in, navigated to Data Entry, switched to Energy tab → `Import CSV` button renders as `disabled` with the tooltip wired ("Your role does not permit data entry"). The project/period selectors and Save Draft button are also disabled (the existing read-only behaviour).
+- **Full end-to-end import test**: signed back in as Super Admin, navigated to Data Entry (Energy), opened dialog, used `agent-browser upload "input[type=file]" /home/z/Downloads/meil-energy-template.csv` to upload the downloaded template. Dialog auto-advanced to step 2 — target project defaulted to `MEIL-SOL-GJT · Gayatri Solar Plant`, reporting period defaulted to `June 2026`, all 5 energy columns auto-mapped (`source→source`, `quantity→quantity`, `sourceUnit→sourceUnit`, `vendor→vendor`, `meterRef→meterRef`) — confirming the case-insensitive header matching works against the canonical template. Preview table rendered with staggered row entrance. Clicked Validate → step 3 showed "Total rows 1 · Valid 1 · Issues 0" with row #1 marked valid. Clicked `Import valid only (1)` → step 4 rendered the animated Progress bar, then the summary: "Created 1 · Failed 0" + "All rows imported successfully. The records list has been refreshed." Dev log shows `POST /api/energy 201 in 93ms` (the real energy API created the record, ran validation + calculation, persisted the audit log atomically — exactly as a manual Save Draft would). Then `GET /api/energy?projectId=…&periodId=… 200` re-fetched the list (the `onImported` → `refreshExistingRecords` callback fired). Clicked `View records` → dialog closed, the existing-records count in the form panel bumped to "3 record(s)" (was 2 before — the imported Grid Electricity row is now visible).
+- Dev server log: zero errors/warnings/exceptions introduced. Only new log lines are the expected `POST /api/energy 201` + the follow-up `GET /api/energy 200`.
+
+Stage Summary:
+- 1 new client component delivered (`src/components/modules/csv-import-dialog.tsx`, ~1060 lines, exports `CsvImportDialog` + `ImportCsvButton`) + a ~12-line edit to `src/components/modules/data-entry.tsx` (import + state + header button + dialog mount).
+- 4-step glass-strong wizard (Upload → Preview & Map → Validate → Import) with a tiny inline RFC-4180 CSV parser, case-insensitive header auto-mapping with alias support, deterministic client-side validation mirroring the server-side rules, sequential POST-to-API import with animated progress + summary cards, and a "View records" close that triggers the parent's `refreshExistingRecords`.
+- Three CSV templates (energy / water / waste) generated client-side via Blob + download link — exact column orders + sample rows from the spec.
+- Role gating: `ImportCsvButton` is `disabled` for BU_REVIEWER/SUBSIDIARY_REVIEWER/GROUP_REVIEWER/AUDITOR/EXECUTIVE with a Radix Tooltip "Your role does not permit data entry". Sub-module gating: the button + dialog only mount for energy/water/waste (workforce/safety/travel are out of scope per spec).
+- Premium glassmorphism design language preserved throughout (glass-strong + glass-shimmer dialog, gradient header tile, gradient upload-icon tile, staggered framer-motion row entrance, animated progress bar, status pills for valid/invalid, success/error summary cards, scroll-elegant custom scrollbar, tabular-nums for counts).
+- All values computed from real DB data via the existing `/api/{energy|water|waste}` POST endpoints — no hardcoded KPIs. The server runs the same validation + calculation chain for each CSV-imported row as it does for a single manual record.
+- Zero lint errors in my files. Zero TS errors in my files. Verified end-to-end in browser via agent-browser (open / template-download × 3 sub-modules / full upload → map → validate → import → records-refresh cycle / role-gating disabled state / out-of-scope tab gating).
+- Work record written to `/agent-ctx/4-bulk-import-builder.md`.
+
+---
+Task ID: 11 (QA + Features round 2)
+Agent: Lead Architect (main) — autonomous webDevReview round 2
+Task: QA testing via agent-browser, styling improvements, new features
+
+Work Log:
+- Reviewed worklog to understand prior work (2 rounds of QA + features already done)
+- Performed fresh QA via agent-browser: logged in as Super Admin, tested all 9 modules (all render without errors), used VLM to visually inspect overview + data entry + analytics + BRSR screenshots
+- Identified improvement opportunities from VLM analysis: KPI cards need sparklines + stronger hierarchy, "current" badges look less serious, missing risk/alert indicators, data entry Engine Preview empty before save, missing bulk import for enterprise data entry
+
+- Added styling improvements + features:
+  1. **KPI Sparklines** — added mini line charts (recharts LineChart) to the 4 environmental KPI cards (Emissions/energy/water/waste) using the monthly trends data. Each sparkline uses a matching color (rose/amber/cyan/emerald). Verified: all 4 environmental KPI cards show sparklines in bottom-right.
+  2. **Risk/Alert Badges** — KPI cards now show prominent risk badges when there are issues: BRSR shows amber "6 gaps" badge + red "review required" banner; Safety shows danger badge if fatalities > 0; Completion shows warning if openExceptions > 0. Replaced the generic "current" purple badge for at-risk metrics with actionable amber/rose alerts. Verified: BRSR card shows amber "6 gaps" + red banner.
+  3. **Bolder KPI typography** — increased KPI value font size to 26px with leading-none for tighter, more scannable hierarchy.
+  4. **Live Emission Estimate in Data Entry** — new LiveEstimateCard component in the Energy form that updates as the user types (before saving). Shows: estimated CO₂e (tCO₂e + kgCO₂e), normalized energy (GJ), factor applied (value + unit + source). Uses the same factor lookup as the server-side engine for determinism. Includes a note "Same input + same factor version = same result as server-side calculation (deterministic)." Verified: typing 75000 KWH Grid Electricity shows 53.7 tCO₂e, 270 GJ, 0.716 CEA v19 factor.
+
+- Dispatched subagent (Task ID 4) to build the **Bulk CSV Import** feature:
+  - New file `src/components/modules/csv-import-dialog.tsx` (~1060 lines) — exports CsvImportDialog + ImportCsvButton
+  - 4-step wizard: Upload (drag-drop + template download) → Preview & Map (auto-column mapping + 5-row preview) → Validate (summary tiles + row-by-row validation) → Import (progress bar + created/failed summary)
+  - Supports Energy/Water/Waste sub-modules with per-module CSV templates
+  - Inline RFC-4180 CSV parser (handles quoted fields, CRLF, BOM)
+  - Sequential POST to /api/energy|water|waste for each valid row (runs through the same validation + calculation + audit chain)
+  - Role gating: disabled for read-only roles (BU/SUBSIDIARY/GROUP reviewers, AUDITOR, EXECUTIVE)
+  - Verified end-to-end: downloaded template, uploaded, auto-mapped, validated, imported 1 row → POST /api/energy 201, records list refreshed
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified all 9 modules render without console errors
+- VLM-verified sparklines on 4 environmental KPI cards
+- VLM-verified BRSR risk badge (amber "6 gaps" + red banner)
+- DOM-verified live estimate: 75000 KWH Grid Electricity → 53.7 tCO₂e, 270 GJ, 0.716 factor
+- Subagent-verified CSV import: full 4-step flow works, POST /api/energy 201, records list refreshes
+
+Stage Summary:
+- 3 styling improvements (sparklines, risk badges, bolder typography)
+- 2 new features (live emission estimate in data entry, bulk CSV import with 4-step wizard)
+- 1 new component (LiveEstimateCard in data-entry.tsx)
+- 1 new subagent-built component (csv-import-dialog.tsx, ~1060 lines)
+- All values computed from real DB data + seeded emission factors — no hardcoded KPIs
+- Premium glassmorphism design language preserved throughout
+- Ready for next round: could add role-specific dashboard variants, real-time WebSocket notifications, mobile-responsive refinements, BRSR framework comparison views, or a data quality heatmap

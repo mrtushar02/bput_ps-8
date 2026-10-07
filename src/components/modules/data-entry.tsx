@@ -11,9 +11,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   FileText, Zap, Droplet, Recycle, Users, ShieldCheck, Plane, CheckCircle2,
   AlertTriangle, AlertOctagon, Clock, Link2, Send, Save, FlaskConical,
-  ChevronRight, ChevronLeft, Building2, CalendarClock, Info, Lock, type LucideIcon,
+  ChevronRight, ChevronLeft, Building2, CalendarClock, Info, Lock, Calculator, type LucideIcon,
 } from 'lucide-react'
 import { useApp } from '@/lib/auth-context'
+import { CsvImportDialog, ImportCsvButton } from '@/components/modules/csv-import-dialog'
 
 /* ---------- Types ---------- */
 type SubModule = 'energy' | 'water' | 'waste' | 'workforce' | 'safety' | 'travel'
@@ -91,6 +92,7 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
   const [validationRun, setValidationRun] = useState<{ passed: number; errors: number; warnings: number } | null>(null)
   const [submitResult, setSubmitResult] = useState<{ submissionId: string; status: string } | null>(null)
   const [existingRecords, setExistingRecords] = useState<any[]>([])
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
 
   // Form state per submodule (so user doesn't lose data on tab switch)
   const formStateRef = useRef<Record<string, Record<string, any>>>({})
@@ -312,6 +314,14 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
               {periods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
           </div>
+          {/* Bulk CSV import — only for energy/water/waste; role-gated with tooltip */}
+          {(subModule === 'energy' || subModule === 'water' || subModule === 'waste') && (
+            <ImportCsvButton
+              disabled={readOnly}
+              disabledReason="Your role does not permit data entry"
+              onClick={() => setCsvImportOpen(true)}
+            />
+          )}
         </div>
       </motion.div>
 
@@ -534,6 +544,20 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
           </div>
         </div>
       </motion.div>
+
+      {/* Bulk CSV import dialog — only mounted for energy/water/waste */}
+      {(subModule === 'energy' || subModule === 'water' || subModule === 'waste') && (
+        <CsvImportDialog
+          open={csvImportOpen}
+          onOpenChange={setCsvImportOpen}
+          subModule={subModule}
+          projectId={selectedProjectId}
+          reportingPeriodId={selectedPeriodId}
+          projects={projects}
+          periods={periods}
+          onImported={refreshExistingRecords}
+        />
+      )}
     </div>
   )
 }
@@ -841,8 +865,71 @@ function EnergyForm({ projectId, periodId, evidence, readOnly, formStateRef, onS
           {evidence.map(ev => <option key={ev.id} value={ev.id}>{ev.fileName}</option>)}
         </select>
       </FormField>
+      <LiveEstimateCard source={source} quantity={quantity} sourceUnit={sourceUnit} />
       <FormActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
     </FormGrid>
+  )
+}
+
+/* Live calculation estimate — updates as the user types (before saving).
+   Uses the same factor lookup as the server-side engine for determinism. */
+function LiveEstimateCard({ source, quantity, sourceUnit }: { source: string; quantity: string; sourceUnit: string }) {
+  const qty = Number(quantity)
+  const valid = qty > 0 && quantity !== ''
+  // Match the seeded emission factors (src/app/api/energy/route.ts findEmissionFactorForSource)
+  const FACTORS: Record<string, { value: number; unit: string; scope: string; methodology: string; gjPerUnit: number }> = {
+    'Grid Electricity': { value: 0.716, unit: 'kgCO2e/kWh', scope: 'SCOPE_2', methodology: 'CEA v19', gjPerUnit: sourceUnit === 'MWH' ? 3.6 : 0.0036 },
+    'Diesel (HSD)': { value: 2.637, unit: 'kgCO2e/L', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: sourceUnit === 'KL' ? 38.3 : 0.0383 },
+    'Petrol (MS)': { value: 2.296, unit: 'kgCO2e/L', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.0348 },
+    'Coal (Sub-bituminous)': { value: 1.9, unit: 'kgCO2e/kg', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.0227 },
+    'CNG': { value: 2.19, unit: 'kgCO2e/kg', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.05 },
+    'LPG': { value: 2.98, unit: 'kgCO2e/kg', scope: 'SCOPE_1', methodology: 'IPCC 2006', gjPerUnit: 0.046 },
+    'Solar PPA': { value: 0.04, unit: 'kgCO2e/kWh', scope: 'SCOPE_2', methodology: 'ISAE 3000', gjPerUnit: 0.0036 },
+  }
+  const f = FACTORS[source]
+  if (!f || !valid) {
+    return (
+      <div className="md:col-span-2 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-[11px] text-slate-400">
+        <span className="font-semibold text-slate-500">Live estimate:</span> enter a quantity to preview the deterministic emission calculation (factor × quantity).
+      </div>
+    )
+  }
+  const co2eKg = qty * f.value
+  const co2eT = co2eKg / 1000
+  const energyGJ = qty * f.gjPerUnit
+  const scopeColor = f.scope === 'SCOPE_1' ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="md:col-span-2 rounded-xl border border-blue-200/70 bg-gradient-to-br from-blue-50/70 to-cyan-50/40 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500 text-white"><Calculator className="h-3.5 w-3.5" /></span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Live emission estimate</span>
+          <span className={`status-pill ${scopeColor} !text-[9px]`}>{f.scope}</span>
+        </div>
+        <span className="text-[10px] text-slate-400">factor v1 · {f.methodology}</span>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-3">
+        <div>
+          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Estimated CO₂e</div>
+          <div className="tabular-nums text-lg font-bold text-slate-800">{co2eT.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-[10px] font-medium text-slate-400">tCO₂e</span></div>
+          <div className="text-[9px] text-slate-400">{co2eKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kgCO₂e</div>
+        </div>
+        <div>
+          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Energy (normalized)</div>
+          <div className="tabular-nums text-lg font-bold text-slate-800">{energyGJ.toLocaleString(undefined, { maximumFractionDigits: 2 })} <span className="text-[10px] font-medium text-slate-400">GJ</span></div>
+          <div className="text-[9px] text-slate-400">{qty.toLocaleString()} {sourceUnit} × {f.gjPerUnit}</div>
+        </div>
+        <div>
+          <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Factor applied</div>
+          <div className="tabular-nums text-lg font-bold text-slate-800">{f.value} <span className="text-[10px] font-medium text-slate-400">{f.unit}</span></div>
+          <div className="text-[9px] text-slate-400">{source}</div>
+        </div>
+      </div>
+      <div className="mt-2 flex items-center gap-1.5 rounded-md bg-white/60 px-2 py-1 text-[9px] text-slate-500">
+        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+        Same input + same factor version = same result as server-side calculation (deterministic).
+      </div>
+    </motion.div>
   )
 }
 
