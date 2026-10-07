@@ -20,6 +20,7 @@ export interface SessionUser {
 export type ModuleKey =
   | 'overview' | 'my-project' | 'data-entry' | 'evidence'
   | 'submissions' | 'reports' | 'analytics' | 'audit' | 'brsr' | 'admin' | 'team'
+  | 'hr-workforce' | 'hr-training' | 'hr-wellbeing' | 'hr-rights'
 
 interface AppState {
   user: SessionUser | null

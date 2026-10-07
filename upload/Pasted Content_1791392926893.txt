@@ -1,0 +1,2890 @@
+============================================================
+PROJECT
+============================================================
+
+MEIL ESG / BRSR ENTERPRISE REPORTING PLATFORM
+
+ROLE:
+HR USER
+
+ROLE CODE:
+HR_OFFICER
+
+TASK:
+Design and implement the COMPLETE HR USER WORKSPACE.
+
+The HR workspace must be a professional enterprise HR + ESG
+intelligence platform.
+
+It must feel like:
+
+Enterprise HR Operations Portal
++
+ESG Workforce Intelligence Center
++
+BRSR Social Disclosure Workspace
++
+Human Capital Compliance System
+
+It must NOT feel like:
+
+- generic admin dashboard
+- basic employee management system
+- ordinary HRMS
+- generic Bootstrap dashboard
+- consumer application
+- old ERP interface
+- cyberpunk dashboard
+- overly colorful analytics system
+
+============================================================
+1. TOTAL HR WORKSPACE TABS
+============================================================
+
+The dedicated HR workspace must contain exactly 7 PRIMARY HR TABS:
+
+1. OVERVIEW
+2. WORKFORCE
+3. TRAINING & DEVELOPMENT
+4. WELLBEING & BENEFITS
+5. HUMAN RIGHTS & FAIR WORK
+6. EVIDENCE
+7. SUBMISSIONS & REGULATORY FILINGS
+
+These are the seven primary HR domain screens.
+
+The existing global MEIL application shell may still expose
+shared navigation such as:
+
+My Project
+Data Entry
+Reports
+Analytics
+Audit & Traceability
+More
+
+But the HR-specific workspace itself must be organized around
+the above 7 HR tabs.
+
+DO NOT randomly add unnecessary HR tabs.
+
+============================================================
+2. SOURCE-ALIGNED HR DOMAIN
+============================================================
+
+The HR workspace must cover HR data relevant to BRSR and ESG,
+including:
+
+- employee numbers
+- worker numbers
+- workforce categories
+- permanent vs non-permanent
+- gender diversity
+- differently-abled workforce
+- employee benefits
+- compensation
+- equal opportunity
+- training
+- skill development
+- performance and career development review
+- wellbeing
+- health and safety related HR information
+- parental leave / return to work
+- grievances
+- labour rights
+- human rights training
+- minimum wage compliance
+- fair wages
+- child labour prevention
+- forced labour prevention
+- association / union membership
+- evidence
+- statutory / BRSR submissions
+
+Principle 3 focuses on employee and worker wellbeing, equity,
+dignity, diversity, equal opportunities, grievance redressal,
+fair wages, safe working environments and training/skill
+enhancement.
+
+Principle 5 covers human-rights training, minimum wages,
+remuneration, grievance mechanisms and related disclosures.
+
+Use the project's supplied BRSR source materials as the
+authoritative functional reference.
+
+Do not invent regulatory requirements that are not supported
+by the project source material.
+
+============================================================
+3. GLOBAL VISUAL DESIGN
+============================================================
+
+Use the same approved MEIL ESG design family.
+
+PRIMARY VISUAL LANGUAGE:
+
+Premium
+Light
+Corporate
+Glassmorphism
+Business SaaS
+Data-driven
+
+Base:
+
+WHITE / OFF-WHITE
+
+Atmosphere:
+
+VERY FAINT MUTED SKY-BLUE
+
+Accent:
+
+EXISTING MEIL BLUE
+
+Secondary:
+
+EXISTING PURPLE
+
+Success:
+
+Existing restrained green
+
+Warning:
+
+Existing restrained amber
+
+Error:
+
+Existing restrained red
+
+IMPORTANT:
+
+DO NOT CHANGE THE APPROVED COLOR PALETTE.
+
+Do not introduce:
+
+- neon
+- dark cyberpunk
+- black glass
+- heavy purple background
+- orange-heavy interface
+- saturated rainbow UI
+- sci-fi visual effects
+
+============================================================
+4. REFERENCE DESIGN
+============================================================
+
+Use the supplied DataStream reference image as the visual
+benchmark for:
+
+- card geometry
+- spacing
+- glass effect
+- white/blue atmosphere
+- typography
+- section hierarchy
+- chart treatment
+- navigation
+- table treatment
+- border softness
+- shadow softness
+- premium visual density
+
+However, the HR workspace must become a UNIQUE HR BUSINESS
+WORKSPACE.
+
+Do not simply duplicate the DataStream demo.
+
+Use the same visual DNA with HR-specific information architecture.
+
+============================================================
+5. GLOBAL SHELL
+============================================================
+
+KEEP THE EXISTING MEIL GLOBAL SHELL.
+
+Header:
+
+LEFT:
+MEIL Logo
+MEIL ESG
+ESG & BRSR Reporting Platform
+
+CENTER:
+Global Search
+
+RIGHT:
+Notifications
+Help
+User Profile
+
+Profile must clearly show:
+
+HR User
+HR & Workforce
+
+Do not redesign the brand identity.
+
+============================================================
+6. HR CONTEXT BAR
+============================================================
+
+Below global header create:
+
+HR & Workforce Intelligence
+
+Hierarchy:
+
+MEIL Group
+/
+HR & Workforce
+/
+Reporting Period
+
+Right side:
+
+Current Reporting Period
+
+Subsidiary Filter
+
+Refresh
+
+The bar should remain compact and glass-like.
+
+============================================================
+7. PRIMARY HR NAVIGATION
+============================================================
+
+Use:
+
+Overview
+Workforce
+Training & Development
+Wellbeing & Benefits
+Human Rights & Fair Work
+Evidence
+Submissions & Regulatory Filings
+
+The active tab should use:
+
+- subtle blue highlight
+- blue underline
+- slightly elevated glass state
+
+No heavy filled navigation buttons.
+
+============================================================
+8. SCREEN 1 — HR OVERVIEW
+============================================================
+
+Purpose:
+
+HR COMMAND CENTER
+
+The overview must immediately answer:
+
+How many people are in the workforce?
+
+What is the workforce composition?
+
+How is gender diversity changing?
+
+How much training is completed?
+
+How is wellbeing performing?
+
+Are wages compliant?
+
+Are HR grievances under control?
+
+How much evidence is available?
+
+What submissions are pending?
+
+What needs immediate HR action?
+
+------------------------------------------------------------
+LAYOUT
+------------------------------------------------------------
+
+Use a premium asymmetric business layout.
+
+TOP:
+
+HR Hero
+
+LEFT:
+
+HUMAN RESOURCES & WORKFORCE INTELLIGENCE
+
+Subtitle:
+
+"Workforce composition, employee wellbeing, training,
+human-rights compliance and BRSR social disclosure readiness."
+
+RIGHT:
+
+HR HEALTH / COMPLIANCE RING
+
+Show a real backend-driven overall HR readiness score.
+
+Below:
+
+Workforce Coverage
+Training Coverage
+Human Rights Coverage
+Evidence Coverage
+
+------------------------------------------------------------
+KPI ROW
+------------------------------------------------------------
+
+Use 6 KPI cards:
+
+1.
+TOTAL WORKFORCE
+
+2.
+FEMALE WORKFORCE
+
+3.
+TRAINING COVERAGE
+
+4.
+FAIR WAGE COMPLIANCE
+
+5.
+PWD / DIFFERENTLY-ABLED INCLUSION
+
+6.
+OPEN / PENDING GRIEVANCES
+
+All values must come from backend.
+
+NO hardcoded numbers.
+
+------------------------------------------------------------
+MAIN OVERVIEW GRID
+------------------------------------------------------------
+
+LEFT LARGE:
+
+WORKFORCE TREND
+
+Visual:
+
+bar / line chart
+
+Show:
+
+total workforce
+employee workforce
+worker workforce
+
+Use reporting-period data.
+
+Support:
+
+Current FY
+Previous FY
+
+Only where actual backend values exist.
+
+------------------------------------------------------------
+CENTER:
+
+ACTION REQUIRED
+
+Show:
+
+training gaps
+expiring evidence
+wage exceptions
+grievances approaching deadline
+incomplete workforce records
+
+Each item:
+
+count
+severity
+description
+navigation action
+
+------------------------------------------------------------
+RIGHT:
+
+HR MODULE HEALTH
+
+Cards:
+
+Workforce
+Training
+Wellbeing
+Human Rights
+Evidence
+Submissions
+
+Each:
+
+status
+completion
+open issues
+click action
+
+------------------------------------------------------------
+LOWER ROW
+------------------------------------------------------------
+
+LEFT:
+
+WORKFORCE BY ENTITY
+
+Table:
+
+Entity
+Employees
+Workers
+Female %
+Training Coverage
+Compliance
+Status
+
+CENTER:
+
+RECENT HR ACTIVITY
+
+Timeline:
+
+Workforce updated
+Training recorded
+Evidence uploaded
+Grievance resolved
+Submission transmitted
+
+RIGHT:
+
+QUICK ACTIONS
+
+Actions:
+
+Add Workforce Record
+Log Training
+Add Wellbeing Record
+Open Human Rights
+Upload Evidence
+Create Submission
+
+============================================================
+9. SCREEN 2 — WORKFORCE
+============================================================
+
+Purpose:
+
+Detailed workforce demographic and employee/worker disclosure
+management.
+
+This screen must support the BRSR workforce requirements.
+
+------------------------------------------------------------
+HEADER
+------------------------------------------------------------
+
+WORKFORCE DEMOGRAPHICS
+
+Subtitle:
+
+"Employee and worker composition, diversity and workforce
+classification."
+
+Controls:
+
+Search
+Subsidiary
+Category
+Reporting Period
+Status
+Export
+
+Action:
+
+Add Workforce Record
+
+------------------------------------------------------------
+KPI ROW
+------------------------------------------------------------
+
+Total Employees
+Total Workers
+Permanent
+Other Than Permanent
+Female %
+PwD
+Turnover %
+
+------------------------------------------------------------
+MAIN TABLE
+------------------------------------------------------------
+
+Columns:
+
+Category
+Entity
+Employee / Worker Type
+Male
+Female
+Total
+Permanent
+Other Than Permanent
+PwD
+Turnover
+Reporting Period
+Status
+Action
+
+Rows should remain spacious.
+
+------------------------------------------------------------
+BREAKDOWN VIEW
+------------------------------------------------------------
+
+Add optional tabs:
+
+By Entity
+By Gender
+By Employment Type
+By Workforce Category
+
+Charts:
+
+Gender composition
+Permanent vs non-permanent
+Entity contribution
+Workforce trend
+
+------------------------------------------------------------
+ADD WORKFORCE RECORD
+------------------------------------------------------------
+
+Use a premium side drawer.
+
+Fields:
+
+Entity
+Category
+Employee / Worker
+Permanent / Other Than Permanent
+Male
+Female
+Other where supported
+Differently Abled
+Turnover %
+Reporting Period
+
+System calculates:
+
+Total
+Female %
+Applicable ratios
+
+Do not allow manually inconsistent totals.
+
+============================================================
+10. SCREEN 3 — TRAINING & DEVELOPMENT
+============================================================
+
+Purpose:
+
+Manage training, skill development and performance/career
+development related workforce data.
+
+Source-aligned focus includes health and safety training,
+skill upgradation and performance/career development review.
+:chatgpt-content-reference{index="2"}
+
+------------------------------------------------------------
+HEADER
+------------------------------------------------------------
+
+TRAINING & DEVELOPMENT
+
+Controls:
+
+Reporting Period
+Entity
+Training Category
+Employee / Worker
+Status
+
+Actions:
+
+Log Training
+Create Training Batch
+Export
+
+------------------------------------------------------------
+KPI CARDS
+------------------------------------------------------------
+
+Training Coverage
+Health & Safety Coverage
+Skill Development Coverage
+Average Training Hours
+Pending Training
+Overdue Training
+
+------------------------------------------------------------
+TRAINING OVERVIEW
+------------------------------------------------------------
+
+Large chart:
+
+Training coverage trend
+
+Secondary:
+
+Health & Safety vs Skill Development
+
+------------------------------------------------------------
+TRAINING REGISTRY
+------------------------------------------------------------
+
+Columns:
+
+Training ID
+Program
+Category
+Target Group
+Entity
+Participants
+Hours
+Health & Safety
+Skill Development
+Completion
+Evidence
+Status
+
+------------------------------------------------------------
+TRAINING DETAIL DRAWER
+------------------------------------------------------------
+
+Show:
+
+Program
+Objective
+Trainer
+Date
+Entity
+Target Employee Category
+Participants
+Hours
+Health & Safety Topics
+Skill Development Topics
+Evidence
+Completion
+Approval
+Audit History
+
+============================================================
+11. PERFORMANCE & CAREER DEVELOPMENT
+============================================================
+
+Within Training & Development add a section:
+
+PERFORMANCE & CAREER DEVELOPMENT REVIEW
+
+Show:
+
+Eligible employees
+Reviewed
+Pending
+Completion %
+
+Breakdown:
+
+Male
+Female
+Employee
+Worker
+
+Show:
+
+Current FY
+Previous FY
+
+Use actual data.
+
+Do not invent previous-year values.
+
+============================================================
+12. SCREEN 4 — WELLBEING & BENEFITS
+============================================================
+
+Purpose:
+
+Track employee/workforce wellbeing, benefits, workplace support
+and return-to-work related information.
+
+Source-aligned areas include benefits and compensation,
+work-life balance, safe working conditions, parental leave /
+return-to-work and wellbeing. :chatgpt-content-reference{index="3"}
+
+------------------------------------------------------------
+HEADER
+------------------------------------------------------------
+
+EMPLOYEE WELLBEING & BENEFITS
+
+Controls:
+
+Entity
+Reporting Period
+Category
+Benefit Type
+
+Actions:
+
+Add Benefit Record
+Add Wellbeing Record
+
+------------------------------------------------------------
+KPI ROW
+------------------------------------------------------------
+
+Benefits Coverage
+Health Coverage
+Insurance Coverage
+Wellbeing Program Coverage
+Parental Leave Cases
+Return-to-Work Rate
+
+------------------------------------------------------------
+BENEFITS MATRIX
+------------------------------------------------------------
+
+Rows:
+
+Benefit Category
+
+Columns:
+
+Employee Group
+Eligible
+Covered
+Coverage %
+Current FY
+Previous FY
+
+Categories can include:
+
+Health
+Insurance
+Leave
+Wellbeing
+Other applicable benefits
+
+Only use categories supported by the source/data model.
+
+------------------------------------------------------------
+WELLBEING PROGRAMS
+------------------------------------------------------------
+
+Cards:
+
+Program
+Target Group
+Participation
+Coverage
+Status
+Evidence
+
+Examples of conceptual areas:
+
+employee wellbeing
+
+health support
+
+work-life balance
+
+workplace support
+
+Do not create fake program names.
+
+------------------------------------------------------------
+RETURN TO WORK
+------------------------------------------------------------
+
+Show:
+
+Parental Leave
+Due to Return
+Returned
+Retained
+Return-to-Work %
+
+Support appropriate category breakdown.
+
+============================================================
+13. SCREEN 5 — HUMAN RIGHTS & FAIR WORK
+============================================================
+
+This must be one of the strongest HR screens.
+
+Purpose:
+
+Human rights, fair wages, grievance mechanisms, equal opportunity,
+labour rights and related BRSR disclosures.
+
+------------------------------------------------------------
+HEADER
+------------------------------------------------------------
+
+HUMAN RIGHTS & FAIR WORK
+
+Subtitle:
+
+"Monitor human-rights coverage, fair wages, grievance redressal,
+equal opportunity and labour-rights indicators."
+
+------------------------------------------------------------
+KPI ROW
+------------------------------------------------------------
+
+Human Rights Training
+Minimum Wage Compliance
+Above Minimum Wage
+Open Grievances
+Resolved Grievances
+Resolution Rate
+
+------------------------------------------------------------
+SECTION A:
+HUMAN RIGHTS TRAINING
+------------------------------------------------------------
+
+Show current and previous year.
+
+Columns:
+
+Category
+Total
+Covered
+Coverage %
+Current FY
+Previous FY
+
+Employee/worker categories should support:
+
+Employees
+Workers
+Permanent
+Other than permanent
+where applicable.
+
+This should align with BRSR Principle 5 disclosure structure.
+:chatgpt-content-reference{index="4"}
+
+------------------------------------------------------------
+SECTION B:
+MINIMUM WAGE / FAIR WAGE
+------------------------------------------------------------
+
+Show:
+
+Category
+
+Total
+
+Equal to Minimum Wage
+
+More Than Minimum Wage
+
+Percentage
+
+Current FY
+
+Previous FY
+
+This follows the supplied BRSR source format. :chatgpt-content-reference{index="5"}
+
+Use grouped rows for:
+
+Employees
+Workers
+Permanent
+Other Than Permanent
+Male
+Female
+where applicable.
+
+------------------------------------------------------------
+SECTION C:
+GRIEVANCE CENTER
+------------------------------------------------------------
+
+Show:
+
+Open
+
+In Review
+
+Escalated
+
+Resolved
+
+Overdue
+
+Create grievance table:
+
+Grievance ID
+Category
+Entity
+Workplace Area
+Filed
+Due
+Severity
+Assigned HR Officer
+Status
+Resolution
+
+Categories may include where supported:
+
+Working Conditions
+Health & Safety
+Pay / Benefits
+Workplace Conduct
+Other supported grievance categories
+
+Grievance data must be backend-driven.
+
+The source material explicitly emphasizes grievance redressal
+systems and complaint resolution. :chatgpt-content-reference{index="6"}
+
+------------------------------------------------------------
+GRIEVANCE DETAIL
+------------------------------------------------------------
+
+Use right-side drawer.
+
+Show:
+
+Case ID
+Category
+Employee/Worker Type
+Entity
+Filed Date
+Severity
+Assigned Officer
+Description
+Actions Taken
+Resolution
+Evidence
+Timeline
+Audit History
+
+============================================================
+14. EQUAL OPPORTUNITY
+============================================================
+
+Within Human Rights screen create:
+
+EQUAL OPPORTUNITY & INCLUSION
+
+Show:
+
+Gender Diversity
+
+PwD Inclusion
+
+Equal Opportunity
+
+Accessibility
+
+Policy Coverage
+
+Training Coverage
+
+Use compact KPI + chart layout.
+
+Do not invent metrics unavailable in backend.
+
+============================================================
+15. LABOUR RIGHTS
+============================================================
+
+Create:
+
+LABOUR RIGHTS & WORKER REPRESENTATION
+
+Show where backend supports:
+
+Union / Association Membership
+Collective Bargaining
+Worker Coverage
+Human Rights Training
+Child Labour Controls
+Forced Labour Controls
+
+Use:
+
+Current FY
+Previous FY
+
+Do not create unsupported values.
+
+============================================================
+16. SCREEN 6 — EVIDENCE
+============================================================
+
+Purpose:
+
+HR Evidence Vault.
+
+Evidence is central to HR/BRSR verification.
+
+------------------------------------------------------------
+HEADER
+------------------------------------------------------------
+
+HR EVIDENCE CENTER
+
+Actions:
+
+Upload Evidence
+Search
+Filter
+Verify
+
+Filters:
+
+Entity
+Category
+Reporting Period
+Evidence Type
+Status
+
+------------------------------------------------------------
+KPI ROW
+------------------------------------------------------------
+
+Total Documents
+Verified
+Pending
+Rejected
+Missing Evidence
+
+------------------------------------------------------------
+DOCUMENT TABLE
+------------------------------------------------------------
+
+Columns:
+
+Document
+Category
+Entity
+Linked Record
+Reporting Period
+Uploaded By
+Uploaded Date
+Status
+Integrity
+Action
+
+------------------------------------------------------------
+EVIDENCE DETAIL
+------------------------------------------------------------
+
+Right drawer:
+
+Document Preview
+
+Metadata
+
+Linked HR Record
+
+Uploaded By
+
+Date
+
+Hash
+
+Integrity
+
+Verification History
+
+Audit History
+
+============================================================
+17. EVIDENCE UPLOAD
+============================================================
+
+Upload flow:
+
+Select File
+
+Select Entity
+
+Select HR Module
+
+Select Record
+
+Select Reporting Period
+
+Document Type
+
+Description
+
+Submit
+
+Backend must:
+
+validate file
+
+validate MIME
+
+validate size
+
+sanitize name
+
+store securely
+
+generate SHA-256
+
+link to record
+
+create audit event
+
+No fake upload success.
+
+============================================================
+18. SCREEN 7 — SUBMISSIONS & REGULATORY FILINGS
+============================================================
+
+Purpose:
+
+Central HR submission and disclosure registry.
+
+This screen manages HR-related BRSR and supported regulatory
+submission records.
+
+------------------------------------------------------------
+HEADER
+------------------------------------------------------------
+
+STATUTORY HR SUBMISSIONS & REGULATORY FILINGS
+
+Actions:
+
+Create Submission
+
+Refresh
+
+Search
+
+Filter
+
+------------------------------------------------------------
+KPI CARDS
+------------------------------------------------------------
+
+Total Submissions
+Accepted
+Under Review
+Pending
+Rejected / Correction
+Evidence Complete
+
+------------------------------------------------------------
+FILING TABLE
+------------------------------------------------------------
+
+Columns:
+
+Submission ID
+Title
+Framework / Filing Type
+Entity
+Financial Year
+Submitted By
+Submission Date
+Acknowledgement
+Status
+Evidence
+Audit
+Action
+
+------------------------------------------------------------
+FILTERS
+------------------------------------------------------------
+
+All
+
+BRSR
+
+HR / Workforce
+
+Human Rights
+
+Other supported HR filings
+
+Status
+
+Entity
+
+Financial Year
+
+------------------------------------------------------------
+SUBMISSION DETAIL
+------------------------------------------------------------
+
+Right drawer:
+
+Submission
+
+Framework
+
+Entity
+
+Financial Year
+
+Prepared By
+
+Evidence
+
+Validation
+
+Approval
+
+Submission Date
+
+Acknowledgement
+
+Current Status
+
+Audit Trail
+
+============================================================
+19. CREATE SUBMISSION
+============================================================
+
+Use multi-step drawer/modal.
+
+STEP 1:
+
+Submission Type
+
+STEP 2:
+
+Reporting Period
+
+STEP 3:
+
+Entity
+
+STEP 4:
+
+Data Completeness
+
+STEP 5:
+
+Evidence Completeness
+
+STEP 6:
+
+Validation
+
+STEP 7:
+
+Review
+
+STEP 8:
+
+Submit
+
+Do not allow submission when blocking validation errors exist.
+
+============================================================
+20. HR BRSR READINESS PANEL
+============================================================
+
+Within Overview and Submissions create:
+
+HR BRSR READINESS
+
+Show relevant HR contribution areas:
+
+Principle 3
+Principle 5
+
+Readiness dimensions:
+
+Data
+Evidence
+Validation
+Review
+Submission
+
+Use:
+
+percentage
+
+progress bars
+
+status
+
+open gaps
+
+Do not display a fake "100%" state.
+
+Calculate from real backend data.
+
+============================================================
+21. BRSR MAPPING VIEW
+============================================================
+
+Create a useful screen section:
+
+HR DATA → BRSR MAPPING
+
+Example structural flow:
+
+HR Workforce
+↓
+P3 disclosures
+
+Training
+↓
+P3 training disclosures
+
+Wellbeing
+↓
+P3 wellbeing disclosures
+
+Human Rights
+↓
+P5 disclosures
+
+Fair Wages
+↓
+P5 wage disclosures
+
+Grievances
+↓
+P3/P5 relevant disclosures
+
+Evidence
+↓
+Assurance Traceability
+
+This is a traceability UI.
+
+Clicking any mapping should open the relevant record.
+
+============================================================
+22. HR DATA QUALITY CENTER
+============================================================
+
+Create a quality section accessible from Overview.
+
+Show:
+
+Missing Workforce Data
+
+Missing Training Data
+
+Missing Evidence
+
+Invalid Totals
+
+Inconsistent Gender Counts
+
+Incomplete Wage Data
+
+Pending Grievances
+
+Overdue Grievances
+
+Incomplete Previous-Year Data
+
+Each item:
+
+Severity
+
+Entity
+
+Record
+
+Detected
+
+Owner
+
+Action
+
+============================================================
+23. DASHBOARD QUICK ACTIONS
+============================================================
+
+Overview quick actions:
+
+Add Workforce Record
+
+Log Training
+
+Add Wellbeing Record
+
+Open Human Rights
+
+Upload Evidence
+
+Create Submission
+
+Every action must lead to a real working flow.
+
+============================================================
+24. SEARCH
+============================================================
+
+HR global search must support:
+
+Employee/worker category
+
+Entity
+
+Training
+
+Evidence
+
+Submission
+
+Grievance
+
+Human Rights record
+
+Reporting period
+
+Do not use hardcoded search results.
+
+============================================================
+25. FILTERING
+============================================================
+
+All relevant HR screens must support:
+
+Reporting Period
+
+Entity/Subsidiary
+
+Category
+
+Status
+
+Search
+
+Where useful:
+
+Financial Year
+
+Record Type
+
+Verification Status
+
+Use synchronized filter state.
+
+============================================================
+26. REAL BACKEND INTEGRATION
+============================================================
+
+This is mandatory.
+
+DO NOT build a static UI.
+
+Every HR screen must consume backend data.
+
+Architecture:
+
+React
+↓
+API Service
+↓
+FastAPI
+↓
+Authentication
+↓
+RBAC
+↓
+HR Business Logic
+↓
+Database
+↓
+Response
+↓
+UI
+
+============================================================
+27. EXISTING HR API INTEGRATION
+============================================================
+
+Inspect and reuse existing HR APIs.
+
+Existing functionality includes HR overview, workforce,
+training, wellbeing, human rights, evidence and submissions.
+
+Use the application's existing API service patterns.
+
+Do not duplicate backend logic in the frontend.
+
+If a required screen needs backend functionality that does not
+currently exist:
+
+1. identify the required data
+2. implement backend API
+3. add schema
+4. add authorization
+5. add validation
+6. add audit logging where appropriate
+7. add tests
+8. connect frontend
+
+============================================================
+28. DATA SYNCHRONIZATION
+============================================================
+
+The workspace must synchronize immediately after mutations.
+
+When user:
+
+Creates workforce record
+
+Updates workforce data
+
+Logs training
+
+Updates training
+
+Adds wellbeing record
+
+Adds human rights record
+
+Uploads evidence
+
+Verifies evidence
+
+Creates submission
+
+Updates submission
+
+changes reporting period
+
+changes entity
+
+then refresh all affected UI.
+
+Affected sections may include:
+
+KPI cards
+
+Overview
+
+Tables
+
+Charts
+
+Readiness
+
+Evidence
+
+Submission status
+
+Activity
+
+============================================================
+29. STATE MANAGEMENT
+============================================================
+
+Use centralized data/state management.
+
+Do not maintain separate conflicting copies of the same HR data
+across components.
+
+Use:
+
+fetch
+
+cache
+
+invalidate
+
+refetch
+
+or the equivalent architecture already present in the project.
+
+Avoid stale data.
+
+============================================================
+30. IMPORTANT — NO MOCK DATA
+============================================================
+
+ABSOLUTE RULE.
+
+Do not use:
+
+hardcoded workforce values
+
+hardcoded entity totals
+
+hardcoded training statistics
+
+hardcoded grievances
+
+hardcoded evidence counts
+
+hardcoded submission records
+
+hardcoded charts
+
+fake success responses
+
+fake IDs
+
+random IDs
+
+Date.now()
+
+Math.random()
+
+synthetic regulatory numbers
+
+mock API responses
+
+as production data.
+
+The current repository has existing HR UI areas containing
+static/default/demo-like datasets.
+
+During this implementation:
+
+FIND THEM.
+
+REMOVE THEM FROM AUTHORITATIVE PRODUCTION DATA PATHS.
+
+Replace them with real backend queries.
+
+Where data is absent:
+
+show empty state.
+
+Where API fails:
+
+show error state.
+
+Never replace failure with fake data.
+
+============================================================
+31. ERROR STATE
+============================================================
+
+Every screen must support:
+
+LOADING
+
+EMPTY
+
+ERROR
+
+SUCCESS
+
+Example:
+
+Unable to load workforce records.
+
+Retry
+
+Do not show fake records.
+
+============================================================
+32. LOADING STATE
+============================================================
+
+Use glass skeletons matching final card dimensions.
+
+Skeletons should not cause layout jumps.
+
+============================================================
+33. EMPTY STATE
+============================================================
+
+Examples:
+
+No workforce records for this period.
+
+No pending training.
+
+No evidence uploaded.
+
+No grievances found.
+
+No submissions for this period.
+
+Use professional empty states with useful actions.
+
+============================================================
+34. SECURITY / RBAC
+============================================================
+
+HR User can manage HR-related information according to backend
+permissions.
+
+Frontend is NOT the security boundary.
+
+Backend must enforce:
+
+authentication
+
+hr:manage
+
+hr:read
+
+evidence permissions
+
+submission permissions
+
+organization scope
+
+reporting-period restrictions
+
+Do not trust client-side:
+
+role
+
+entity
+
+subsidiary
+
+project
+
+approval status
+
+============================================================
+35. ORGANIZATION SCOPE
+============================================================
+
+HR data must respect:
+
+GROUP
+↓
+SUBSIDIARY
+↓
+BUSINESS UNIT
+↓
+PROJECT / SITE
+
+HR users must only see data within their authorized scope.
+
+Backend must enforce this.
+
+============================================================
+36. AUDIT
+============================================================
+
+Audit important HR actions:
+
+Create workforce record
+
+Update workforce record
+
+Create training record
+
+Create wellbeing record
+
+Create human rights record
+
+Upload evidence
+
+Verify evidence
+
+Create submission
+
+Submit filing
+
+Status change
+
+Correction
+
+Critical configuration change
+
+Show:
+
+Actor
+
+Role
+
+Timestamp
+
+Entity
+
+Action
+
+Scope
+
+Audit reference
+
+============================================================
+37. VISUAL STYLE — CARDS
+============================================================
+
+Card types:
+
+1. KPI Glass Card
+
+2. Chart Glass Card
+
+3. Table Glass Card
+
+4. Action Glass Card
+
+5. Timeline Card
+
+6. Compliance Card
+
+7. Evidence Card
+
+8. Status Card
+
+9. Detail Drawer
+
+10. Readiness Card
+
+All must share:
+
+same radius
+
+same padding
+
+same border
+
+same shadow system
+
+same typography hierarchy
+
+============================================================
+38. CARD FINISHING
+============================================================
+
+Major cards:
+
+20–24px radius
+
+Padding:
+
+20–24px
+
+Border:
+
+1px low-opacity cool-blue/gray
+
+Shadow:
+
+soft diffused
+
+Background:
+
+frosted white
+
+Hover:
+
+subtle elevation
+
+Do not overdo blur.
+
+============================================================
+39. BUSINESS-STYLE LAYOUT
+============================================================
+
+The HR workspace should feel like a PROFESSIONAL BUSINESS
+WEBSITE / ENTERPRISE PORTAL.
+
+Use:
+
+wide composition
+
+asymmetric layout
+
+large hero
+
+wide tables
+
+compact KPI cards
+
+split detail panels
+
+right-side drawers
+
+small charts
+
+business-style action bars
+
+Avoid making every section a 3-column equal grid.
+
+============================================================
+40. HR OVERVIEW DESKTOP LAYOUT
+============================================================
+
+Preferred structure:
+
+GLOBAL HEADER
+        ↓
+HR CONTEXT BAR
+        ↓
+HR HERO
+        ↓
+6 KPI CARDS
+        ↓
+┌──────────────────────────────────────────┬───────────────┐
+│ WORKFORCE TREND / HR PERFORMANCE         │ ACTION /      │
+│                                          │ HEALTH        │
+└──────────────────────────────────────────┴───────────────┘
+┌──────────────────────────────┬─────────────────────────────┐
+│ WORKFORCE BY ENTITY          │ RECENT HR ACTIVITY          │
+└──────────────────────────────┴─────────────────────────────┘
+┌──────────────────────────────┬─────────────────────────────┤
+│ MODULE HEALTH / QUICK ACTION │ HR BRSR READINESS           │
+└──────────────────────────────┴─────────────────────────────┘
+
+Keep visual breathing room.
+
+============================================================
+41. WORKFORCE SCREEN LAYOUT
+============================================================
+
+TOP:
+
+Page Header
+Filters
+Add Record
+
+SECOND:
+
+KPI Strip
+
+THIRD:
+
+Large Data Table
+
+FOURTH:
+
+Workforce Breakdown Charts
+
+FIFTH:
+
+Entity Comparison
+
+============================================================
+42. TRAINING SCREEN LAYOUT
+============================================================
+
+TOP:
+
+Header + filters
+
+SECOND:
+
+Training KPIs
+
+THIRD:
+
+Training trend + coverage charts
+
+FOURTH:
+
+Training registry
+
+FIFTH:
+
+Performance & career review
+
+============================================================
+43. WELLBEING SCREEN LAYOUT
+============================================================
+
+TOP:
+
+Header
+
+SECOND:
+
+Benefit KPIs
+
+THIRD:
+
+Benefits matrix
+
+FOURTH:
+
+Wellbeing programs
+
+FIFTH:
+
+Return-to-work panel
+
+============================================================
+44. HUMAN RIGHTS SCREEN LAYOUT
+============================================================
+
+TOP:
+
+Human Rights header
+
+SECOND:
+
+Compliance KPIs
+
+THIRD:
+
+Human Rights Training
+
+FOURTH:
+
+Minimum Wage Matrix
+
+FIFTH:
+
+Grievance Center
+
+SIXTH:
+
+Equal Opportunity / Labour Rights
+
+============================================================
+45. EVIDENCE SCREEN LAYOUT
+============================================================
+
+TOP:
+
+Evidence header
+
+SECOND:
+
+Evidence KPI cards
+
+THIRD:
+
+Filters
+
+FOURTH:
+
+Document grid/table
+
+FIFTH:
+
+Preview/detail drawer
+
+============================================================
+46. SUBMISSIONS SCREEN LAYOUT
+============================================================
+
+TOP:
+
+Regulatory Filing header
+
+SECOND:
+
+Status KPIs
+
+THIRD:
+
+Filing filters
+
+FOURTH:
+
+Submission registry
+
+FIFTH:
+
+Submission detail drawer
+
+============================================================
+47. UI MICRO-INTERACTIONS
+============================================================
+
+Use subtle:
+
+card hover
+
+button press
+
+tab transition
+
+drawer animation
+
+modal animation
+
+chart reveal
+
+timeline reveal
+
+loading shimmer
+
+Duration:
+
+150–300ms.
+
+No exaggerated animation.
+
+============================================================
+48. RESPONSIVE
+============================================================
+
+Primary:
+
+1280px+
+1440px+
+1600px+
+1920px+
+
+At smaller widths:
+
+cards stack
+
+tables scroll horizontally
+
+drawers become full-width
+
+charts resize
+
+filters wrap
+
+no clipping
+
+no overlap
+
+============================================================
+49. ACCESSIBILITY
+============================================================
+
+Support:
+
+keyboard navigation
+
+focus states
+
+ARIA labels
+
+accessible dialogs
+
+Escape to close
+
+semantic headings
+
+accessible tables
+
+sufficient contrast
+
+============================================================
+50. HR ROLE EXPERIENCE
+============================================================
+
+When HR User logs in:
+
+Do not show:
+
+admin configuration
+
+system settings
+
+user administration
+
+role administration
+
+group lock controls
+
+security administration
+
+Super Admin functions
+
+The user should immediately land in:
+
+HR OVERVIEW
+
+============================================================
+51. PERIOD SELECTION
+============================================================
+
+Reporting period must be globally consistent within HR workspace.
+
+When period changes:
+
+refresh:
+
+workforce
+
+training
+
+wellbeing
+
+human rights
+
+evidence
+
+submissions
+
+overview
+
+BRSR readiness
+
+charts
+
+KPIs
+
+Never mix records from different periods without clearly showing
+the comparison.
+
+============================================================
+52. CURRENT VS PREVIOUS YEAR
+============================================================
+
+Where applicable use:
+
+CURRENT FY
+
+PREVIOUS FY
+
+CHANGE
+
+The BRSR source material explicitly structures several HR
+disclosures using current and previous financial year comparisons.
+:chatgpt-content-reference{index="7"}
+
+Do not manufacture previous-year values.
+
+============================================================
+53. EXPORT
+============================================================
+
+Where export functionality is provided:
+
+export actual filtered backend-derived data.
+
+Never export the frontend's fake/static state.
+
+Use proper:
+
+CSV
+XLSX
+PDF
+
+where supported by backend.
+
+============================================================
+54. DATA VALIDATION
+============================================================
+
+Validate:
+
+Male + Female + other applicable categories
+=
+Total
+
+Permanent + Other Than Permanent
+=
+relevant total
+
+Training covered
+cannot exceed applicable denominator unless the disclosure's
+methodology explicitly allows such interpretation.
+
+Wage category totals must reconcile.
+
+Grievance status must be valid.
+
+Reporting period must match.
+
+Entity must be valid.
+
+Do not create arbitrary business rules.
+
+Use source-supported and engineering-justified rules.
+
+============================================================
+55. FORM UX
+============================================================
+
+Forms must use:
+
+clear labels
+
+units
+
+helper text
+
+required indicators
+
+inline validation
+
+error state
+
+success state
+
+cancel
+
+save
+
+submit
+
+Never hide validation failures.
+
+============================================================
+56. DETAIL DRAWER UX
+============================================================
+
+Use right-side detail drawers for:
+
+Workforce Record
+
+Training Record
+
+Wellbeing Record
+
+Human Rights Record
+
+Evidence
+
+Submission
+
+Grievance
+
+Drawer structure:
+
+Header
+
+Identity
+
+Main Data
+
+Validation
+
+Evidence
+
+History
+
+Audit
+
+Actions
+
+============================================================
+57. NOTIFICATIONS
+============================================================
+
+HR notifications should include real backend events.
+
+Examples:
+
+Incomplete workforce record
+
+Training deadline
+
+Evidence missing
+
+Grievance deadline
+
+Submission pending
+
+Submission accepted
+
+Correction requested
+
+Do not hardcode notification records.
+
+============================================================
+58. GLOBAL SEARCH
+============================================================
+
+Search results should navigate directly to:
+
+Workforce
+
+Training
+
+Wellbeing
+
+Human Rights
+
+Evidence
+
+Submission
+
+Do not use demo search arrays.
+
+============================================================
+59. FINAL UI FINISHING
+============================================================
+
+Perform a professional design QA.
+
+Inspect:
+
+alignment
+
+spacing
+
+card height
+
+card width
+
+font sizes
+
+button size
+
+table row height
+
+chart dimensions
+
+icon alignment
+
+border consistency
+
+shadow consistency
+
+glass transparency
+
+section spacing
+
+empty states
+
+loading states
+
+responsive states
+
+No unfinished areas.
+
+============================================================
+60. FRONTEND / BACKEND TESTING
+============================================================
+
+Test:
+
+HR login
+
+HR role
+
+HR permission
+
+HR scope
+
+Overview
+
+Workforce
+
+Training
+
+Wellbeing
+
+Human Rights
+
+Evidence
+
+Submissions
+
+Period switch
+
+Data refresh
+
+Create record
+
+Update record
+
+Upload evidence
+
+Submission
+
+Error state
+
+Unauthorized access
+
+Logout
+
+============================================================
+61. NEGATIVE TESTS
+============================================================
+
+Test that:
+
+unauthenticated → HR endpoint = 401
+
+non-HR user → HR mutation = 403
+
+out-of-scope user → HR data = 403
+
+invalid workforce record = 422
+
+invalid totals = rejected
+
+empty required field = rejected
+
+invalid evidence = rejected
+
+unauthorized submission mutation = 403
+
+============================================================
+62. DATA SYNC TESTS
+============================================================
+
+After workforce creation:
+
+Overview KPI updates.
+
+After training creation:
+
+Training KPI updates.
+
+After evidence upload:
+
+Evidence count updates.
+
+After grievance update:
+
+Human Rights status updates.
+
+After submission:
+
+Submission count/status updates.
+
+After period change:
+
+all period-bound screens update.
+
+============================================================
+63. NO STALE DATA
+============================================================
+
+After mutation:
+
+invalidate/refetch affected backend data.
+
+Do not depend on manually mutating multiple local arrays.
+
+============================================================
+64. REPOSITORY AUDIT
+============================================================
+
+Search new and modified HR code for:
+
+mock
+
+demo
+
+fake
+
+fallback
+
+hardcoded
+
+synthetic
+
+Date.now
+
+Math.random
+
+localStorage
+
+TODO
+
+FIXME
+
+placeholder
+
+fake success
+
+fake API
+
+Remove inappropriate occurrences.
+
+============================================================
+65. EXISTING HR CODE CLEANUP
+============================================================
+
+Inspect existing:
+
+HRModule.jsx
+
+HROverviewScreen.jsx
+
+HRWorkforceScreen.jsx
+
+HRTrainingScreen.jsx
+
+HRWellbeingScreen.jsx
+
+HRHumanRightsScreen.jsx
+
+HREvidenceScreen.jsx
+
+HRSubmissionsScreen.jsx
+
+and the HR API methods.
+
+Do not blindly preserve static values.
+
+Refactor the existing screens where required.
+
+Preserve working functionality.
+
+Upgrade their architecture rather than creating duplicate HR
+screens.
+
+============================================================
+66. IMPORTANT CURRENT-REPOSITORY CONSTRAINT
+============================================================
+
+The existing HR module already has dedicated screens for:
+
+Overview
+Workforce
+Training
+Wellbeing
+Human Rights
+Evidence
+Submissions
+
+Use these as the foundation.
+
+Do not create a second parallel HR application.
+
+Refactor/rebuild the existing implementation into the final
+design.
+
+============================================================
+67. FINAL DESIGN STANDARD
+============================================================
+
+The HR workspace should feel like:
+
+"MEIL HUMAN CAPITAL & ESG INTELLIGENCE CENTER"
+
+The user should immediately understand:
+
+WORKFORCE
+
+DIVERSITY
+
+TRAINING
+
+WELLBEING
+
+HUMAN RIGHTS
+
+FAIR WAGES
+
+GRIEVANCES
+
+EVIDENCE
+
+BRSR READINESS
+
+SUBMISSIONS
+
+============================================================
+68. FINAL VERIFICATION REPORT
+============================================================
+
+Create:
+
+MEIL_PS08_HR_WORKSPACE_VERIFICATION.md
+
+Include:
+
+1. 7 HR tabs implemented
+
+2. Overview verification
+
+3. Workforce verification
+
+4. Training verification
+
+5. Wellbeing verification
+
+6. Human Rights verification
+
+7. Evidence verification
+
+8. Submissions verification
+
+9. BRSR mapping verification
+
+10. Backend APIs used
+
+11. Database entities used
+
+12. RBAC verification
+
+13. Organization scope verification
+
+14. Reporting-period verification
+
+15. Data synchronization verification
+
+16. Error-state verification
+
+17. Negative authorization tests
+
+18. Frontend build result
+
+19. Backend integration test result
+
+20. E2E verification
+
+21. Remaining issues
+
+22. Exact commit SHA tested
+
+============================================================
+69. FINAL IMPLEMENTATION RULE
+============================================================
+
+DO NOT STOP AT DESIGN.
+
+Implement:
+
+DESIGN
++
+UI
++
+UX
++
+COMPONENTS
++
+ROUTING
++
+API
++
+DATABASE
++
+RBAC
++
+DATA FETCHING
++
+DATA VALIDATION
++
+EVIDENCE
++
+SUBMISSIONS
++
+SYNC
++
+AUDIT
++
+TESTING
+
+Everything must work together.
+
+============================================================
+70. FINAL QUALITY BAR
+============================================================
+
+The result must look and behave like a real enterprise HR
+and ESG platform.
+
+It must be:
+
+PREMIUM
+
+CORPORATE
+
+CLEAN
+
+MODERN
+
+TRUSTWORTHY
+
+DATA-DRIVEN
+
+BRSR-ALIGNED
+
+SECURE
+
+TRACEABLE
+
+RESPONSIVE
+
+POLISHED
+
+DO NOT declare the workspace complete merely because the UI
+renders.
+
+It is complete only when:
+
+DESIGN WORKS
++
+FRONTEND WORKS
++
+BACKEND WORKS
++
+DATABASE WORKS
++
+RBAC WORKS
++
+SCOPE WORKS
++
+DATA SYNC WORKS
++
+FORMS WORK
++
+EVIDENCE WORKS
++
+SUBMISSIONS WORK
++
+TESTS PASS
++
+BUILD PASSES
+
+============================================================
+START
+============================================================
+
+FIRST:
+Inspect the existing HR implementation.
+
+SECOND:
+Map each existing HR screen to the 7-tab architecture.
+
+THIRD:
+Inspect current APIs and database models.
+
+FOURTH:
+Identify static/demo/fallback data.
+
+FIFTH:
+Create the new professional HR information architecture.
+
+SIXTH:
+Implement the UI using the approved MEIL visual system.
+
+SEVENTH:
+Connect every screen to real backend data.
+
+EIGHTH:
+Implement synchronization and refresh.
+
+NINTH:
+Implement validation and error states.
+
+TENTH:
+Run RBAC and scope tests.
+
+ELEVENTH:
+Run integration tests.
+
+TWELFTH:
+Run frontend build.
+
+THIRTEENTH:
+Perform final visual QA.
+
+FOURTEENTH:
+Fix discovered issues.
+
+FIFTEENTH:
+Generate the verification report.
+
+Do not claim completion until the exact implementation has been
+tested against the final commit.

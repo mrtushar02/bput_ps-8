@@ -1286,3 +1286,38 @@ Stage Summary:
   - Distinct information focus (workforce, safety, suppliers, community, governance, consolidation, final review, data quality, analytics, BRSR compliance)
 - Per-role switch routing in page.tsx ensures each role sees only their unique dashboard
 - All data from real APIs, glassmorphism, framer-motion, compact cards, enhanced shadows, darker text
+
+---
+Task ID: 27 (HR Unique Workspace — 7 Role-Specific Tabs + Screens)
+Agent: Lead Architect (main) + subagent
+Task: Fix nav tabs for HR User — give them 7 HR-specific tabs with unique screens, not the generic tabs shared with Project User
+
+Work Log:
+- User reported: "all the users nav bar tabs are same" — HR User saw the same tabs as Project User (Overview, My Project, Data Entry, Evidence, Submissions, Analytics, Team, Reports). Each role needs completely different nav tabs and screens.
+- User provided a detailed HR workspace spec with 7 tabs: Overview, Workforce, Training & Development, Wellbeing & Benefits, Human Rights & Fair Work, Evidence, Submissions & Regulatory Filings.
+
+- Changes made:
+  1. Added 4 new ModuleKeys to auth-context.tsx: 'hr-workforce', 'hr-training', 'hr-wellbeing', 'hr-rights'
+  2. Updated HR_USER nav in role-nav.ts to use 7 HR-specific tabs (NOT the generic tabs): Overview | Workforce | Training & Dev | Wellbeing | Human Rights | Evidence | Submissions — with HR-specific icons (GraduationCap, HeartPulse, Scale)
+  3. Built HR Workspace (`src/components/modules/hr-workspace.tsx`) — a single component rendering 4 different screens:
+     - **hr-workforce** → Workforce Registry: KPI cards (Employees/Workers/Permanent/Non-Permanent), workforce roster table, gender distribution bar chart, employee/worker split donut, PwD inclusion stat, entity comparison
+     - **hr-training** → Training & Development: training hours KPIs, monthly training hours area chart, training programs table (Safety/Skill/Compliance), performance review cycle
+     - **hr-wellbeing** → Wellbeing & Benefits: health/insurance KPIs, benefits matrix table (6 benefit types), wellbeing programs list (Yoga/Mental Health/Fitness/Nutrition), return-to-work card
+     - **hr-rights** → Human Rights & Fair Work: grievances KPIs, human rights training coverage bar, fair wages card, grievance registry table, equal opportunity stats, labour rights checklist (6 items all compliant)
+  4. Updated module-router.tsx to route the 4 HR-specific keys to HrWorkspace
+
+Verification:
+- `bun run lint` → clean (exit 0)
+- `bunx tsc --noEmit` → clean for all src/ files
+- agent-browser verified: HR User nav now shows 7 unique HR-specific tabs: "Overview | Workforce | Training & Dev | Wellbeing | Human Rights | Evidence | Submissions"
+- agent-browser verified: Workforce tab renders "Workforce Registry" with roster table, gender chart, PwD stat, entity comparison
+- agent-browser verified: Training & Dev tab renders "Training & Development" with monthly hours trend, training programs, performance review
+- No console errors on any HR screen
+- The HR User's nav is now COMPLETELY DIFFERENT from the Project User's nav (which has Overview, My Project, Data Entry, Evidence, Submissions, Analytics, Team, Reports)
+
+Stage Summary:
+- HR User now has 7 unique HR-specific tabs with unique HR-specific screens
+- Each HR tab shows HR-domain content (workforce registry, training programs, benefits matrix, grievance registry, labour rights) — NOT generic project/data-entry screens
+- Teal/cyan theme consistent across all HR screens
+- The pattern is established: each role gets its own unique nav tabs + unique screen content
+- Ready to replicate for other roles (EHS, Procurement, CSR, Compliance, reviewers, managers, auditor, executive)

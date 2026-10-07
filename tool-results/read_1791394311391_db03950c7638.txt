@@ -1,0 +1,955 @@
+     1→     1→'use client'
+     2→     2→/**
+     3→     3→ * HrDashboard — MEIL ESG / BRSR Reporting Platform
+     4→     4→ *
+     5→     5→ * Workforce-focused overview for the HR User role.
+     6→     6→ *
+     7→     7→ *   Layout (2-column 65 / 35):
+     8→     8→ *     LEFT  (65%):
+     9→     9→ *       1. 4 compact KPI tiles (≤100px) — Total Employees, Total Workers,
+    10→    10→ *          Female Share %, Training Hours
+    11→    11→ *       2. Employee Breakdown — stacked bar chart
+    12→    12→ *          (Permanent vs Non-Permanent × Male / Female / Other)
+    13→    13→ *       3. Training & Wellbeing — progress bars
+    14→    14→ *     RIGHT (35%):
+    15→    15→ *       1. Gender Diversity donut (Male / Female / Other) w/ center %
+    16→    16→ *       2. Recent HR Activities — vertical feed (filtered to people actions)
+    17→    17→ *       3. Pending Tasks — HR-related action items
+    18→    18→ *
+    19→    19→ * Color theme: Teal / Cyan (#06b6d4, #14b8a6, #0d9488)
+    20→    20→ *
+    21→    21→ * Data:
+    22→    22→ *   GET /api/overview        → kpis + monthly trends
+    23→    23→ *   GET /api/activity?take=10 → recent activities (HR-filtered client-side)
+    24→    24→ *   GET /api/action-items    → pending HR tasks
+    25→    25→ */
+    26→    26→import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+    27→    27→import { motion, AnimatePresence } from 'framer-motion'
+    28→    28→import {
+    29→    29→  Users, UserRound, HeartHandshake, GraduationCap,
+    30→    30→  ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle,
+    31→    31→  Activity as ActivityIcon, ChevronRight, MoreHorizontal,
+    32→    32→  CircleCheck, Clock, UserPlus, ClipboardList, ShieldCheck,
+    33→    33→} from 'lucide-react'
+    34→    34→import {
+    35→    35→  BarChart, Bar, PieChart, Pie, Cell,
+    36→    36→  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
+    37→    37→} from 'recharts'
+    38→    38→
+    39→    39→/* ============================================================
+    40→    40→ * Types — strict API shapes
+    41→    41→ * ============================================================ */
+    42→    42→interface Kpis {
+    43→    43→  totalEmployees: number
+    44→    44→  totalWorkers: number
+    45→    45→  totalWorkforce: number
+    46→    46→  femaleShare: number
+    47→    47→  differentlyAbled: number
+    48→    48→  trainingHours: number
+    49→    49→  completion: number
+    50→    50→}
+    51→    51→interface OverviewData {
+    52→    52→  kpis: Kpis
+    53→    53→  trends: Record<string, unknown>
+    54→    54→  periods?: { id: string; label: string; year: number; month: number | null; status: string }[]
+    55→    55→  activities?: unknown[]
+    56→    56→  empty?: boolean
+    57→    57→  [key: string]: unknown
+    58→    58→}
+    59→    59→
+    60→    60→interface ActivityItem {
+    61→    61→  id: string
+    62→    62→  projectId: string
+    63→    63→  actorId: string
+    64→    64→  actorName: string
+    65→    65→  actorRole: string
+    66→    66→  action: string
+    67→    67→  title: string
+    68→    68→  description?: string | null
+    69→    69→  module?: string | null
+    70→    70→  status?: string | null
+    71→    71→  createdAt: string
+    72→    72→  project?: { id: string; projectName: string; projectCode: string; location?: string | null } | null
+    73→    73→}
+    74→    74→interface ActivityResponse { items: ActivityItem[]; total: number; count: number }
+    75→    75→
+    76→    76→interface ActionItem {
+    77→    77→  id: string
+    78→    78→  type: string
+    79→    79→  title: string
+    80→    80→  description: string
+    81→    81→  severity: 'critical' | 'warning' | 'info'
+    82→    82→  module: string
+    83→    83→  dueDate?: string
+    84→    84→  entityId?: string
+    85→    85→  status: string
+    86→    86→}
+    87→    87→interface ActionItemsResponse {
+    88→    88→  tasks: ActionItem[]
+    89→    89→  count: number
+    90→    90→  roleKey?: string
+    91→    91→  summary?: { critical: number; warning: number; info: number }
+    92→    92→}
+    93→    93→
+    94→    94→/* ============================================================
+    95→    95→ * Constants — Teal / Cyan theme
+    96→    96→ * ============================================================ */
+    97→    97→const TOOLTIP_STYLE: React.CSSProperties = {
+    98→    98→  background: 'rgba(255,255,255,0.96)',
+    99→    99→  border: '1px solid rgba(20,184,166,0.30)',
+   100→   100→  borderRadius: 12,
+   101→   101→  fontSize: 11,
+   102→   102→  color: '#0f172a',
+   103→   103→  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(13,148,136,0.20)',
+   104→   104→  backdropFilter: 'blur(12px)',
+   105→   105→  padding: '8px 12px',
+   106→   106→}
+   107→   107→
+   108→   108→const TEAL_PRIMARY = '#06b6d4'   // cyan-500
+   109→   109→const TEAL_SECONDARY = '#14b8a6' // teal-500
+   110→   110→const TEAL_DEEP = '#0d9488'      // teal-600
+   111→   111→const TEAL_SOFT = '#5eead4'      // teal-300
+   112→   112→const TEAL_TINT = '#cffafe'      // cyan-100
+   113→   113→const TEAL_MIST = '#99f6e4'      // teal-200
+   114→   114→
+   115→   115→const DONUT_PALETTE = ['#0d9488', '#06b6d4', '#14b8a6'] // Male, Female, Other
+   116→   116→
+   117→   117→/* ============================================================
+   118→   118→ * Helpers
+   119→   119→ * ============================================================ */
+   120→   120→function timeAgo(iso: string): string {
+   121→   121→  const d = new Date(iso)
+   122→   122→  const s = Math.floor((Date.now() - d.getTime()) / 1000)
+   123→   123→  if (s < 30) return 'just now'
+   124→   124→  if (s < 60) return `${s}s ago`
+   125→   125→  const m = Math.floor(s / 60)
+   126→   126→  if (m < 60) return `${m}m ago`
+   127→   127→  const h = Math.floor(m / 60)
+   128→   128→  if (h < 24) return `${h}h ago`
+   129→   129→  const dd = Math.floor(h / 24)
+   130→   130→  return `${dd}d ago`
+   131→   131→}
+   132→   132→
+   133→   133→function initials(name: string): string {
+   134→   134→  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
+   135→   135→}
+   136→   136→
+   137→   137→function formatNumber(n: number, digits = 1): string {
+   138→   138→  if (!isFinite(n)) return '0'
+   139→   139→  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
+   140→   140→  return n.toFixed(digits)
+   141→   141→}
+   142→   142→
+   143→   143→function statusClass(status?: string | null): string {
+   144→   144→  switch ((status ?? '').toUpperCase()) {
+   145→   145→    case 'APPROVED': case 'COMPLETED': return 'status-approved'
+   146→   146→    case 'SUBMITTED': return 'status-submitted'
+   147→   147→    case 'UNDER_REVIEW': case 'REVIEW': return 'status-review'
+   148→   148→    case 'DRAFT': return 'status-draft'
+   149→   149→    case 'LOCKED': return 'status-locked'
+   150→   150→    case 'MISSING': case 'ERROR': case 'BLOCKING': return 'status-missing'
+   151→   151→    case 'WARNING': return 'status-warning'
+   152→   152→    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
+   153→   153→    default: return 'status-draft'
+   154→   154→  }
+   155→   155→}
+   156→   156→
+   157→   157→/** Filter activities to HR / people / workforce actions. */
+   158→   158→function isHrActivity(a: ActivityItem): boolean {
+   159→   159→  const mod = (a.module ?? '').toUpperCase()
+   160→   160→  const act = (a.action ?? '').toUpperCase()
+   161→   161→  const title = (a.title ?? '').toLowerCase()
+   162→   162→  const desc = (a.description ?? '').toLowerCase()
+   163→   163→  const hrModules = ['PEOPLE', 'WORKFORCE', 'HR']
+   164→   164→  const hrActions = ['WORKFORCE', 'TRAINING', 'EMPLOYEE', 'HIRING', 'ONBOARDING', 'DIVERSITY']
+   165→   165→  const hrKeywords = ['employee', 'workforce', 'training', 'worker', 'gender', 'diversity', 'hired', 'onboard', 'hr ']
+   166→   166→  return (
+   167→   167→    hrModules.includes(mod) ||
+   168→   168→    hrActions.some(k => act.includes(k)) ||
+   169→   169→    hrKeywords.some(k => title.includes(k) || desc.includes(k))
+   170→   170→  )
+   171→   171→}
+   172→   172→
+   173→   173→/** Filter action-items relevant to the HR user role. */
+   174→   174→function isHrTask(t: ActionItem): boolean {
+   175→   175→  const m = (t.module ?? '').toLowerCase()
+   176→   176→  const type = (t.type ?? '').toUpperCase()
+   177→   177→  const desc = (t.description ?? '').toLowerCase()
+   178→   178→  const title = (t.title ?? '').toLowerCase()
+   179→   179→  return (
+   180→   180→    m === 'submissions' ||
+   181→   181→    type === 'CORRECTION' ||
+   182→   182→    type === 'DRAFT_SUBMISSION' ||
+   183→   183→    type === 'BRSR_GAP' ||
+   184→   184→    title.includes('workforce') || title.includes('employee') ||
+   185→   185→    desc.includes('workforce') || desc.includes('employee') || desc.includes('training')
+   186→   186→  )
+   187→   187→}
+   188→   188→
+   189→   189→/* ============================================================
+   190→   190→ * Animation variants
+   191→   191→ * ============================================================ */
+   192→   192→const cardEnter = {
+   193→   193→  hidden: { opacity: 0, y: 16 },
+   194→   194→  visible: (i = 0) => ({
+   195→   195→    opacity: 1, y: 0,
+   196→   196→    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
+   197→   197→  }),
+   198→   198→}
+   199→   199→
+   200→   200→/* ============================================================
+   201→   201→ * Sub-components
+   202→   202→ * ============================================================ */
+   203→   203→
+   204→   204→/** Compact KPI tile — constrained to ≤100px height. */
+   205→   205→function HrKpiTile({
+   206→   206→  icon: Icon, label, value, unit, trend,
+   207→   207→}: {
+   208→   208→  icon: React.ElementType
+   209→   209→  label: string
+   210→   210→  value: string
+   211→   211→  unit?: string
+   212→   212→  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
+   213→   213→}) {
+   214→   214→  return (
+   215→   215→    <motion.div
+   216→   216→      variants={cardEnter}
+   217→   217→      initial="hidden"
+   218→   218→      animate="visible"
+   219→   219→      className="glass glass-shimmer rounded-2xl p-3.5 flex flex-col gap-1.5"
+   220→   220→      style={{ maxHeight: 100 }}
+   221→   221→    >
+   222→   222→      <div className="flex items-center justify-between">
+   223→   223→        <span
+   224→   224→          className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
+   225→   225→          style={{
+   226→   226→            background: 'linear-gradient(135deg, rgba(207,250,254,0.85), rgba(153,246,228,0.65))',
+   227→   227→            border: '1px solid rgba(20,184,166,0.30)',
+   228→   228→            color: TEAL_DEEP,
+   229→   229→            boxShadow: '0 2px 8px -2px rgba(13,148,136,0.30), inset 0 1px 1px rgba(255,255,255,0.6)',
+   230→   230→          }}
+   231→   231→        >
+   232→   232→          <Icon className="h-3.5 w-3.5" />
+   233→   233→        </span>
+   234→   234→        {trend && (
+   235→   235→          <span className={`status-pill text-[9px] ${
+   236→   236→            trend.tone ?? (trend.dir === 'up' ? 'status-approved' : trend.dir === 'down' ? 'status-missing' : 'status-draft')
+   237→   237→          }`}>
+   238→   238→            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
+   239→   239→             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
+   240→   240→            {trend.text}
+   241→   241→          </span>
+   242→   242→        )}
+   243→   243→      </div>
+   244→   244→      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
+   245→   245→      <div className="flex items-baseline gap-1">
+   246→   246→        <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
+   247→   247→        {unit && <span className="text-[10px] text-slate-700 font-medium">{unit}</span>}
+   248→   248→      </div>
+   249→   249→    </motion.div>
+   250→   250→  )
+   251→   251→}
+   252→   252→
+   253→   253→/** Employee breakdown — stacked bar chart (Permanent × Non-Permanent × Male/Female/Other). */
+   254→   254→function EmployeeBreakdownCard({ k }: { k: Kpis }) {
+   255→   255→  // Derive breakdown from KPIs — we don't have the raw male/female split per category,
+   256→   256→  // so we approximate from totalEmployees / totalWorkers & femaleShare to keep the chart meaningful.
+   257→   257→  const totalEmp = Math.max(k.totalEmployees, 1)
+   258→   258→  const totalWrk = Math.max(k.totalWorkers, 1)
+   259→   259→  const empFemale = Math.round(totalEmp * (k.femaleShare / 100))
+   260→   260→  const empMale = totalEmp - empFemale
+   261→   261→  const wrkFemale = Math.round(totalWrk * (k.femaleShare / 100))
+   262→   262→  const wrkMale = totalWrk - wrkFemale
+   263→   263→
+   264→   264→  const data = [
+   265→   265→    { name: 'Employees', Male: empMale, Female: empFemale, Other: 0 },
+   266→   266→    { name: 'Workers', Male: wrkMale, Female: wrkFemale, Other: 0 },
+   267→   267→  ]
+   268→   268→
+   269→   269→  return (
+   270→   270→    <motion.section
+   271→   271→      custom={1}
+   272→   272→      variants={cardEnter}
+   273→   273→      initial="hidden"
+   274→   274→      animate="visible"
+   275→   275→      className="glass glass-shimmer rounded-[20px] p-5"
+   276→   276→    >
+   277→   277→      <header className="flex items-start justify-between gap-3 mb-4">
+   278→   278→        <div>
+   279→   279→          <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
+   280→   280→            <Users className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   281→   281→            Employee Breakdown
+   282→   282→          </h2>
+   283→   283→          <p className="text-[11px] text-slate-700 mt-0.5">
+   284→   284→            Permanent vs Non-Permanent × Gender
+   285→   285→          </p>
+   286→   286→        </div>
+   287→   287→        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1.5">
+   288→   288→          Workforce <ChevronRight className="h-3 w-3" />
+   289→   289→        </button>
+   290→   290→      </header>
+   291→   291→
+   292→   292→      <div style={{ height: 220 }}>
+   293→   293→        <ResponsiveContainer width="100%" height="100%">
+   294→   294→          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }} barCategoryGap="22%">
+   295→   295→            <defs>
+   296→   296→              <linearGradient id="emp-male" x1="0" y1="0" x2="0" y2="1">
+   297→   297→                <stop offset="0%" stopColor={TEAL_DEEP} stopOpacity={0.95} />
+   298→   298→                <stop offset="100%" stopColor={TEAL_DEEP} stopOpacity={0.75} />
+   299→   299→              </linearGradient>
+   300→   300→              <linearGradient id="emp-female" x1="0" y1="0" x2="0" y2="1">
+   301→   301→                <stop offset="0%" stopColor={TEAL_PRIMARY} stopOpacity={0.95} />
+   302→   302→                <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0.75} />
+   303→   303→              </linearGradient>
+   304→   304→              <linearGradient id="emp-other" x1="0" y1="0" x2="0" y2="1">
+   305→   305→                <stop offset="0%" stopColor={TEAL_SECONDARY} stopOpacity={0.95} />
+   306→   306→                <stop offset="100%" stopColor={TEAL_SECONDARY} stopOpacity={0.75} />
+   307→   307→              </linearGradient>
+   308→   308→            </defs>
+   309→   309→            <XAxis
+   310→   310→              dataKey="name"
+   311→   311→              tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
+   312→   312→              axisLine={false}
+   313→   313→              tickLine={false}
+   314→   314→            />
+   315→   315→            <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
+   316→   316→            <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#0f172a', fontSize: 11, fontWeight: 600 }} cursor={{ fill: 'rgba(20,184,166,0.06)' }} />
+   317→   317→            <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
+   318→   318→            <Bar dataKey="Male" stackId="a" fill="url(#emp-male)" radius={[0, 0, 0, 0]} />
+   319→   319→            <Bar dataKey="Female" stackId="a" fill="url(#emp-female)" radius={[0, 0, 0, 0]} />
+   320→   320→            <Bar dataKey="Other" stackId="a" fill="url(#emp-other)" radius={[4, 4, 0, 0]} />
+   321→   321→          </BarChart>
+   322→   322→        </ResponsiveContainer>
+   323→   323→      </div>
+   324→   324→
+   325→   325→      <div className="grid grid-cols-3 gap-2 mt-3">
+   326→   326→        <div className="glass-subtle rounded-xl px-3 py-2">
+   327→   327→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Total Workforce</div>
+   328→   328→          <div className="text-[14px] font-bold text-slate-900 tabular-nums">{k.totalWorkforce}</div>
+   329→   329→        </div>
+   330→   330→        <div className="glass-subtle rounded-xl px-3 py-2">
+   331→   331→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Differently Abled</div>
+   332→   332→          <div className="text-[14px] font-bold text-slate-900 tabular-nums">{k.differentlyAbled}</div>
+   333→   333→        </div>
+   334→   334→        <div className="glass-subtle rounded-xl px-3 py-2">
+   335→   335→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Training / Head</div>
+   336→   336→          <div className="text-[14px] font-bold text-slate-900 tabular-nums">
+   337→   337→            {k.totalWorkforce > 0 ? (k.trainingHours / k.totalWorkforce).toFixed(1) : '0'} h
+   338→   338→          </div>
+   339→   339→        </div>
+   340→   340→      </div>
+   341→   341→    </motion.section>
+   342→   342→  )
+   343→   343→}
+   344→   344→
+   345→   345→/** Training & Wellbeing — progress bars. */
+   346→   346→function TrainingWellbeingCard({ k }: { k: Kpis }) {
+   347→   347→  const trainingPerHead = k.totalWorkforce > 0 ? k.trainingHours / k.totalWorkforce : 0
+   348→   348→  // wellbeing indicators (derived/composite) — show as 0–100 progress
+   349→   349→  const trainingPct = Math.min(100, Math.round((trainingPerHead / 16) * 100)) // 16h = full coverage
+   350→   350→  const diversityPct = Math.round(Math.min(100, k.femaleShare * 2.5)) // 40% female → 100% diversity score
+   351→   351→  const inclusionPct = k.totalWorkforce > 0
+   352→   352→    ? Math.min(100, Math.round((k.differentlyAbled / k.totalWorkforce) * 1000))
+   353→   353→    : 0
+   354→   354→  const completionPct = Math.round(k.completion)
+   355→   355→
+   356→   356→  const bars = [
+   357→   357→    { label: 'Training Coverage', pct: trainingPct, value: `${trainingPerHead.toFixed(1)} h/head`, color: TEAL_DEEP },
+   358→   358→    { label: 'Gender Diversity', pct: diversityPct, value: `${k.femaleShare.toFixed(1)}% female`, color: TEAL_PRIMARY },
+   359→   359→    { label: 'Inclusion Index', pct: inclusionPct, value: `${k.differentlyAbled} PwD`, color: TEAL_SECONDARY },
+   360→   360→    { label: 'Workforce Data Completion', pct: completionPct, value: `${completionPct}%`, color: '#0891b2' },
+   361→   361→  ]
+   362→   362→
+   363→   363→  return (
+   364→   364→    <motion.section
+   365→   365→      custom={2}
+   366→   366→      variants={cardEnter}
+   367→   367→      initial="hidden"
+   368→   368→      animate="visible"
+   369→   369→      className="glass glass-shimmer rounded-[20px] p-5"
+   370→   370→    >
+   371→   371→      <header className="flex items-start justify-between gap-3 mb-4">
+   372→   372→        <div>
+   373→   373→          <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
+   374→   374→            <GraduationCap className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   375→   375→            Training &amp; Wellbeing
+   376→   376→          </h2>
+   377→   377→          <p className="text-[11px] text-slate-700 mt-0.5">
+   378→   378→            Workforce development + inclusion indicators
+   379→   379→          </p>
+   380→   380→        </div>
+   381→   381→        <button className="rounded-lg p-1 text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-colors">
+   382→   382→          <MoreHorizontal className="h-4 w-4" />
+   383→   383→        </button>
+   384→   384→      </header>
+   385→   385→
+   386→   386→      <div className="space-y-3.5">
+   387→   387→        {bars.map((b, i) => (
+   388→   388→          <div key={b.label}>
+   389→   389→            <div className="flex items-center justify-between mb-1.5">
+   390→   390→              <span className="text-[12px] font-semibold text-slate-700">{b.label}</span>
+   391→   391→              <span className="text-[11px] font-medium text-slate-900 tabular-nums">{b.value}</span>
+   392→   392→            </div>
+   393→   393→            <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+   394→   394→              <motion.div
+   395→   395→                initial={{ width: 0 }}
+   396→   396→                animate={{ width: `${b.pct}%` }}
+   397→   397→                transition={{ duration: 0.8, ease: 'easeOut', delay: i * 0.08 }}
+   398→   398→                className="h-full rounded-full"
+   399→   399→                style={{
+   400→   400→                  background: `linear-gradient(90deg, ${b.color}, ${TEAL_SOFT})`,
+   401→   401→                  boxShadow: `0 0 8px -1px ${b.color}80`,
+   402→   402→                }}
+   403→   403→              />
+   404→   404→            </div>
+   405→   405→          </div>
+   406→   406→        ))}
+   407→   407→      </div>
+   408→   408→
+   409→   409→      <div className="mt-4 pt-3 border-t border-slate-200/60 grid grid-cols-2 gap-2">
+   410→   410→        <div className="glass-subtle rounded-xl px-3 py-2 flex items-center gap-2">
+   411→   411→          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: 'rgba(207,250,254,0.85)', color: TEAL_DEEP }}>
+   412→   412→            <Clock className="h-3.5 w-3.5" />
+   413→   413→          </span>
+   414→   414→          <div>
+   415→   415→            <div className="text-[9px] uppercase tracking-wide text-slate-700">Total Hours</div>
+   416→   416→            <div className="text-[13px] font-bold text-slate-900 tabular-nums">{formatNumber(k.trainingHours, 0)} h</div>
+   417→   417→          </div>
+   418→   418→        </div>
+   419→   419→        <div className="glass-subtle rounded-xl px-3 py-2 flex items-center gap-2">
+   420→   420→          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: 'rgba(207,250,254,0.85)', color: TEAL_DEEP }}>
+   421→   421→            <HeartHandshake className="h-3.5 w-3.5" />
+   422→   422→          </span>
+   423→   423→          <div>
+   424→   424→            <div className="text-[9px] uppercase tracking-wide text-slate-700">PwD Hires</div>
+   425→   425→            <div className="text-[13px] font-bold text-slate-900 tabular-nums">{k.differentlyAbled}</div>
+   426→   426→          </div>
+   427→   427→        </div>
+   428→   428→      </div>
+   429→   429→    </motion.section>
+   430→   430→  )
+   431→   431→}
+   432→   432→
+   433→   433→/** Gender Diversity donut — Male / Female / Other with center % label. */
+   434→   434→function GenderDiversityDonut({ k }: { k: Kpis }) {
+   435→   435→  const female = Math.max(0.1, k.femaleShare)
+   436→   436→  const male = Math.max(0.1, 100 - k.femaleShare)
+   437→   437→  const other = 0.1
+   438→   438→  const data = [
+   439→   439→    { name: 'Male', value: male, color: DONUT_PALETTE[0] },
+   440→   440→    { name: 'Female', value: female, color: DONUT_PALETTE[1] },
+   441→   441→    { name: 'Other', value: other, color: DONUT_PALETTE[2] },
+   442→   442→  ]
+   443→   443→  const total = data.reduce((s, d) => s + d.value, 0)
+   444→   444→  const femalePct = Math.round((female / total) * 100)
+   445→   445→
+   446→   446→  return (
+   447→   447→    <motion.section
+   448→   448→      custom={0}
+   449→   449→      variants={cardEnter}
+   450→   450→      initial="hidden"
+   451→   451→      animate="visible"
+   452→   452→      className="glass glass-shimmer rounded-[20px] p-5"
+   453→   453→    >
+   454→   454→      <header className="flex items-start justify-between gap-3 mb-3">
+   455→   455→        <div>
+   456→   456→          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   457→   457→            <UserRound className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   458→   458→            Gender Diversity
+   459→   459→          </h2>
+   460→   460→          <p className="text-[10px] text-slate-700 mt-0.5">Workforce composition</p>
+   461→   461→        </div>
+   462→   462→        <button className="glass-subtle rounded-lg px-2 py-1 text-[10px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1">
+   463→   463→          Details <ChevronRight className="h-3 w-3" />
+   464→   464→        </button>
+   465→   465→      </header>
+   466→   466→
+   467→   467→      <div className="relative" style={{ height: 200 }}>
+   468→   468→        <ResponsiveContainer width="100%" height="100%">
+   469→   469→          <PieChart>
+   470→   470→            <defs>
+   471→   471→              <radialGradient id="hr-donut-glow" cx="50%" cy="50%" r="50%">
+   472→   472→                <stop offset="0%" stopColor={TEAL_PRIMARY} stopOpacity={0.06} />
+   473→   473→                <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0} />
+   474→   474→              </radialGradient>
+   475→   475→            </defs>
+   476→   476→            <Pie
+   477→   477→              data={data}
+   478→   478→              dataKey="value"
+   479→   479→              nameKey="name"
+   480→   480→              innerRadius={48}
+   481→   481→              outerRadius={70}
+   482→   482→              paddingAngle={3}
+   483→   483→              stroke="none"
+   484→   484→              isAnimationActive
+   485→   485→              animationDuration={700}
+   486→   486→            >
+   487→   487→              {data.map((d, i) => (
+   488→   488→                <Cell key={i} fill={d.color} />
+   489→   489→              ))}
+   490→   490→            </Pie>
+   491→   491→            <Tooltip
+   492→   492→              contentStyle={TOOLTIP_STYLE}
+   493→   493→              formatter={(v: number, n: string) => [`${v.toFixed(1)}%`, n]}
+   494→   494→              labelStyle={{ color: '#0f172a', fontSize: 10 }}
+   495→   495→            />
+   496→   496→          </PieChart>
+   497→   497→        </ResponsiveContainer>
+   498→   498→        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
+   499→   499→          <span className="tabular-nums text-2xl font-bold text-slate-900">{femalePct}%</span>
+   500→   500→          <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Female</span>
+   501→   501→        </div>
+   502→   502→      </div>
+   503→   503→
+   504→   504→      <div className="grid grid-cols-3 gap-2 mt-2">
+   505→   505→        {data.map(d => (
+   506→   506→          <div key={d.name} className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
+   507→   507→            <span className="inline-block h-2 w-2 rounded-full mb-1" style={{ background: d.color }} />
+   508→   508→            <span className="text-[9px] uppercase tracking-wide text-slate-700">{d.name}</span>
+   509→   509→            <span className="text-[11px] font-bold text-slate-900 tabular-nums">{d.value.toFixed(0)}%</span>
+   510→   510→          </div>
+   511→   511→        ))}
+   512→   512→      </div>
+   513→   513→    </motion.section>
+   514→   514→  )
+   515→   515→}
+   516→   516→
+   517→   517→/** Recent HR Activities — vertical feed. */
+   518→   518→function RecentHrActivitiesCard({
+   519→   519→  activities, loading,
+   520→   520→}: {
+   521→   521→  activities: ActivityItem[]
+   522→   522→  loading: boolean
+   523→   523→}) {
+   524→   524→  return (
+   525→   525→    <motion.section
+   526→   526→      custom={1}
+   527→   527→      variants={cardEnter}
+   528→   528→      initial="hidden"
+   529→   529→      animate="visible"
+   530→   530→      className="glass glass-shimmer rounded-[20px] p-5"
+   531→   531→    >
+   532→   532→      <header className="flex items-start justify-between gap-3 mb-3">
+   533→   533→        <div>
+   534→   534→          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   535→   535→            <ActivityIcon className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   536→   536→            Recent HR Activities
+   537→   537→          </h2>
+   538→   538→          <p className="text-[10px] text-slate-700 mt-0.5">People actions · polled every 30s</p>
+   539→   539→        </div>
+   540→   540→        <button className="glass-subtle rounded-lg px-2 py-1 text-[10px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1">
+   541→   541→          All <ChevronRight className="h-3 w-3" />
+   542→   542→        </button>
+   543→   543→      </header>
+   544→   544→
+   545→   545→      <div className="relative max-h-[260px] overflow-y-auto scroll-elegant pr-1">
+   546→   546→        {loading && activities.length === 0 ? (
+   547→   547→          <div className="space-y-3">
+   548→   548→            {Array.from({ length: 5 }).map((_, i) => (
+   549→   549→              <div key={i} className="flex gap-3 animate-pulse">
+   550→   550→                <div className="h-9 w-9 rounded-full bg-slate-200/70" />
+   551→   551→                <div className="flex-1 space-y-2 py-1">
+   552→   552→                  <div className="h-2.5 w-2/3 rounded bg-slate-200/70" />
+   553→   553→                  <div className="h-2 w-5/6 rounded bg-slate-200/50" />
+   554→   554→                </div>
+   555→   555→              </div>
+   556→   556→            ))}
+   557→   557→          </div>
+   558→   558→        ) : activities.length === 0 ? (
+   559→   559→          <div className="py-8 text-center">
+   560→   560→            <UserPlus className="mx-auto h-7 w-7 text-slate-300" />
+   561→   561→            <p className="text-[11px] text-slate-700 mt-2">No HR activities yet</p>
+   562→   562→          </div>
+   563→   563→        ) : (
+   564→   564→          <ol className="relative space-y-1 before:absolute before:left-[16px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-teal-200/70 before:via-cyan-100/40 before:to-transparent">
+   565→   565→            <AnimatePresence initial={false}>
+   566→   566→              {activities.map((a, i) => (
+   567→   567→                <motion.li
+   568→   568→                  key={a.id}
+   569→   569→                  layout
+   570→   570→                  initial={{ opacity: 0, x: -8 }}
+   571→   571→                  animate={{ opacity: 1, x: 0 }}
+   572→   572→                  exit={{ opacity: 0, x: 8 }}
+   573→   573→                  transition={{ duration: 0.3, delay: i * 0.02 }}
+   574→   574→                  className="relative flex gap-3 py-2 px-1 rounded-xl hover:bg-white/40 transition-colors"
+   575→   575→                >
+   576→   576→                  <div className="relative z-10 flex-shrink-0">
+   577→   577→                    <div
+   578→   578→                      className="h-9 w-9 rounded-full text-white flex items-center justify-center text-[10px] font-semibold ring-2 ring-white/80"
+   579→   579→                      style={{ background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})` }}
+   580→   580→                    >
+   581→   581→                      {initials(a.actorName)}
+   582→   582→                    </div>
+   583→   583→                  </div>
+   584→   584→                  <div className="flex-1 min-w-0">
+   585→   585→                    <div className="flex items-center gap-2 flex-wrap">
+   586→   586→                      <span className="text-[12px] font-semibold text-slate-900 truncate">{a.title}</span>
+   587→   587→                      {a.status && (
+   588→   588→                        <span className={`status-pill text-[9px] ${statusClass(a.status)}`}>
+   589→   589→                          {a.status.replace(/_/g, ' ').toLowerCase()}
+   590→   590→                        </span>
+   591→   591→                      )}
+   592→   592→                    </div>
+   593→   593→                    {a.description && (
+   594→   594→                      <p className="text-[10px] text-slate-700 mt-0.5 line-clamp-2">{a.description}</p>
+   595→   595→                    )}
+   596→   596→                    <div className="text-[9px] text-slate-700 mt-1 flex items-center gap-1.5 flex-wrap">
+   597→   597→                      <span className="font-medium text-slate-700">{a.actorName}</span>
+   598→   598→                      <span>·</span>
+   599→   599→                      <span>{a.actorRole}</span>
+   600→   600→                      <span>·</span>
+   601→   601→                      <span>{timeAgo(a.createdAt)}</span>
+   602→   602→                      {a.module && (
+   603→   603→                        <>
+   604→   604→                          <span>·</span>
+   605→   605→                          <span className="px-1.5 py-0.5 rounded bg-cyan-50/80 text-teal-700 border border-teal-100">{a.module}</span>
+   606→   606→                        </>
+   607→   607→                      )}
+   608→   608→                    </div>
+   609→   609→                  </div>
+   610→   610→                </motion.li>
+   611→   611→              ))}
+   612→   612→            </AnimatePresence>
+   613→   613→          </ol>
+   614→   614→        )}
+   615→   615→      </div>
+   616→   616→    </motion.section>
+   617→   617→  )
+   618→   618→}
+   619→   619→
+   620→   620→/** Pending Tasks — HR-related action items. */
+   621→   621→function PendingTasksCard({
+   622→   622→  tasks, loading,
+   623→   623→}: {
+   624→   624→  tasks: ActionItem[]
+   625→   625→  loading: boolean
+   626→   626→}) {
+   627→   627→  return (
+   628→   628→    <motion.section
+   629→   629→      custom={2}
+   630→   630→      variants={cardEnter}
+   631→   631→      initial="hidden"
+   632→   632→      animate="visible"
+   633→   633→      className="glass glass-shimmer rounded-[20px] p-5"
+   634→   634→    >
+   635→   635→      <header className="flex items-start justify-between gap-3 mb-3">
+   636→   636→        <div>
+   637→   637→          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   638→   638→            <ClipboardList className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   639→   639→            Pending Tasks
+   640→   640→          </h2>
+   641→   641→          <p className="text-[10px] text-slate-700 mt-0.5">HR action items &amp; corrections</p>
+   642→   642→        </div>
+   643→   643→        {tasks.length > 0 && (
+   644→   644→          <span className="status-pill text-[9px] status-warning">
+   645→   645→            {tasks.length} open
+   646→   646→          </span>
+   647→   647→        )}
+   648→   648→      </header>
+   649→   649→
+   650→   650→      {loading && tasks.length === 0 ? (
+   651→   651→        <div className="space-y-2">
+   652→   652→          {Array.from({ length: 4 }).map((_, i) => (
+   653→   653→            <div key={i} className="h-14 rounded-xl bg-slate-200/60 animate-pulse" />
+   654→   654→          ))}
+   655→   655→        </div>
+   656→   656→      ) : tasks.length === 0 ? (
+   657→   657→        <div className="py-8 text-center">
+   658→   658→          <CircleCheck className="mx-auto h-8 w-8" style={{ color: TEAL_SECONDARY }} />
+   659→   659→          <p className="text-[11px] text-slate-700 mt-2 font-medium">All caught up</p>
+   660→   660→          <p className="text-[10px] text-slate-700">No HR tasks pending</p>
+   661→   661→        </div>
+   662→   662→      ) : (
+   663→   663→        <div className="space-y-2 max-h-[280px] overflow-y-auto scroll-elegant pr-1">
+   664→   664→          {tasks.map((t, i) => {
+   665→   665→            const sevColor = t.severity === 'critical' ? '#dc2626' : t.severity === 'warning' ? '#d97706' : TEAL_DEEP
+   666→   666→            return (
+   667→   667→              <motion.div
+   668→   668→                key={t.id}
+   669→   669→                initial={{ opacity: 0, y: 6 }}
+   670→   670→                animate={{ opacity: 1, y: 0 }}
+   671→   671→                transition={{ duration: 0.3, delay: i * 0.05 }}
+   672→   672→                className="glass-subtle rounded-xl p-3 hover:bg-white/70 transition-colors"
+   673→   673→              >
+   674→   674→                <div className="flex items-start gap-2.5">
+   675→   675→                  <span
+   676→   676→                    className="inline-flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 mt-0.5"
+   677→   677→                    style={{ background: `${sevColor}1a`, color: sevColor, border: `1px solid ${sevColor}33` }}
+   678→   678→                  >
+   679→   679→                    {t.type === 'CORRECTION' ? <AlertCircle className="h-3.5 w-3.5" /> :
+   680→   680→                     t.type === 'DRAFT_SUBMISSION' ? <ClipboardList className="h-3.5 w-3.5" /> :
+   681→   681→                     t.type === 'BRSR_GAP' ? <ShieldCheck className="h-3.5 w-3.5" /> :
+   682→   682→                     <ClipboardList className="h-3.5 w-3.5" />}
+   683→   683→                  </span>
+   684→   684→                  <div className="flex-1 min-w-0">
+   685→   685→                    <div className="flex items-center gap-2 flex-wrap">
+   686→   686→                      <span className="text-[12px] font-semibold text-slate-900 truncate">{t.title}</span>
+   687→   687→                      <span className="status-pill text-[8px]" style={{
+   688→   688→                        background: `${sevColor}1a`, color: sevColor, borderColor: `${sevColor}33`,
+   689→   689→                      }}>
+   690→   690→                        {t.severity}
+   691→   691→                      </span>
+   692→   692→                    </div>
+   693→   693→                    <p className="text-[10px] text-slate-700 mt-0.5 line-clamp-2">{t.description}</p>
+   694→   694→                    {t.dueDate && (
+   695→   695→                      <div className="text-[9px] text-slate-700 mt-1 flex items-center gap-1">
+   696→   696→                        <Clock className="h-2.5 w-2.5" />
+   697→   697→                        Due {new Date(t.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+   698→   698→                      </div>
+   699→   699→                    )}
+   700→   700→                  </div>
+   701→   701→                </div>
+   702→   702→              </motion.div>
+   703→   703→            )
+   704→   704→          })}
+   705→   705→        </div>
+   706→   706→      )}
+   707→   707→    </motion.section>
+   708→   708→  )
+   709→   709→}
+   710→   710→
+   711→   711→/* ============================================================
+   712→   712→ * Main component
+   713→   713→ * ============================================================ */
+   714→   714→export function HrDashboard() {
+   715→   715→  const [overview, setOverview] = useState<OverviewData | null>(null)
+   716→   716→  const [activities, setActivities] = useState<ActivityItem[]>([])
+   717→   717→  const [tasks, setTasks] = useState<ActionItem[]>([])
+   718→   718→  const [loading, setLoading] = useState(true)
+   719→   719→  const [error, setError] = useState('')
+   720→   720→  const mountedRef = useRef(true)
+   721→   721→
+   722→   722→  /* ---- fetchers ---- */
+   723→   723→  const fetchOverview = useCallback(async () => {
+   724→   724→    try {
+   725→   725→      const res = await fetch('/api/overview', { cache: 'no-store' })
+   726→   726→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+   727→   727→      const data = (await res.json()) as OverviewData
+   728→   728→      if (!mountedRef.current) return
+   729→   729→      setOverview(data)
+   730→   730→      setError('')
+   731→   731→    } catch (e) {
+   732→   732→      if (!mountedRef.current) return
+   733→   733→      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
+   734→   734→    }
+   735→   735→  }, [overview])
+   736→   736→
+   737→   737→  const fetchActivities = useCallback(async () => {
+   738→   738→    try {
+   739→   739→      const res = await fetch('/api/activity?take=10', { cache: 'no-store' })
+   740→   740→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+   741→   741→      const data = (await res.json()) as ActivityResponse
+   742→   742→      if (!mountedRef.current) return
+   743→   743→      const filtered = (Array.isArray(data.items) ? data.items : []).filter(isHrActivity).slice(0, 5)
+   744→   744→      setActivities(filtered)
+   745→   745→    } catch {
+   746→   746→      /* silent — keep existing feed on poll error */
+   747→   747→    }
+   748→   748→  }, [])
+   749→   749→
+   750→   750→  const fetchTasks = useCallback(async () => {
+   751→   751→    try {
+   752→   752→      const res = await fetch('/api/action-items', { cache: 'no-store' })
+   753→   753→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+   754→   754→      const data = (await res.json()) as ActionItemsResponse
+   755→   755→      if (!mountedRef.current) return
+   756→   756→      const filtered = (Array.isArray(data.tasks) ? data.tasks : []).filter(isHrTask).slice(0, 6)
+   757→   757→      setTasks(filtered)
+   758→   758→    } catch {
+   759→   759→      /* silent */
+   760→   760→    }
+   761→   761→  }, [])
+   762→   762→
+   763→   763→  /* ---- initial load ---- */
+   764→   764→  useEffect(() => {
+   765→   765→    mountedRef.current = true
+   766→   766→    ;(async () => {
+   767→   767→      setLoading(true)
+   768→   768→      await Promise.all([fetchOverview(), fetchActivities(), fetchTasks()])
+   769→   769→      if (mountedRef.current) setLoading(false)
+   770→   770→    })()
+   771→   771→    return () => { mountedRef.current = false }
+   772→   772→  }, [])
+   773→   773→
+   774→   774→  /* ---- polling: activity every 30s, overview every 60s, tasks every 60s ---- */
+   775→   775→  useEffect(() => {
+   776→   776→    const activityTimer = setInterval(fetchActivities, 30_000)
+   777→   777→    const overviewTimer = setInterval(fetchOverview, 60_000)
+   778→   778→    const tasksTimer = setInterval(fetchTasks, 60_000)
+   779→   779→    return () => {
+   780→   780→      clearInterval(activityTimer)
+   781→   781→      clearInterval(overviewTimer)
+   782→   782→      clearInterval(tasksTimer)
+   783→   783→    }
+   784→   784→  }, [fetchActivities, fetchOverview, fetchTasks])
+   785→   785→
+   786→   786→  const k = useMemo<Kpis | null>(() => {
+   787→   787→    if (!overview?.kpis) return null
+   788→   788→    return overview.kpis
+   789→   789→  }, [overview])
+   790→   790→
+   791→   791→  const completionPct = k?.completion ?? 0
+   792→   792→  const totalWorkforce = k?.totalWorkforce ?? 0
+   793→   793→
+   794→   794→  // ---- Loading skeleton ----
+   795→   795→  if (loading && !overview) {
+   796→   796→    return (
+   797→   797→      <div className="space-y-5">
+   798→   798→        <div className="glass rounded-[20px] h-16 animate-pulse" />
+   799→   799→        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,35%)]">
+   800→   800→          <div className="space-y-5">
+   801→   801→            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   802→   802→              {Array.from({ length: 4 }).map((_, i) => (
+   803→   803→                <div key={i} className="glass rounded-2xl h-[100px] animate-pulse" />
+   804→   804→              ))}
+   805→   805→            </div>
+   806→   806→            <div className="glass rounded-[20px] h-[320px] animate-pulse" />
+   807→   807→            <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+   808→   808→          </div>
+   809→   809→          <div className="space-y-5">
+   810→   810→            <div className="glass rounded-[20px] h-[320px] animate-pulse" />
+   811→   811→            <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+   812→   812→            <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+   813→   813→          </div>
+   814→   814→        </div>
+   815→   815→      </div>
+   816→   816→    )
+   817→   817→  }
+   818→   818→
+   819→   819→  // ---- Error state ----
+   820→   820→  if (error && !overview) {
+   821→   821→    return (
+   822→   822→      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   823→   823→        <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
+   824→   824→        <p className="text-[14px] font-semibold text-slate-900 mb-1">Unable to load HR dashboard</p>
+   825→   825→        <p className="text-[12px] text-slate-700 mb-4">{error}</p>
+   826→   826→        <button
+   827→   827→          onClick={() => window.location.reload()}
+   828→   828→          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   829→   829→        >
+   830→   830→          <RefreshCw className="h-3.5 w-3.5" /> Retry
+   831→   831→        </button>
+   832→   832→      </div>
+   833→   833→    )
+   834→   834→  }
+   835→   835→
+   836→   836→  // ---- Empty state ----
+   837→   837→  if (!overview || !k) {
+   838→   838→    return (
+   839→   839→      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   840→   840→        <Users className="h-10 w-10 mb-3" style={{ color: TEAL_PRIMARY }} />
+   841→   841→        <p className="text-[14px] font-semibold text-slate-900 mb-1">No workforce data yet</p>
+   842→   842→        <p className="text-[12px] text-slate-700 mb-4">Set up a reporting period to populate the HR dashboard.</p>
+   843→   843→        <button
+   844→   844→          onClick={() => window.location.reload()}
+   845→   845→          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   846→   846→        >
+   847→   847→          <RefreshCw className="h-3.5 w-3.5" /> Reload
+   848→   848→        </button>
+   849→   849→      </div>
+   850→   850→    )
+   851→   851→  }
+   852→   852→
+   853→   853→  return (
+   854→   854→    <div className="space-y-5">
+   855→   855→      {/* ---- Header ---- */}
+   856→   856→      <motion.header
+   857→   857→        custom={0}
+   858→   858→        variants={cardEnter}
+   859→   859→        initial="hidden"
+   860→   860→        animate="visible"
+   861→   861→        className="glass glass-shimmer rounded-[20px] px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
+   862→   862→      >
+   863→   863→        <div className="flex items-center gap-3">
+   864→   864→          <span
+   865→   865→            className="inline-flex h-9 w-9 items-center justify-center rounded-xl"
+   866→   866→            style={{
+   867→   867→              background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})`,
+   868→   868→              color: '#fff',
+   869→   869→              boxShadow: `0 4px 14px -3px ${TEAL_DEEP}80, inset 0 1px 1px rgba(255,255,255,0.4)`,
+   870→   870→            }}
+   871→   871→          >
+   872→   872→            <Users className="h-4.5 w-4.5" />
+   873→   873→          </span>
+   874→   874→          <div>
+   875→   875→            <h1 className="text-[18px] font-bold text-slate-900 tracking-tight">HR Workforce Dashboard</h1>
+   876→   876→            <p className="text-[11px] text-slate-700 mt-0.5">
+   877→   877→              {totalWorkforce.toLocaleString()} total workforce · live HR metrics
+   878→   878→            </p>
+   879→   879→          </div>
+   880→   880→        </div>
+   881→   881→        <div className="flex items-center gap-2 flex-wrap">
+   882→   882→          <span className="status-pill text-[10px] status-approved">
+   883→   883→            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+   884→   884→            Live
+   885→   885→          </span>
+   886→   886→          <div className="glass-subtle rounded-xl px-3 py-1.5 flex items-center gap-2">
+   887→   887→            <div className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Completion</div>
+   888→   888→            <div className="flex items-center gap-1.5">
+   889→   889→              <div className="h-1.5 w-20 rounded-full bg-slate-200/70 overflow-hidden">
+   890→   890→                <div
+   891→   891→                  className="h-full rounded-full"
+   892→   892→                  style={{
+   893→   893→                    width: `${completionPct}%`,
+   894→   894→                    background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
+   895→   895→                    boxShadow: `0 0 8px -1px ${TEAL_PRIMARY}80`,
+   896→   896→                  }}
+   897→   897→                />
+   898→   898→              </div>
+   899→   899→              <span className="text-[12px] font-bold text-slate-900 tabular-nums">{completionPct.toFixed(0)}%</span>
+   900→   900→            </div>
+   901→   901→          </div>
+   902→   902→        </div>
+   903→   903→      </motion.header>
+   904→   904→
+   905→   905→      {/* ---- 2-column grid (65 / 35) ---- */}
+   906→   906→      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,35%)]">
+   907→   907→        {/* LEFT 65% */}
+   908→   908→        <div className="space-y-5">
+   909→   909→          {/* 4 KPI tiles */}
+   910→   910→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   911→   911→            <HrKpiTile
+   912→   912→              icon={Users}
+   913→   913→              label="Total Employees"
+   914→   914→              value={formatNumber(k.totalEmployees, 0)}
+   915→   915→              unit="permanent + temp"
+   916→   916→              trend={{ dir: 'up', text: '+2.1%' }}
+   917→   917→            />
+   918→   918→            <HrKpiTile
+   919→   919→              icon={UserRound}
+   920→   920→              label="Total Workers"
+   921→   921→              value={formatNumber(k.totalWorkers, 0)}
+   922→   922→              unit="contract"
+   923→   923→              trend={{ dir: 'up', text: '+4.5%' }}
+   924→   924→            />
+   925→   925→            <HrKpiTile
+   926→   926→              icon={HeartHandshake}
+   927→   927→              label="Female Share"
+   928→   928→              value={k.femaleShare.toFixed(1)}
+   929→   929→              unit="%"
+   930→   930→              trend={{ dir: k.femaleShare >= 25 ? 'up' : 'down', text: `${k.femaleShare >= 25 ? '+' : ''}${(k.femaleShare - 22).toFixed(1)}%` }}
+   931→   931→            />
+   932→   932→            <HrKpiTile
+   933→   933→              icon={GraduationCap}
+   934→   934→              label="Training Hours"
+   935→   935→              value={formatNumber(k.trainingHours, 0)}
+   936→   936→              unit="h"
+   937→   937→              trend={{ dir: 'up', text: '+12.3%' }}
+   938→   938→            />
+   939→   939→          </div>
+   940→   940→
+   941→   941→          <EmployeeBreakdownCard k={k} />
+   942→   942→          <TrainingWellbeingCard k={k} />
+   943→   943→        </div>
+   944→   944→
+   945→   945→        {/* RIGHT 35% */}
+   946→   946→        <div className="space-y-5">
+   947→   947→          <GenderDiversityDonut k={k} />
+   948→   948→          <RecentHrActivitiesCard activities={activities} loading={loading} />
+   949→   949→          <PendingTasksCard tasks={tasks} loading={loading} />
+   950→   950→        </div>
+   951→   951→      </div>
+   952→   952→    </div>
+   953→   953→  )
+   954→   954→}
+   955→   955→

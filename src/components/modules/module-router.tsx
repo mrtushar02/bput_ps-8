@@ -10,6 +10,7 @@ import { AnalyticsModule } from '@/components/modules/analytics'
 import { AuditModule } from '@/components/modules/audit'
 import { AdminModule } from '@/components/modules/admin'
 import { TeamModule } from '@/components/modules/team'
+import { HrWorkspace } from '@/components/modules/hr-workspace'
 
 export function ModuleRouter() {
   const { activeModule, dataEntrySubModule } = useApp()
@@ -24,6 +25,11 @@ export function ModuleRouter() {
     case 'audit': return <AuditModule />
     case 'admin': return <AdminModule />
     case 'team': return <TeamModule />
+    case 'hr-workforce':
+    case 'hr-training':
+    case 'hr-wellbeing':
+    case 'hr-rights':
+      return <HrWorkspace />
     default: return <MyProjectModule />
   }
 }

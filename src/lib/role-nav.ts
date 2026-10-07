@@ -7,6 +7,7 @@ import {
   LayoutDashboard, Building2, FileText, Link2, Send, FileBarChart,
   TrendingUp, History, FileCheck2, Settings2, Users, ShieldCheck,
   Package, HeartHandshake, Scale, Briefcase, BarChart3, Gavel, Eye, Crown,
+  GraduationCap, HeartPulse,
   type LucideIcon,
 } from 'lucide-react'
 import type { ModuleKey } from '@/lib/auth-context'
@@ -46,14 +47,15 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'reports', label: 'Reports', icon: FileBarChart },
   ],
 
-  // HR User — workforce data focused
+  // HR User — 7 HR-specific tabs (NOT generic tabs)
   HR_USER: [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { key: 'my-project', label: 'Workforce', icon: Users },
-    { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
+    { key: 'hr-workforce', label: 'Workforce', icon: Users },
+    { key: 'hr-training', label: 'Training & Dev', icon: GraduationCap },
+    { key: 'hr-wellbeing', label: 'Wellbeing', icon: HeartPulse },
+    { key: 'hr-rights', label: 'Human Rights', icon: Scale },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
-    { key: 'team', label: 'Team', icon: Users },
   ],
 
   // EHS / Safety User — safety data focused

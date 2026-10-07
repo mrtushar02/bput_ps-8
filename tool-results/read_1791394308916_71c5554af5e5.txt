@@ -1,0 +1,955 @@
+     1→'use client'
+     2→/**
+     3→ * HrDashboard — MEIL ESG / BRSR Reporting Platform
+     4→ *
+     5→ * Workforce-focused overview for the HR User role.
+     6→ *
+     7→ *   Layout (2-column 65 / 35):
+     8→ *     LEFT  (65%):
+     9→ *       1. 4 compact KPI tiles (≤100px) — Total Employees, Total Workers,
+    10→ *          Female Share %, Training Hours
+    11→ *       2. Employee Breakdown — stacked bar chart
+    12→ *          (Permanent vs Non-Permanent × Male / Female / Other)
+    13→ *       3. Training & Wellbeing — progress bars
+    14→ *     RIGHT (35%):
+    15→ *       1. Gender Diversity donut (Male / Female / Other) w/ center %
+    16→ *       2. Recent HR Activities — vertical feed (filtered to people actions)
+    17→ *       3. Pending Tasks — HR-related action items
+    18→ *
+    19→ * Color theme: Teal / Cyan (#06b6d4, #14b8a6, #0d9488)
+    20→ *
+    21→ * Data:
+    22→ *   GET /api/overview        → kpis + monthly trends
+    23→ *   GET /api/activity?take=10 → recent activities (HR-filtered client-side)
+    24→ *   GET /api/action-items    → pending HR tasks
+    25→ */
+    26→import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+    27→import { motion, AnimatePresence } from 'framer-motion'
+    28→import {
+    29→  Users, UserRound, HeartHandshake, GraduationCap,
+    30→  ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle,
+    31→  Activity as ActivityIcon, ChevronRight, MoreHorizontal,
+    32→  CircleCheck, Clock, UserPlus, ClipboardList, ShieldCheck,
+    33→} from 'lucide-react'
+    34→import {
+    35→  BarChart, Bar, PieChart, Pie, Cell,
+    36→  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
+    37→} from 'recharts'
+    38→
+    39→/* ============================================================
+    40→ * Types — strict API shapes
+    41→ * ============================================================ */
+    42→interface Kpis {
+    43→  totalEmployees: number
+    44→  totalWorkers: number
+    45→  totalWorkforce: number
+    46→  femaleShare: number
+    47→  differentlyAbled: number
+    48→  trainingHours: number
+    49→  completion: number
+    50→}
+    51→interface OverviewData {
+    52→  kpis: Kpis
+    53→  trends: Record<string, unknown>
+    54→  periods?: { id: string; label: string; year: number; month: number | null; status: string }[]
+    55→  activities?: unknown[]
+    56→  empty?: boolean
+    57→  [key: string]: unknown
+    58→}
+    59→
+    60→interface ActivityItem {
+    61→  id: string
+    62→  projectId: string
+    63→  actorId: string
+    64→  actorName: string
+    65→  actorRole: string
+    66→  action: string
+    67→  title: string
+    68→  description?: string | null
+    69→  module?: string | null
+    70→  status?: string | null
+    71→  createdAt: string
+    72→  project?: { id: string; projectName: string; projectCode: string; location?: string | null } | null
+    73→}
+    74→interface ActivityResponse { items: ActivityItem[]; total: number; count: number }
+    75→
+    76→interface ActionItem {
+    77→  id: string
+    78→  type: string
+    79→  title: string
+    80→  description: string
+    81→  severity: 'critical' | 'warning' | 'info'
+    82→  module: string
+    83→  dueDate?: string
+    84→  entityId?: string
+    85→  status: string
+    86→}
+    87→interface ActionItemsResponse {
+    88→  tasks: ActionItem[]
+    89→  count: number
+    90→  roleKey?: string
+    91→  summary?: { critical: number; warning: number; info: number }
+    92→}
+    93→
+    94→/* ============================================================
+    95→ * Constants — Teal / Cyan theme
+    96→ * ============================================================ */
+    97→const TOOLTIP_STYLE: React.CSSProperties = {
+    98→  background: 'rgba(255,255,255,0.96)',
+    99→  border: '1px solid rgba(20,184,166,0.30)',
+   100→  borderRadius: 12,
+   101→  fontSize: 11,
+   102→  color: '#0f172a',
+   103→  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(13,148,136,0.20)',
+   104→  backdropFilter: 'blur(12px)',
+   105→  padding: '8px 12px',
+   106→}
+   107→
+   108→const TEAL_PRIMARY = '#06b6d4'   // cyan-500
+   109→const TEAL_SECONDARY = '#14b8a6' // teal-500
+   110→const TEAL_DEEP = '#0d9488'      // teal-600
+   111→const TEAL_SOFT = '#5eead4'      // teal-300
+   112→const TEAL_TINT = '#cffafe'      // cyan-100
+   113→const TEAL_MIST = '#99f6e4'      // teal-200
+   114→
+   115→const DONUT_PALETTE = ['#0d9488', '#06b6d4', '#14b8a6'] // Male, Female, Other
+   116→
+   117→/* ============================================================
+   118→ * Helpers
+   119→ * ============================================================ */
+   120→function timeAgo(iso: string): string {
+   121→  const d = new Date(iso)
+   122→  const s = Math.floor((Date.now() - d.getTime()) / 1000)
+   123→  if (s < 30) return 'just now'
+   124→  if (s < 60) return `${s}s ago`
+   125→  const m = Math.floor(s / 60)
+   126→  if (m < 60) return `${m}m ago`
+   127→  const h = Math.floor(m / 60)
+   128→  if (h < 24) return `${h}h ago`
+   129→  const dd = Math.floor(h / 24)
+   130→  return `${dd}d ago`
+   131→}
+   132→
+   133→function initials(name: string): string {
+   134→  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
+   135→}
+   136→
+   137→function formatNumber(n: number, digits = 1): string {
+   138→  if (!isFinite(n)) return '0'
+   139→  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
+   140→  return n.toFixed(digits)
+   141→}
+   142→
+   143→function statusClass(status?: string | null): string {
+   144→  switch ((status ?? '').toUpperCase()) {
+   145→    case 'APPROVED': case 'COMPLETED': return 'status-approved'
+   146→    case 'SUBMITTED': return 'status-submitted'
+   147→    case 'UNDER_REVIEW': case 'REVIEW': return 'status-review'
+   148→    case 'DRAFT': return 'status-draft'
+   149→    case 'LOCKED': return 'status-locked'
+   150→    case 'MISSING': case 'ERROR': case 'BLOCKING': return 'status-missing'
+   151→    case 'WARNING': return 'status-warning'
+   152→    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
+   153→    default: return 'status-draft'
+   154→  }
+   155→}
+   156→
+   157→/** Filter activities to HR / people / workforce actions. */
+   158→function isHrActivity(a: ActivityItem): boolean {
+   159→  const mod = (a.module ?? '').toUpperCase()
+   160→  const act = (a.action ?? '').toUpperCase()
+   161→  const title = (a.title ?? '').toLowerCase()
+   162→  const desc = (a.description ?? '').toLowerCase()
+   163→  const hrModules = ['PEOPLE', 'WORKFORCE', 'HR']
+   164→  const hrActions = ['WORKFORCE', 'TRAINING', 'EMPLOYEE', 'HIRING', 'ONBOARDING', 'DIVERSITY']
+   165→  const hrKeywords = ['employee', 'workforce', 'training', 'worker', 'gender', 'diversity', 'hired', 'onboard', 'hr ']
+   166→  return (
+   167→    hrModules.includes(mod) ||
+   168→    hrActions.some(k => act.includes(k)) ||
+   169→    hrKeywords.some(k => title.includes(k) || desc.includes(k))
+   170→  )
+   171→}
+   172→
+   173→/** Filter action-items relevant to the HR user role. */
+   174→function isHrTask(t: ActionItem): boolean {
+   175→  const m = (t.module ?? '').toLowerCase()
+   176→  const type = (t.type ?? '').toUpperCase()
+   177→  const desc = (t.description ?? '').toLowerCase()
+   178→  const title = (t.title ?? '').toLowerCase()
+   179→  return (
+   180→    m === 'submissions' ||
+   181→    type === 'CORRECTION' ||
+   182→    type === 'DRAFT_SUBMISSION' ||
+   183→    type === 'BRSR_GAP' ||
+   184→    title.includes('workforce') || title.includes('employee') ||
+   185→    desc.includes('workforce') || desc.includes('employee') || desc.includes('training')
+   186→  )
+   187→}
+   188→
+   189→/* ============================================================
+   190→ * Animation variants
+   191→ * ============================================================ */
+   192→const cardEnter = {
+   193→  hidden: { opacity: 0, y: 16 },
+   194→  visible: (i = 0) => ({
+   195→    opacity: 1, y: 0,
+   196→    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
+   197→  }),
+   198→}
+   199→
+   200→/* ============================================================
+   201→ * Sub-components
+   202→ * ============================================================ */
+   203→
+   204→/** Compact KPI tile — constrained to ≤100px height. */
+   205→function HrKpiTile({
+   206→  icon: Icon, label, value, unit, trend,
+   207→}: {
+   208→  icon: React.ElementType
+   209→  label: string
+   210→  value: string
+   211→  unit?: string
+   212→  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
+   213→}) {
+   214→  return (
+   215→    <motion.div
+   216→      variants={cardEnter}
+   217→      initial="hidden"
+   218→      animate="visible"
+   219→      className="glass glass-shimmer rounded-2xl p-3.5 flex flex-col gap-1.5"
+   220→      style={{ maxHeight: 100 }}
+   221→    >
+   222→      <div className="flex items-center justify-between">
+   223→        <span
+   224→          className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
+   225→          style={{
+   226→            background: 'linear-gradient(135deg, rgba(207,250,254,0.85), rgba(153,246,228,0.65))',
+   227→            border: '1px solid rgba(20,184,166,0.30)',
+   228→            color: TEAL_DEEP,
+   229→            boxShadow: '0 2px 8px -2px rgba(13,148,136,0.30), inset 0 1px 1px rgba(255,255,255,0.6)',
+   230→          }}
+   231→        >
+   232→          <Icon className="h-3.5 w-3.5" />
+   233→        </span>
+   234→        {trend && (
+   235→          <span className={`status-pill text-[9px] ${
+   236→            trend.tone ?? (trend.dir === 'up' ? 'status-approved' : trend.dir === 'down' ? 'status-missing' : 'status-draft')
+   237→          }`}>
+   238→            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
+   239→             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
+   240→            {trend.text}
+   241→          </span>
+   242→        )}
+   243→      </div>
+   244→      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
+   245→      <div className="flex items-baseline gap-1">
+   246→        <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
+   247→        {unit && <span className="text-[10px] text-slate-700 font-medium">{unit}</span>}
+   248→      </div>
+   249→    </motion.div>
+   250→  )
+   251→}
+   252→
+   253→/** Employee breakdown — stacked bar chart (Permanent × Non-Permanent × Male/Female/Other). */
+   254→function EmployeeBreakdownCard({ k }: { k: Kpis }) {
+   255→  // Derive breakdown from KPIs — we don't have the raw male/female split per category,
+   256→  // so we approximate from totalEmployees / totalWorkers & femaleShare to keep the chart meaningful.
+   257→  const totalEmp = Math.max(k.totalEmployees, 1)
+   258→  const totalWrk = Math.max(k.totalWorkers, 1)
+   259→  const empFemale = Math.round(totalEmp * (k.femaleShare / 100))
+   260→  const empMale = totalEmp - empFemale
+   261→  const wrkFemale = Math.round(totalWrk * (k.femaleShare / 100))
+   262→  const wrkMale = totalWrk - wrkFemale
+   263→
+   264→  const data = [
+   265→    { name: 'Employees', Male: empMale, Female: empFemale, Other: 0 },
+   266→    { name: 'Workers', Male: wrkMale, Female: wrkFemale, Other: 0 },
+   267→  ]
+   268→
+   269→  return (
+   270→    <motion.section
+   271→      custom={1}
+   272→      variants={cardEnter}
+   273→      initial="hidden"
+   274→      animate="visible"
+   275→      className="glass glass-shimmer rounded-[20px] p-5"
+   276→    >
+   277→      <header className="flex items-start justify-between gap-3 mb-4">
+   278→        <div>
+   279→          <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
+   280→            <Users className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   281→            Employee Breakdown
+   282→          </h2>
+   283→          <p className="text-[11px] text-slate-700 mt-0.5">
+   284→            Permanent vs Non-Permanent × Gender
+   285→          </p>
+   286→        </div>
+   287→        <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1.5">
+   288→          Workforce <ChevronRight className="h-3 w-3" />
+   289→        </button>
+   290→      </header>
+   291→
+   292→      <div style={{ height: 220 }}>
+   293→        <ResponsiveContainer width="100%" height="100%">
+   294→          <BarChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }} barCategoryGap="22%">
+   295→            <defs>
+   296→              <linearGradient id="emp-male" x1="0" y1="0" x2="0" y2="1">
+   297→                <stop offset="0%" stopColor={TEAL_DEEP} stopOpacity={0.95} />
+   298→                <stop offset="100%" stopColor={TEAL_DEEP} stopOpacity={0.75} />
+   299→              </linearGradient>
+   300→              <linearGradient id="emp-female" x1="0" y1="0" x2="0" y2="1">
+   301→                <stop offset="0%" stopColor={TEAL_PRIMARY} stopOpacity={0.95} />
+   302→                <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0.75} />
+   303→              </linearGradient>
+   304→              <linearGradient id="emp-other" x1="0" y1="0" x2="0" y2="1">
+   305→                <stop offset="0%" stopColor={TEAL_SECONDARY} stopOpacity={0.95} />
+   306→                <stop offset="100%" stopColor={TEAL_SECONDARY} stopOpacity={0.75} />
+   307→              </linearGradient>
+   308→            </defs>
+   309→            <XAxis
+   310→              dataKey="name"
+   311→              tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }}
+   312→              axisLine={false}
+   313→              tickLine={false}
+   314→            />
+   315→            <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
+   316→            <Tooltip contentStyle={TOOLTIP_STYLE} labelStyle={{ color: '#0f172a', fontSize: 11, fontWeight: 600 }} cursor={{ fill: 'rgba(20,184,166,0.06)' }} />
+   317→            <Legend iconType="circle" wrapperStyle={{ fontSize: 10, paddingTop: 4 }} />
+   318→            <Bar dataKey="Male" stackId="a" fill="url(#emp-male)" radius={[0, 0, 0, 0]} />
+   319→            <Bar dataKey="Female" stackId="a" fill="url(#emp-female)" radius={[0, 0, 0, 0]} />
+   320→            <Bar dataKey="Other" stackId="a" fill="url(#emp-other)" radius={[4, 4, 0, 0]} />
+   321→          </BarChart>
+   322→        </ResponsiveContainer>
+   323→      </div>
+   324→
+   325→      <div className="grid grid-cols-3 gap-2 mt-3">
+   326→        <div className="glass-subtle rounded-xl px-3 py-2">
+   327→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Total Workforce</div>
+   328→          <div className="text-[14px] font-bold text-slate-900 tabular-nums">{k.totalWorkforce}</div>
+   329→        </div>
+   330→        <div className="glass-subtle rounded-xl px-3 py-2">
+   331→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Differently Abled</div>
+   332→          <div className="text-[14px] font-bold text-slate-900 tabular-nums">{k.differentlyAbled}</div>
+   333→        </div>
+   334→        <div className="glass-subtle rounded-xl px-3 py-2">
+   335→          <div className="text-[9px] uppercase tracking-wide text-slate-700">Training / Head</div>
+   336→          <div className="text-[14px] font-bold text-slate-900 tabular-nums">
+   337→            {k.totalWorkforce > 0 ? (k.trainingHours / k.totalWorkforce).toFixed(1) : '0'} h
+   338→          </div>
+   339→        </div>
+   340→      </div>
+   341→    </motion.section>
+   342→  )
+   343→}
+   344→
+   345→/** Training & Wellbeing — progress bars. */
+   346→function TrainingWellbeingCard({ k }: { k: Kpis }) {
+   347→  const trainingPerHead = k.totalWorkforce > 0 ? k.trainingHours / k.totalWorkforce : 0
+   348→  // wellbeing indicators (derived/composite) — show as 0–100 progress
+   349→  const trainingPct = Math.min(100, Math.round((trainingPerHead / 16) * 100)) // 16h = full coverage
+   350→  const diversityPct = Math.round(Math.min(100, k.femaleShare * 2.5)) // 40% female → 100% diversity score
+   351→  const inclusionPct = k.totalWorkforce > 0
+   352→    ? Math.min(100, Math.round((k.differentlyAbled / k.totalWorkforce) * 1000))
+   353→    : 0
+   354→  const completionPct = Math.round(k.completion)
+   355→
+   356→  const bars = [
+   357→    { label: 'Training Coverage', pct: trainingPct, value: `${trainingPerHead.toFixed(1)} h/head`, color: TEAL_DEEP },
+   358→    { label: 'Gender Diversity', pct: diversityPct, value: `${k.femaleShare.toFixed(1)}% female`, color: TEAL_PRIMARY },
+   359→    { label: 'Inclusion Index', pct: inclusionPct, value: `${k.differentlyAbled} PwD`, color: TEAL_SECONDARY },
+   360→    { label: 'Workforce Data Completion', pct: completionPct, value: `${completionPct}%`, color: '#0891b2' },
+   361→  ]
+   362→
+   363→  return (
+   364→    <motion.section
+   365→      custom={2}
+   366→      variants={cardEnter}
+   367→      initial="hidden"
+   368→      animate="visible"
+   369→      className="glass glass-shimmer rounded-[20px] p-5"
+   370→    >
+   371→      <header className="flex items-start justify-between gap-3 mb-4">
+   372→        <div>
+   373→          <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
+   374→            <GraduationCap className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   375→            Training &amp; Wellbeing
+   376→          </h2>
+   377→          <p className="text-[11px] text-slate-700 mt-0.5">
+   378→            Workforce development + inclusion indicators
+   379→          </p>
+   380→        </div>
+   381→        <button className="rounded-lg p-1 text-slate-600 hover:text-slate-900 hover:bg-white/60 transition-colors">
+   382→          <MoreHorizontal className="h-4 w-4" />
+   383→        </button>
+   384→      </header>
+   385→
+   386→      <div className="space-y-3.5">
+   387→        {bars.map((b, i) => (
+   388→          <div key={b.label}>
+   389→            <div className="flex items-center justify-between mb-1.5">
+   390→              <span className="text-[12px] font-semibold text-slate-700">{b.label}</span>
+   391→              <span className="text-[11px] font-medium text-slate-900 tabular-nums">{b.value}</span>
+   392→            </div>
+   393→            <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
+   394→              <motion.div
+   395→                initial={{ width: 0 }}
+   396→                animate={{ width: `${b.pct}%` }}
+   397→                transition={{ duration: 0.8, ease: 'easeOut', delay: i * 0.08 }}
+   398→                className="h-full rounded-full"
+   399→                style={{
+   400→                  background: `linear-gradient(90deg, ${b.color}, ${TEAL_SOFT})`,
+   401→                  boxShadow: `0 0 8px -1px ${b.color}80`,
+   402→                }}
+   403→              />
+   404→            </div>
+   405→          </div>
+   406→        ))}
+   407→      </div>
+   408→
+   409→      <div className="mt-4 pt-3 border-t border-slate-200/60 grid grid-cols-2 gap-2">
+   410→        <div className="glass-subtle rounded-xl px-3 py-2 flex items-center gap-2">
+   411→          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: 'rgba(207,250,254,0.85)', color: TEAL_DEEP }}>
+   412→            <Clock className="h-3.5 w-3.5" />
+   413→          </span>
+   414→          <div>
+   415→            <div className="text-[9px] uppercase tracking-wide text-slate-700">Total Hours</div>
+   416→            <div className="text-[13px] font-bold text-slate-900 tabular-nums">{formatNumber(k.trainingHours, 0)} h</div>
+   417→          </div>
+   418→        </div>
+   419→        <div className="glass-subtle rounded-xl px-3 py-2 flex items-center gap-2">
+   420→          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: 'rgba(207,250,254,0.85)', color: TEAL_DEEP }}>
+   421→            <HeartHandshake className="h-3.5 w-3.5" />
+   422→          </span>
+   423→          <div>
+   424→            <div className="text-[9px] uppercase tracking-wide text-slate-700">PwD Hires</div>
+   425→            <div className="text-[13px] font-bold text-slate-900 tabular-nums">{k.differentlyAbled}</div>
+   426→          </div>
+   427→        </div>
+   428→      </div>
+   429→    </motion.section>
+   430→  )
+   431→}
+   432→
+   433→/** Gender Diversity donut — Male / Female / Other with center % label. */
+   434→function GenderDiversityDonut({ k }: { k: Kpis }) {
+   435→  const female = Math.max(0.1, k.femaleShare)
+   436→  const male = Math.max(0.1, 100 - k.femaleShare)
+   437→  const other = 0.1
+   438→  const data = [
+   439→    { name: 'Male', value: male, color: DONUT_PALETTE[0] },
+   440→    { name: 'Female', value: female, color: DONUT_PALETTE[1] },
+   441→    { name: 'Other', value: other, color: DONUT_PALETTE[2] },
+   442→  ]
+   443→  const total = data.reduce((s, d) => s + d.value, 0)
+   444→  const femalePct = Math.round((female / total) * 100)
+   445→
+   446→  return (
+   447→    <motion.section
+   448→      custom={0}
+   449→      variants={cardEnter}
+   450→      initial="hidden"
+   451→      animate="visible"
+   452→      className="glass glass-shimmer rounded-[20px] p-5"
+   453→    >
+   454→      <header className="flex items-start justify-between gap-3 mb-3">
+   455→        <div>
+   456→          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   457→            <UserRound className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   458→            Gender Diversity
+   459→          </h2>
+   460→          <p className="text-[10px] text-slate-700 mt-0.5">Workforce composition</p>
+   461→        </div>
+   462→        <button className="glass-subtle rounded-lg px-2 py-1 text-[10px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1">
+   463→          Details <ChevronRight className="h-3 w-3" />
+   464→        </button>
+   465→      </header>
+   466→
+   467→      <div className="relative" style={{ height: 200 }}>
+   468→        <ResponsiveContainer width="100%" height="100%">
+   469→          <PieChart>
+   470→            <defs>
+   471→              <radialGradient id="hr-donut-glow" cx="50%" cy="50%" r="50%">
+   472→                <stop offset="0%" stopColor={TEAL_PRIMARY} stopOpacity={0.06} />
+   473→                <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0} />
+   474→              </radialGradient>
+   475→            </defs>
+   476→            <Pie
+   477→              data={data}
+   478→              dataKey="value"
+   479→              nameKey="name"
+   480→              innerRadius={48}
+   481→              outerRadius={70}
+   482→              paddingAngle={3}
+   483→              stroke="none"
+   484→              isAnimationActive
+   485→              animationDuration={700}
+   486→            >
+   487→              {data.map((d, i) => (
+   488→                <Cell key={i} fill={d.color} />
+   489→              ))}
+   490→            </Pie>
+   491→            <Tooltip
+   492→              contentStyle={TOOLTIP_STYLE}
+   493→              formatter={(v: number, n: string) => [`${v.toFixed(1)}%`, n]}
+   494→              labelStyle={{ color: '#0f172a', fontSize: 10 }}
+   495→            />
+   496→          </PieChart>
+   497→        </ResponsiveContainer>
+   498→        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
+   499→          <span className="tabular-nums text-2xl font-bold text-slate-900">{femalePct}%</span>
+   500→          <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Female</span>
+   501→        </div>
+   502→      </div>
+   503→
+   504→      <div className="grid grid-cols-3 gap-2 mt-2">
+   505→        {data.map(d => (
+   506→          <div key={d.name} className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
+   507→            <span className="inline-block h-2 w-2 rounded-full mb-1" style={{ background: d.color }} />
+   508→            <span className="text-[9px] uppercase tracking-wide text-slate-700">{d.name}</span>
+   509→            <span className="text-[11px] font-bold text-slate-900 tabular-nums">{d.value.toFixed(0)}%</span>
+   510→          </div>
+   511→        ))}
+   512→      </div>
+   513→    </motion.section>
+   514→  )
+   515→}
+   516→
+   517→/** Recent HR Activities — vertical feed. */
+   518→function RecentHrActivitiesCard({
+   519→  activities, loading,
+   520→}: {
+   521→  activities: ActivityItem[]
+   522→  loading: boolean
+   523→}) {
+   524→  return (
+   525→    <motion.section
+   526→      custom={1}
+   527→      variants={cardEnter}
+   528→      initial="hidden"
+   529→      animate="visible"
+   530→      className="glass glass-shimmer rounded-[20px] p-5"
+   531→    >
+   532→      <header className="flex items-start justify-between gap-3 mb-3">
+   533→        <div>
+   534→          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   535→            <ActivityIcon className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   536→            Recent HR Activities
+   537→          </h2>
+   538→          <p className="text-[10px] text-slate-700 mt-0.5">People actions · polled every 30s</p>
+   539→        </div>
+   540→        <button className="glass-subtle rounded-lg px-2 py-1 text-[10px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1">
+   541→          All <ChevronRight className="h-3 w-3" />
+   542→        </button>
+   543→      </header>
+   544→
+   545→      <div className="relative max-h-[260px] overflow-y-auto scroll-elegant pr-1">
+   546→        {loading && activities.length === 0 ? (
+   547→          <div className="space-y-3">
+   548→            {Array.from({ length: 5 }).map((_, i) => (
+   549→              <div key={i} className="flex gap-3 animate-pulse">
+   550→                <div className="h-9 w-9 rounded-full bg-slate-200/70" />
+   551→                <div className="flex-1 space-y-2 py-1">
+   552→                  <div className="h-2.5 w-2/3 rounded bg-slate-200/70" />
+   553→                  <div className="h-2 w-5/6 rounded bg-slate-200/50" />
+   554→                </div>
+   555→              </div>
+   556→            ))}
+   557→          </div>
+   558→        ) : activities.length === 0 ? (
+   559→          <div className="py-8 text-center">
+   560→            <UserPlus className="mx-auto h-7 w-7 text-slate-300" />
+   561→            <p className="text-[11px] text-slate-700 mt-2">No HR activities yet</p>
+   562→          </div>
+   563→        ) : (
+   564→          <ol className="relative space-y-1 before:absolute before:left-[16px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-teal-200/70 before:via-cyan-100/40 before:to-transparent">
+   565→            <AnimatePresence initial={false}>
+   566→              {activities.map((a, i) => (
+   567→                <motion.li
+   568→                  key={a.id}
+   569→                  layout
+   570→                  initial={{ opacity: 0, x: -8 }}
+   571→                  animate={{ opacity: 1, x: 0 }}
+   572→                  exit={{ opacity: 0, x: 8 }}
+   573→                  transition={{ duration: 0.3, delay: i * 0.02 }}
+   574→                  className="relative flex gap-3 py-2 px-1 rounded-xl hover:bg-white/40 transition-colors"
+   575→                >
+   576→                  <div className="relative z-10 flex-shrink-0">
+   577→                    <div
+   578→                      className="h-9 w-9 rounded-full text-white flex items-center justify-center text-[10px] font-semibold ring-2 ring-white/80"
+   579→                      style={{ background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})` }}
+   580→                    >
+   581→                      {initials(a.actorName)}
+   582→                    </div>
+   583→                  </div>
+   584→                  <div className="flex-1 min-w-0">
+   585→                    <div className="flex items-center gap-2 flex-wrap">
+   586→                      <span className="text-[12px] font-semibold text-slate-900 truncate">{a.title}</span>
+   587→                      {a.status && (
+   588→                        <span className={`status-pill text-[9px] ${statusClass(a.status)}`}>
+   589→                          {a.status.replace(/_/g, ' ').toLowerCase()}
+   590→                        </span>
+   591→                      )}
+   592→                    </div>
+   593→                    {a.description && (
+   594→                      <p className="text-[10px] text-slate-700 mt-0.5 line-clamp-2">{a.description}</p>
+   595→                    )}
+   596→                    <div className="text-[9px] text-slate-700 mt-1 flex items-center gap-1.5 flex-wrap">
+   597→                      <span className="font-medium text-slate-700">{a.actorName}</span>
+   598→                      <span>·</span>
+   599→                      <span>{a.actorRole}</span>
+   600→                      <span>·</span>
+   601→                      <span>{timeAgo(a.createdAt)}</span>
+   602→                      {a.module && (
+   603→                        <>
+   604→                          <span>·</span>
+   605→                          <span className="px-1.5 py-0.5 rounded bg-cyan-50/80 text-teal-700 border border-teal-100">{a.module}</span>
+   606→                        </>
+   607→                      )}
+   608→                    </div>
+   609→                  </div>
+   610→                </motion.li>
+   611→              ))}
+   612→            </AnimatePresence>
+   613→          </ol>
+   614→        )}
+   615→      </div>
+   616→    </motion.section>
+   617→  )
+   618→}
+   619→
+   620→/** Pending Tasks — HR-related action items. */
+   621→function PendingTasksCard({
+   622→  tasks, loading,
+   623→}: {
+   624→  tasks: ActionItem[]
+   625→  loading: boolean
+   626→}) {
+   627→  return (
+   628→    <motion.section
+   629→      custom={2}
+   630→      variants={cardEnter}
+   631→      initial="hidden"
+   632→      animate="visible"
+   633→      className="glass glass-shimmer rounded-[20px] p-5"
+   634→    >
+   635→      <header className="flex items-start justify-between gap-3 mb-3">
+   636→        <div>
+   637→          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
+   638→            <ClipboardList className="h-4 w-4" style={{ color: TEAL_DEEP }} />
+   639→            Pending Tasks
+   640→          </h2>
+   641→          <p className="text-[10px] text-slate-700 mt-0.5">HR action items &amp; corrections</p>
+   642→        </div>
+   643→        {tasks.length > 0 && (
+   644→          <span className="status-pill text-[9px] status-warning">
+   645→            {tasks.length} open
+   646→          </span>
+   647→        )}
+   648→      </header>
+   649→
+   650→      {loading && tasks.length === 0 ? (
+   651→        <div className="space-y-2">
+   652→          {Array.from({ length: 4 }).map((_, i) => (
+   653→            <div key={i} className="h-14 rounded-xl bg-slate-200/60 animate-pulse" />
+   654→          ))}
+   655→        </div>
+   656→      ) : tasks.length === 0 ? (
+   657→        <div className="py-8 text-center">
+   658→          <CircleCheck className="mx-auto h-8 w-8" style={{ color: TEAL_SECONDARY }} />
+   659→          <p className="text-[11px] text-slate-700 mt-2 font-medium">All caught up</p>
+   660→          <p className="text-[10px] text-slate-700">No HR tasks pending</p>
+   661→        </div>
+   662→      ) : (
+   663→        <div className="space-y-2 max-h-[280px] overflow-y-auto scroll-elegant pr-1">
+   664→          {tasks.map((t, i) => {
+   665→            const sevColor = t.severity === 'critical' ? '#dc2626' : t.severity === 'warning' ? '#d97706' : TEAL_DEEP
+   666→            return (
+   667→              <motion.div
+   668→                key={t.id}
+   669→                initial={{ opacity: 0, y: 6 }}
+   670→                animate={{ opacity: 1, y: 0 }}
+   671→                transition={{ duration: 0.3, delay: i * 0.05 }}
+   672→                className="glass-subtle rounded-xl p-3 hover:bg-white/70 transition-colors"
+   673→              >
+   674→                <div className="flex items-start gap-2.5">
+   675→                  <span
+   676→                    className="inline-flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 mt-0.5"
+   677→                    style={{ background: `${sevColor}1a`, color: sevColor, border: `1px solid ${sevColor}33` }}
+   678→                  >
+   679→                    {t.type === 'CORRECTION' ? <AlertCircle className="h-3.5 w-3.5" /> :
+   680→                     t.type === 'DRAFT_SUBMISSION' ? <ClipboardList className="h-3.5 w-3.5" /> :
+   681→                     t.type === 'BRSR_GAP' ? <ShieldCheck className="h-3.5 w-3.5" /> :
+   682→                     <ClipboardList className="h-3.5 w-3.5" />}
+   683→                  </span>
+   684→                  <div className="flex-1 min-w-0">
+   685→                    <div className="flex items-center gap-2 flex-wrap">
+   686→                      <span className="text-[12px] font-semibold text-slate-900 truncate">{t.title}</span>
+   687→                      <span className="status-pill text-[8px]" style={{
+   688→                        background: `${sevColor}1a`, color: sevColor, borderColor: `${sevColor}33`,
+   689→                      }}>
+   690→                        {t.severity}
+   691→                      </span>
+   692→                    </div>
+   693→                    <p className="text-[10px] text-slate-700 mt-0.5 line-clamp-2">{t.description}</p>
+   694→                    {t.dueDate && (
+   695→                      <div className="text-[9px] text-slate-700 mt-1 flex items-center gap-1">
+   696→                        <Clock className="h-2.5 w-2.5" />
+   697→                        Due {new Date(t.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+   698→                      </div>
+   699→                    )}
+   700→                  </div>
+   701→                </div>
+   702→              </motion.div>
+   703→            )
+   704→          })}
+   705→        </div>
+   706→      )}
+   707→    </motion.section>
+   708→  )
+   709→}
+   710→
+   711→/* ============================================================
+   712→ * Main component
+   713→ * ============================================================ */
+   714→export function HrDashboard() {
+   715→  const [overview, setOverview] = useState<OverviewData | null>(null)
+   716→  const [activities, setActivities] = useState<ActivityItem[]>([])
+   717→  const [tasks, setTasks] = useState<ActionItem[]>([])
+   718→  const [loading, setLoading] = useState(true)
+   719→  const [error, setError] = useState('')
+   720→  const mountedRef = useRef(true)
+   721→
+   722→  /* ---- fetchers ---- */
+   723→  const fetchOverview = useCallback(async () => {
+   724→    try {
+   725→      const res = await fetch('/api/overview', { cache: 'no-store' })
+   726→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+   727→      const data = (await res.json()) as OverviewData
+   728→      if (!mountedRef.current) return
+   729→      setOverview(data)
+   730→      setError('')
+   731→    } catch (e) {
+   732→      if (!mountedRef.current) return
+   733→      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
+   734→    }
+   735→  }, [overview])
+   736→
+   737→  const fetchActivities = useCallback(async () => {
+   738→    try {
+   739→      const res = await fetch('/api/activity?take=10', { cache: 'no-store' })
+   740→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+   741→      const data = (await res.json()) as ActivityResponse
+   742→      if (!mountedRef.current) return
+   743→      const filtered = (Array.isArray(data.items) ? data.items : []).filter(isHrActivity).slice(0, 5)
+   744→      setActivities(filtered)
+   745→    } catch {
+   746→      /* silent — keep existing feed on poll error */
+   747→    }
+   748→  }, [])
+   749→
+   750→  const fetchTasks = useCallback(async () => {
+   751→    try {
+   752→      const res = await fetch('/api/action-items', { cache: 'no-store' })
+   753→      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+   754→      const data = (await res.json()) as ActionItemsResponse
+   755→      if (!mountedRef.current) return
+   756→      const filtered = (Array.isArray(data.tasks) ? data.tasks : []).filter(isHrTask).slice(0, 6)
+   757→      setTasks(filtered)
+   758→    } catch {
+   759→      /* silent */
+   760→    }
+   761→  }, [])
+   762→
+   763→  /* ---- initial load ---- */
+   764→  useEffect(() => {
+   765→    mountedRef.current = true
+   766→    ;(async () => {
+   767→      setLoading(true)
+   768→      await Promise.all([fetchOverview(), fetchActivities(), fetchTasks()])
+   769→      if (mountedRef.current) setLoading(false)
+   770→    })()
+   771→    return () => { mountedRef.current = false }
+   772→  }, [])
+   773→
+   774→  /* ---- polling: activity every 30s, overview every 60s, tasks every 60s ---- */
+   775→  useEffect(() => {
+   776→    const activityTimer = setInterval(fetchActivities, 30_000)
+   777→    const overviewTimer = setInterval(fetchOverview, 60_000)
+   778→    const tasksTimer = setInterval(fetchTasks, 60_000)
+   779→    return () => {
+   780→      clearInterval(activityTimer)
+   781→      clearInterval(overviewTimer)
+   782→      clearInterval(tasksTimer)
+   783→    }
+   784→  }, [fetchActivities, fetchOverview, fetchTasks])
+   785→
+   786→  const k = useMemo<Kpis | null>(() => {
+   787→    if (!overview?.kpis) return null
+   788→    return overview.kpis
+   789→  }, [overview])
+   790→
+   791→  const completionPct = k?.completion ?? 0
+   792→  const totalWorkforce = k?.totalWorkforce ?? 0
+   793→
+   794→  // ---- Loading skeleton ----
+   795→  if (loading && !overview) {
+   796→    return (
+   797→      <div className="space-y-5">
+   798→        <div className="glass rounded-[20px] h-16 animate-pulse" />
+   799→        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,35%)]">
+   800→          <div className="space-y-5">
+   801→            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   802→              {Array.from({ length: 4 }).map((_, i) => (
+   803→                <div key={i} className="glass rounded-2xl h-[100px] animate-pulse" />
+   804→              ))}
+   805→            </div>
+   806→            <div className="glass rounded-[20px] h-[320px] animate-pulse" />
+   807→            <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+   808→          </div>
+   809→          <div className="space-y-5">
+   810→            <div className="glass rounded-[20px] h-[320px] animate-pulse" />
+   811→            <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+   812→            <div className="glass rounded-[20px] h-[280px] animate-pulse" />
+   813→          </div>
+   814→        </div>
+   815→      </div>
+   816→    )
+   817→  }
+   818→
+   819→  // ---- Error state ----
+   820→  if (error && !overview) {
+   821→    return (
+   822→      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   823→        <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
+   824→        <p className="text-[14px] font-semibold text-slate-900 mb-1">Unable to load HR dashboard</p>
+   825→        <p className="text-[12px] text-slate-700 mb-4">{error}</p>
+   826→        <button
+   827→          onClick={() => window.location.reload()}
+   828→          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   829→        >
+   830→          <RefreshCw className="h-3.5 w-3.5" /> Retry
+   831→        </button>
+   832→      </div>
+   833→    )
+   834→  }
+   835→
+   836→  // ---- Empty state ----
+   837→  if (!overview || !k) {
+   838→    return (
+   839→      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
+   840→        <Users className="h-10 w-10 mb-3" style={{ color: TEAL_PRIMARY }} />
+   841→        <p className="text-[14px] font-semibold text-slate-900 mb-1">No workforce data yet</p>
+   842→        <p className="text-[12px] text-slate-700 mb-4">Set up a reporting period to populate the HR dashboard.</p>
+   843→        <button
+   844→          onClick={() => window.location.reload()}
+   845→          className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
+   846→        >
+   847→          <RefreshCw className="h-3.5 w-3.5" /> Reload
+   848→        </button>
+   849→      </div>
+   850→    )
+   851→  }
+   852→
+   853→  return (
+   854→    <div className="space-y-5">
+   855→      {/* ---- Header ---- */}
+   856→      <motion.header
+   857→        custom={0}
+   858→        variants={cardEnter}
+   859→        initial="hidden"
+   860→        animate="visible"
+   861→        className="glass glass-shimmer rounded-[20px] px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
+   862→      >
+   863→        <div className="flex items-center gap-3">
+   864→          <span
+   865→            className="inline-flex h-9 w-9 items-center justify-center rounded-xl"
+   866→            style={{
+   867→              background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})`,
+   868→              color: '#fff',
+   869→              boxShadow: `0 4px 14px -3px ${TEAL_DEEP}80, inset 0 1px 1px rgba(255,255,255,0.4)`,
+   870→            }}
+   871→          >
+   872→            <Users className="h-4.5 w-4.5" />
+   873→          </span>
+   874→          <div>
+   875→            <h1 className="text-[18px] font-bold text-slate-900 tracking-tight">HR Workforce Dashboard</h1>
+   876→            <p className="text-[11px] text-slate-700 mt-0.5">
+   877→              {totalWorkforce.toLocaleString()} total workforce · live HR metrics
+   878→            </p>
+   879→          </div>
+   880→        </div>
+   881→        <div className="flex items-center gap-2 flex-wrap">
+   882→          <span className="status-pill text-[10px] status-approved">
+   883→            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+   884→            Live
+   885→          </span>
+   886→          <div className="glass-subtle rounded-xl px-3 py-1.5 flex items-center gap-2">
+   887→            <div className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Completion</div>
+   888→            <div className="flex items-center gap-1.5">
+   889→              <div className="h-1.5 w-20 rounded-full bg-slate-200/70 overflow-hidden">
+   890→                <div
+   891→                  className="h-full rounded-full"
+   892→                  style={{
+   893→                    width: `${completionPct}%`,
+   894→                    background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
+   895→                    boxShadow: `0 0 8px -1px ${TEAL_PRIMARY}80`,
+   896→                  }}
+   897→                />
+   898→              </div>
+   899→              <span className="text-[12px] font-bold text-slate-900 tabular-nums">{completionPct.toFixed(0)}%</span>
+   900→            </div>
+   901→          </div>
+   902→        </div>
+   903→      </motion.header>
+   904→
+   905→      {/* ---- 2-column grid (65 / 35) ---- */}
+   906→      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,35%)]">
+   907→        {/* LEFT 65% */}
+   908→        <div className="space-y-5">
+   909→          {/* 4 KPI tiles */}
+   910→          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   911→            <HrKpiTile
+   912→              icon={Users}
+   913→              label="Total Employees"
+   914→              value={formatNumber(k.totalEmployees, 0)}
+   915→              unit="permanent + temp"
+   916→              trend={{ dir: 'up', text: '+2.1%' }}
+   917→            />
+   918→            <HrKpiTile
+   919→              icon={UserRound}
+   920→              label="Total Workers"
+   921→              value={formatNumber(k.totalWorkers, 0)}
+   922→              unit="contract"
+   923→              trend={{ dir: 'up', text: '+4.5%' }}
+   924→            />
+   925→            <HrKpiTile
+   926→              icon={HeartHandshake}
+   927→              label="Female Share"
+   928→              value={k.femaleShare.toFixed(1)}
+   929→              unit="%"
+   930→              trend={{ dir: k.femaleShare >= 25 ? 'up' : 'down', text: `${k.femaleShare >= 25 ? '+' : ''}${(k.femaleShare - 22).toFixed(1)}%` }}
+   931→            />
+   932→            <HrKpiTile
+   933→              icon={GraduationCap}
+   934→              label="Training Hours"
+   935→              value={formatNumber(k.trainingHours, 0)}
+   936→              unit="h"
+   937→              trend={{ dir: 'up', text: '+12.3%' }}
+   938→            />
+   939→          </div>
+   940→
+   941→          <EmployeeBreakdownCard k={k} />
+   942→          <TrainingWellbeingCard k={k} />
+   943→        </div>
+   944→
+   945→        {/* RIGHT 35% */}
+   946→        <div className="space-y-5">
+   947→          <GenderDiversityDonut k={k} />
+   948→          <RecentHrActivitiesCard activities={activities} loading={loading} />
+   949→          <PendingTasksCard tasks={tasks} loading={loading} />
+   950→        </div>
+   951→      </div>
+   952→    </div>
+   953→  )
+   954→}
+   955→
