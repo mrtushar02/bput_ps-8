@@ -28,7 +28,6 @@ const ROLE_NAV: Record<string, NavItem[]> = {
   // Super Admin — full system access
   SUPER_ADMIN: [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { key: 'my-project', label: 'My Project', icon: Building2 },
     { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
@@ -42,7 +41,6 @@ const ROLE_NAV: Record<string, NavItem[]> = {
   // Project / Site User — data entry focused
   PROJECT_USER: [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { key: 'my-project', label: 'My Project', icon: Building2 },
     { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
     { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
     { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },

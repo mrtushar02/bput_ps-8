@@ -60,7 +60,6 @@ type ModuleEntry = {
 
 const MODULES: ModuleEntry[] = [
   { key: 'overview',   label: 'Overview',     icon: LayoutDashboard, shortcut: 'G O', desc: 'Group-wide ESG dashboard' },
-  { key: 'my-project', label: 'My Project',   icon: Building2,       shortcut: 'G P', desc: 'Project-scoped control center' },
   { key: 'data-entry', label: 'Data Entry',   icon: FileText,         shortcut: 'G D', desc: 'Capture source data + run engines' },
   { key: 'evidence',   label: 'Evidence',     icon: Link2,            shortcut: 'G E', desc: 'Evidence vault + verification' },
   { key: 'submissions',label: 'Submissions',  icon: Send,             shortcut: 'G S', desc: 'Workflow + approval chain' },
@@ -216,7 +215,7 @@ export function CommandPalette({ initialQuery, openExternally, onConsumed }: { i
         label: p.projectName,
         description: `${p.projectCode}${p.location ? ' · ' + p.location : ''}`,
         icon: Building2,
-        run: () => go('my-project'),
+        run: () => go('data-entry'),
       }))
 
     return [...navItems, ...qaItems, ...projItems]

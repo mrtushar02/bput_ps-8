@@ -39,7 +39,7 @@ export function ModuleRouter() {
     case 'fin-activity':
       return <FinanceWorkspace />
     // Shared modules
-    case 'my-project': return <MyProjectModule />
+    case 'my-project': return <DataEntryModule subModule={dataEntrySubModule} />
     case 'data-entry': return <DataEntryModule subModule={dataEntrySubModule} />
     case 'evidence': return <EvidenceModule />
     case 'submissions': return <SubmissionsModule />
@@ -88,6 +88,6 @@ export function ModuleRouter() {
     // Executive workspace
     case 'exec-enterprise': case 'exec-brsr': case 'exec-risks': case 'exec-trends': case 'exec-bus': case 'exec-assurance':
       return <ExecutiveWorkspace />
-    default: return <MyProjectModule />
+    default: return <DataEntryModule subModule={dataEntrySubModule} />
   }
 }
