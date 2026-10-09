@@ -1071,12 +1071,18 @@ function RolePickerScreen({
     { id: 'leadership', label: 'Leadership & Board', count: roles.filter(r => r.phase === 3 && r.category === 'leadership').length, icon: Crown },
   ]
 
-  // Responsive dynamic card width class so all 7 cards fit on screen for Phase 1
+  // Responsive dynamic card width and gap so all 7 cards fit completely without clipping
   const cardWidthClass = displayedRoles.length >= 7
-    ? 'w-[138px] sm:w-[148px] md:w-[156px] lg:w-[164px] xl:w-[172px] shrink-0'
+    ? 'w-[124px] sm:w-[132px] md:w-[138px] lg:w-[145px] xl:w-[150px] shrink-0'
     : displayedRoles.length <= 3
-      ? 'w-[185px] sm:w-[200px] lg:w-[218px] shrink-0'
-      : 'w-[160px] sm:w-[172px] lg:w-[185px] shrink-0'
+      ? 'w-[185px] sm:w-[205px] lg:w-[220px] shrink-0'
+      : 'w-[155px] sm:w-[168px] lg:w-[180px] shrink-0'
+
+  const cardGapClass = displayedRoles.length >= 7
+    ? 'gap-1.5 sm:gap-2 lg:gap-2.5'
+    : displayedRoles.length <= 3
+      ? 'gap-5 sm:gap-6 lg:gap-8'
+      : 'gap-3 sm:gap-4 lg:gap-5'
 
   return (
     <div className="relative flex w-full flex-col items-center justify-between py-2 sm:py-3">
@@ -1151,14 +1157,14 @@ function RolePickerScreen({
       {/* Horizontal Carousel Track with Mouse Scroll + Touch Drag + Chevrons */}
       <div 
         onWheel={handleWheel}
-        className="relative w-full flex items-center justify-center gap-2 sm:gap-3 lg:gap-4 my-3 sm:my-5 px-1 select-none"
+        className="relative w-full max-w-[1360px] mx-auto flex items-center justify-center gap-2 sm:gap-3 lg:gap-4 my-2 sm:my-3 px-2 sm:px-4 select-none"
       >
         {/* Left Circular Arrow Button */}
         <button
           onClick={prevPage}
           aria-label="Previous phase slide"
           title="Previous Phase"
-          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/85 border border-white/95 shadow-sm backdrop-blur-md text-slate-500 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all cursor-pointer z-10"
+          className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-white/90 border border-white shadow-md shadow-sky-500/10 backdrop-blur-md text-slate-600 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all cursor-pointer z-20"
         >
           <ChevronLeft className="h-5 w-5 stroke-[2.2]" />
         </button>
@@ -1171,7 +1177,7 @@ function RolePickerScreen({
             if (info.offset.x < -50) nextPage()
             else if (info.offset.x > 50) prevPage()
           }}
-          className="flex items-center justify-center gap-2 sm:gap-2.5 lg:gap-3 xl:gap-3.5 flex-nowrap cursor-grab active:cursor-grabbing max-w-full overflow-x-auto scrollbar-none py-3 px-1"
+          className={`flex items-center justify-center ${cardGapClass} flex-nowrap cursor-grab active:cursor-grabbing max-w-full overflow-x-auto sm:overflow-visible scrollbar-none py-4 px-1`}
         >
           <AnimatePresence mode="popLayout">
             {displayedRoles.map((r, idx) => {
@@ -1184,7 +1190,7 @@ function RolePickerScreen({
                   onMouseEnter={() => setHovered(r.key)}
                   onMouseLeave={() => setHovered(null)}
                   onClick={() => onPick(r)}
-                  initial={{ opacity: 0, y: 22, scale: 0.93 }}
+                  initial={{ opacity: 0, y: 20, scale: 0.93 }}
                   animate={{ 
                     opacity: 1, 
                     y: isHighlighted ? -16 : 0, 
@@ -1198,11 +1204,11 @@ function RolePickerScreen({
                     delay: idx * 0.025 
                   }}
                   whileHover={{ 
-                    y: isHighlighted ? -22 : -10, 
-                    scale: isHighlighted ? 1.04 : 1.025 
+                    y: isHighlighted ? -20 : -8, 
+                    scale: isHighlighted ? 1.03 : 1.02 
                   }}
                   whileTap={{ scale: 0.96 }}
-                  className={`group relative flex cursor-pointer flex-col items-center justify-between rounded-[28px] p-4 text-center transition-all duration-300 ${cardWidthClass} h-[270px] sm:h-[280px] lg:h-[286px] ${
+                  className={`group relative flex cursor-pointer flex-col items-center justify-between rounded-[24px] sm:rounded-[26px] p-3 sm:p-3.5 text-center transition-all duration-300 ${cardWidthClass} h-[255px] sm:h-[262px] lg:h-[270px] ${
                     isHighlighted
                       ? 'bg-white/95 border-2 border-[#60A5FA] z-10 shadow-[0_36px_85px_-8px_rgba(37,99,235,0.44),0_16px_36px_-4px_rgba(37,99,235,0.28),inset_0_2px_4px_rgba(255,255,255,1)] ring-4 ring-blue-400/20'
                       : 'bg-white/80 border border-white/90 shadow-[0_16px_36px_-8px_rgba(2,132,199,0.18),0_4px_14px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.95)] hover:bg-white/95 hover:border-sky-300 hover:shadow-[0_28px_65px_-8px_rgba(2,132,199,0.34),0_12px_24px_-4px_rgba(14,165,233,0.22),inset_0_2px_4px_rgba(255,255,255,1)]'
@@ -1212,28 +1218,28 @@ function RolePickerScreen({
                   <motion.div 
                     whileHover={{ scale: 1.15, rotate: [0, -4, 4, 0] }}
                     transition={{ duration: 0.3 }}
-                    className={`mb-3 flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-[18px] transition-colors duration-200 ${
+                    className={`mb-2.5 flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-[16px] transition-colors duration-200 ${
                       isHighlighted 
                         ? 'bg-[#E0EFFE] text-[#2563EB] shadow-md shadow-blue-500/20' 
                         : 'bg-[#EBF4FE] text-[#2563EB] group-hover:bg-[#E0EFFE]'
                     }`}
                   >
-                    <Icon className="h-6 w-6 stroke-[1.8] text-[#2563EB]" />
+                    <Icon className="h-5.5 w-5.5 stroke-[1.8] text-[#2563EB]" />
                   </motion.div>
 
                   {/* Role Title */}
-                  <h3 className="text-xs sm:text-[13px] lg:text-[13.5px] font-extrabold text-[#0F172A] leading-tight mb-1.5 group-hover:text-blue-700 transition-colors">
+                  <h3 className="text-[11.5px] sm:text-[12px] lg:text-[12.5px] font-extrabold text-[#0F172A] leading-tight mb-1 group-hover:text-blue-700 transition-colors">
                     {r.role}
                   </h3>
 
                   {/* Description */}
-                  <p className="text-[10px] sm:text-[10.5px] leading-relaxed text-slate-500 font-normal px-0.5 line-clamp-2">
+                  <p className="text-[9px] sm:text-[9.5px] lg:text-[10px] leading-snug text-slate-500 font-normal px-0.5 line-clamp-2">
                     {r.blurb}
                   </p>
 
                   {/* Subtle Phase Pill */}
-                  <div className="mt-auto pt-2.5">
-                    <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                  <div className="mt-auto pt-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[8.5px] font-bold uppercase tracking-wider ${
                       isHighlighted ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600'
                     }`}>
                       Phase {r.phase}
@@ -1250,7 +1256,7 @@ function RolePickerScreen({
           onClick={nextPage}
           aria-label="Next phase slide"
           title="Next Phase"
-          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/85 border border-white/95 shadow-sm backdrop-blur-md text-slate-500 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all cursor-pointer z-10"
+          className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full bg-white/90 border border-white shadow-md shadow-sky-500/10 backdrop-blur-md text-slate-600 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all cursor-pointer z-20"
         >
           <ChevronRight className="h-5 w-5 stroke-[2.2]" />
         </button>
