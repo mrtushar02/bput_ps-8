@@ -9,7 +9,7 @@
  *  4. LOGIN MORPH (Instant demo authentication)
  */
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, ArrowLeft, Building2, Leaf, Users, ShieldCheck,
@@ -28,6 +28,7 @@ import {
 } from '@/lib/meil-portfolio'
 
 type Stage = 'welcome' | 'project' | 'role' | 'login'
+type RoleCategory = 'all' | 'operations' | 'approvals' | 'governance' | 'leadership'
 
 interface RoleCardDef {
   key: string
@@ -35,27 +36,28 @@ interface RoleCardDef {
   email: string
   role: string
   phase: 1 | 2 | 3
+  category: 'operations' | 'approvals' | 'governance' | 'leadership'
   icon: typeof Building2
   tint: string
   blurb: string
 }
 
 const ROLES: RoleCardDef[] = [
-  { key: 'PROJECT_USER', name: 'Rohit Kumar', email: 'rohit@meil-esg.in', role: 'Project / Site User', phase: 1, icon: Building2, tint: 'from-sky-500 to-blue-600', blurb: 'Site operations & daily ESG metrics' },
-  { key: 'HR_USER', name: 'Sunita Rao', email: 'sunita@meil-esg.in', role: 'HR User', phase: 1, icon: Users, tint: 'from-cyan-500 to-teal-600', blurb: 'Human resources & workforce welfare metrics' },
-  { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS / Safety User', phase: 1, icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Environment, Health & Safety incident reports' },
-  { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement User', phase: 1, icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Supply chain sustainability & vendor ESG scores' },
-  { key: 'CSR_USER', name: 'Imran Sheikh', email: 'imran@meil-esg.in', role: 'CSR / Community User', phase: 1, icon: Heart, tint: 'from-rose-500 to-pink-600', blurb: 'Community outreach & CSR initiatives' },
-  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance User', phase: 1, icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Regulatory reporting & framework compliance' },
+  { key: 'PROJECT_USER', name: 'Rohit Kumar', email: 'rohit@meil-esg.in', role: 'Project / Site User', phase: 1, category: 'operations', icon: Building2, tint: 'from-sky-500 to-blue-600', blurb: 'Site operations & daily ESG metrics' },
+  { key: 'HR_USER', name: 'Sunita Rao', email: 'sunita@meil-esg.in', role: 'HR User', phase: 1, category: 'operations', icon: Users, tint: 'from-cyan-500 to-teal-600', blurb: 'Human resources & workforce welfare metrics' },
+  { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS / Safety User', phase: 1, category: 'operations', icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Environment, Health & Safety incident reports' },
+  { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement User', phase: 1, category: 'operations', icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Supply chain sustainability & vendor ESG scores' },
+  { key: 'CSR_USER', name: 'Imran Sheikh', email: 'imran@meil-esg.in', role: 'CSR / Community User', phase: 1, category: 'operations', icon: Heart, tint: 'from-rose-500 to-pink-600', blurb: 'Community outreach & CSR initiatives' },
+  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance User', phase: 1, category: 'governance', icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Regulatory reporting & framework compliance' },
   // Page 2 & subsequent roles
-  { key: 'SUPER_ADMIN', name: 'Arjun Mehta', email: 'admin@meil-esg.in', role: 'Super Admin', phase: 3, icon: Settings2, tint: 'from-slate-500 to-slate-700', blurb: 'Full enterprise data & user administration' },
-  { key: 'BU_REVIEWER', name: 'Rakesh Verma', email: 'rakesh@meil-esg.in', role: 'Business Unit Reviewer', phase: 2, icon: FileCheck, tint: 'from-blue-500 to-indigo-600', blurb: 'BU-level technical validation & review approval' },
-  { key: 'SUBSIDIARY_REVIEWER', name: 'Nisha Pillai', email: 'nisha@meil-esg.in', role: 'Subsidiary Reviewer', phase: 2, icon: Briefcase, tint: 'from-indigo-500 to-blue-700', blurb: 'Subsidiary consolidation & sign-off review' },
-  { key: 'GROUP_REVIEWER', name: 'Vikram Shah', email: 'vikram@meil-esg.in', role: 'Group / HQ Reviewer', phase: 2, icon: Gavel, tint: 'from-blue-600 to-cyan-700', blurb: 'Conglomerate-level sign-off & audit lock' },
-  { key: 'ESG_MANAGER', name: 'Anita Desai', email: 'anita@meil-esg.in', role: 'ESG Manager', phase: 3, icon: BarChart3, tint: 'from-teal-500 to-emerald-600', blurb: 'Data completeness, emission factors & GHG calculation' },
-  { key: 'BRSR_MANAGER', name: 'Meena Iyer', email: 'meena@meil-esg.in', role: 'BRSR Lead Manager', phase: 3, icon: FileCheck, tint: 'from-emerald-600 to-teal-700', blurb: 'SEBI BRSR Core disclosures & report generation' },
-  { key: 'AUDITOR', name: 'Karthik S.', email: 'karthik@meil-esg.in', role: 'Assurance Auditor', phase: 3, icon: Eye, tint: 'from-slate-600 to-gray-700', blurb: 'Read-only assurance testing & audit trail' },
-  { key: 'EXECUTIVE', name: 'Rajesh Khanna', email: 'rajesh@meil-esg.in', role: 'Executive Board', phase: 3, icon: Crown, tint: 'from-amber-600 to-yellow-700', blurb: 'Strategic ESG metrics, risks & executive dashboards' },
+  { key: 'SUPER_ADMIN', name: 'Arjun Mehta', email: 'admin@meil-esg.in', role: 'Super Admin', phase: 3, category: 'leadership', icon: Settings2, tint: 'from-slate-500 to-slate-700', blurb: 'Full enterprise data & user administration' },
+  { key: 'BU_REVIEWER', name: 'Rakesh Verma', email: 'rakesh@meil-esg.in', role: 'Business Unit Reviewer', phase: 2, category: 'approvals', icon: FileCheck, tint: 'from-blue-500 to-indigo-600', blurb: 'BU-level technical validation & review approval' },
+  { key: 'SUBSIDIARY_REVIEWER', name: 'Nisha Pillai', email: 'nisha@meil-esg.in', role: 'Subsidiary Reviewer', phase: 2, category: 'approvals', icon: Briefcase, tint: 'from-indigo-500 to-blue-700', blurb: 'Subsidiary consolidation & sign-off review' },
+  { key: 'GROUP_REVIEWER', name: 'Vikram Shah', email: 'vikram@meil-esg.in', role: 'Group / HQ Reviewer', phase: 2, category: 'approvals', icon: Gavel, tint: 'from-blue-600 to-cyan-700', blurb: 'Conglomerate-level sign-off & audit lock' },
+  { key: 'ESG_MANAGER', name: 'Anita Desai', email: 'anita@meil-esg.in', role: 'ESG Manager', phase: 3, category: 'governance', icon: BarChart3, tint: 'from-teal-500 to-emerald-600', blurb: 'Data completeness, emission factors & GHG calculation' },
+  { key: 'BRSR_MANAGER', name: 'Meena Iyer', email: 'meena@meil-esg.in', role: 'BRSR Lead Manager', phase: 3, category: 'governance', icon: FileCheck, tint: 'from-emerald-600 to-teal-700', blurb: 'SEBI BRSR Core disclosures & report generation' },
+  { key: 'AUDITOR', name: 'Karthik S.', email: 'karthik@meil-esg.in', role: 'Assurance Auditor', phase: 3, category: 'leadership', icon: Eye, tint: 'from-slate-600 to-gray-700', blurb: 'Read-only assurance testing & audit trail' },
+  { key: 'EXECUTIVE', name: 'Rajesh Khanna', email: 'rajesh@meil-esg.in', role: 'Executive Board', phase: 3, category: 'leadership', icon: Crown, tint: 'from-amber-600 to-yellow-700', blurb: 'Strategic ESG metrics, risks & executive dashboards' },
 ]
 
 const PHASE_LABELS = {
@@ -974,27 +976,71 @@ function RolePickerScreen({
   onPick: (r: RoleCardDef) => void
   onBack: () => void
 }) {
+  const [selectedCategory, setSelectedCategory] = useState<RoleCategory>('all')
   const [currentPage, setCurrentPage] = useState(0)
   const pageSize = 6
-  const totalPages = Math.ceil(roles.length / pageSize)
+  const wheelLockRef = useRef<boolean>(false)
+
+  // Filter roles based on selected category tab
+  const filteredRoles = useMemo(() => {
+    if (selectedCategory === 'all') return roles
+    return roles.filter(r => r.category === selectedCategory)
+  }, [roles, selectedCategory])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / pageSize))
+
+  // Ensure current page is valid when category changes
+  useEffect(() => {
+    if (currentPage >= totalPages) {
+      setCurrentPage(0)
+    }
+  }, [totalPages, currentPage])
 
   const displayedRoles = useMemo(() => {
     const start = currentPage * pageSize
-    return roles.slice(start, start + pageSize)
-  }, [roles, currentPage, pageSize])
+    return filteredRoles.slice(start, start + pageSize)
+  }, [filteredRoles, currentPage, pageSize])
 
   const nextPage = () => setCurrentPage(prev => (prev + 1) % totalPages)
   const prevPage = () => setCurrentPage(prev => (prev - 1 + totalPages) % totalPages)
 
+  // Mouse wheel scroll handler: enables natural horizontal paging on wheel
+  const handleWheel = (e: React.WheelEvent) => {
+    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
+    if (Math.abs(delta) < 18) return
+    if (wheelLockRef.current) return
+
+    wheelLockRef.current = true
+    setTimeout(() => {
+      wheelLockRef.current = false
+    }, 280)
+
+    if (delta > 0) {
+      nextPage()
+    } else {
+      prevPage()
+    }
+  }
+
   // Active highlighted card index for carousel dots & elevation
-  // Defaults to 4th index (CSR / Community User) on page 0 if not hovering another card
   const activeIndex = useMemo(() => {
     if (hovered) {
       const idx = displayedRoles.findIndex(r => r.key === hovered)
       if (idx !== -1) return idx
     }
-    return currentPage === 0 ? 4 : 0
-  }, [hovered, displayedRoles, currentPage])
+    // Default to CSR_USER if on page 0 of 'all' or 'operations', else first card
+    const csrIdx = displayedRoles.findIndex(r => r.key === 'CSR_USER')
+    if (csrIdx !== -1) return csrIdx
+    return 0
+  }, [hovered, displayedRoles])
+
+  const ROLE_CATEGORIES: { id: RoleCategory; label: string; count: number; icon: typeof Globe }[] = [
+    { id: 'all', label: 'All Roles', count: roles.length, icon: Globe },
+    { id: 'operations', label: 'Site Operations', count: roles.filter(r => r.category === 'operations').length, icon: Building2 },
+    { id: 'approvals', label: 'Review & Approvals', count: roles.filter(r => r.category === 'approvals').length, icon: FileCheck },
+    { id: 'governance', label: 'BRSR & Governance', count: roles.filter(r => r.category === 'governance').length, icon: Scale },
+    { id: 'leadership', label: 'Leadership & Board', count: roles.filter(r => r.category === 'leadership').length, icon: Crown },
+  ]
 
   return (
     <div className="relative flex w-full flex-col items-center justify-between py-2 sm:py-3">
@@ -1018,71 +1064,150 @@ function RolePickerScreen({
         </p>
       </div>
 
-      {/* Horizontal Carousel Track with Circular Chevrons */}
-      <div className="relative w-full flex items-center justify-center gap-2 sm:gap-4 lg:gap-5 my-6 sm:my-8 px-2">
+      {/* Categorize Cards Options (Filter Pills Bar) */}
+      <div className="flex items-center justify-center gap-2 overflow-x-auto py-1 px-2 my-2 sm:my-3 max-w-full">
+        {ROLE_CATEGORIES.map(cat => {
+          const isSelected = selectedCategory === cat.id
+          const CatIcon = cat.icon
+          return (
+            <button
+              key={cat.id}
+              onClick={() => {
+                setSelectedCategory(cat.id)
+                setCurrentPage(0)
+              }}
+              className={`group flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                isSelected
+                  ? 'bg-gradient-to-r from-blue-600 via-sky-500 to-blue-700 text-white shadow-md shadow-blue-500/25 scale-[1.03]'
+                  : 'bg-white/70 backdrop-blur-md border border-white/80 text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-xs'
+              }`}
+            >
+              <CatIcon className={`h-3.5 w-3.5 transition-transform group-hover:scale-110 ${isSelected ? 'text-white' : 'text-sky-600'}`} />
+              <span>{cat.label}</span>
+              <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold ${
+                isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
+              }`}>
+                {cat.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Horizontal Carousel Track with Mouse Scroll + Touch Drag + Chevrons */}
+      <div 
+        onWheel={handleWheel}
+        className="relative w-full flex items-center justify-center gap-2 sm:gap-4 lg:gap-5 my-4 sm:my-6 px-2 select-none"
+      >
         {/* Left Circular Arrow Button */}
         <button
           onClick={prevPage}
+          disabled={totalPages <= 1}
           aria-label="Previous roles"
-          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all"
+          className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all ${
+            totalPages <= 1 ? 'opacity-40 cursor-not-allowed' : ''
+          }`}
         >
           <ChevronLeft className="h-5 w-5 stroke-[2]" />
         </button>
 
-        {/* 6 Role Cards in Row */}
-        <div className="flex items-center justify-center gap-3 sm:gap-4 lg:gap-5 flex-wrap sm:flex-nowrap">
-          {displayedRoles.map((r, idx) => {
-            const Icon = r.icon
-            const isHighlighted = idx === activeIndex
+        {/* 6 Role Cards in Row with Motion Animations & Drag / Wheel Scroll */}
+        <motion.div 
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          onDragEnd={(_e, info) => {
+            if (info.offset.x < -50) nextPage()
+            else if (info.offset.x > 50) prevPage()
+          }}
+          className="flex items-center justify-center gap-3 sm:gap-4 lg:gap-5 flex-wrap sm:flex-nowrap cursor-grab active:cursor-grabbing"
+        >
+          <AnimatePresence mode="popLayout">
+            {displayedRoles.map((r, idx) => {
+              const Icon = r.icon
+              const isHighlighted = idx === activeIndex
 
-            return (
-              <motion.div
-                key={r.key}
-                onMouseEnter={() => setHovered(r.key)}
-                onMouseLeave={() => setHovered(null)}
-                onClick={() => onPick(r)}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: idx * 0.03 }}
-                className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-[28px] p-5 text-center transition-all duration-300 ${
-                  isHighlighted
-                    ? 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/95 border-2 border-[#60A5FA] -translate-y-4 z-10 shadow-[0_28px_60px_-10px_rgba(37,99,235,0.38),0_12px_24px_-6px_rgba(37,99,235,0.22)]'
-                    : 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/75 border border-white/90 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.03),0_2px_6px_-1px_rgba(0,0,0,0.02)] hover:-translate-y-2 hover:bg-white/90 hover:border-sky-300 hover:shadow-[0_20px_45px_-8px_rgba(37,99,235,0.22)]'
-                }`}
-              >
-                {/* Top Squircle Icon */}
-                <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] transition-transform duration-200 group-hover:scale-105 ${
-                  isHighlighted ? 'bg-[#E0EFFE]' : 'bg-[#EBF4FE]'
-                }`}>
-                  <Icon className="h-7 w-7 stroke-[1.8] text-[#2563EB]" />
-                </div>
+              return (
+                <motion.div
+                  key={r.key}
+                  onMouseEnter={() => setHovered(r.key)}
+                  onMouseLeave={() => setHovered(null)}
+                  onClick={() => onPick(r)}
+                  initial={{ opacity: 0, y: 24, scale: 0.94 }}
+                  animate={{ 
+                    opacity: 1, 
+                    y: isHighlighted ? -16 : 0, 
+                    scale: isHighlighted ? 1.02 : 1 
+                  }}
+                  exit={{ opacity: 0, y: -20, scale: 0.92 }}
+                  transition={{ 
+                    type: 'spring', 
+                    stiffness: 300, 
+                    damping: 24, 
+                    delay: idx * 0.03 
+                  }}
+                  whileHover={{ 
+                    y: isHighlighted ? -22 : -10, 
+                    scale: isHighlighted ? 1.04 : 1.025 
+                  }}
+                  whileTap={{ scale: 0.96 }}
+                  className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-[28px] p-5 text-center transition-all duration-300 ${
+                    isHighlighted
+                      ? 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/95 border-2 border-[#60A5FA] z-10 shadow-[0_36px_85px_-8px_rgba(37,99,235,0.44),0_16px_36px_-4px_rgba(37,99,235,0.28),inset_0_2px_4px_rgba(255,255,255,1)] ring-4 ring-blue-400/20'
+                      : 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/80 border border-white/90 shadow-[0_16px_36px_-8px_rgba(2,132,199,0.18),0_4px_14px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.95)] hover:bg-white/95 hover:border-sky-300 hover:shadow-[0_28px_65px_-8px_rgba(2,132,199,0.34),0_12px_24px_-4px_rgba(14,165,233,0.22),inset_0_2px_4px_rgba(255,255,255,1)]'
+                  }`}
+                >
+                  {/* Top Squircle Icon with Motion Pulse */}
+                  <motion.div 
+                    whileHover={{ scale: 1.15, rotate: [0, -4, 4, 0] }}
+                    transition={{ duration: 0.3 }}
+                    className={`mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] transition-colors duration-200 ${
+                      isHighlighted 
+                        ? 'bg-[#E0EFFE] text-[#2563EB] shadow-md shadow-blue-500/20' 
+                        : 'bg-[#EBF4FE] text-[#2563EB] group-hover:bg-[#E0EFFE]'
+                    }`}
+                  >
+                    <Icon className="h-7 w-7 stroke-[1.8] text-[#2563EB]" />
+                  </motion.div>
 
-                {/* Role Title */}
-                <h3 className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] leading-tight mb-2">
-                  {r.role}
-                </h3>
+                  {/* Role Title */}
+                  <h3 className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] leading-tight mb-2 group-hover:text-blue-700 transition-colors">
+                    {r.role}
+                  </h3>
 
-                {/* Description */}
-                <p className="text-[11px] leading-relaxed text-slate-500 font-normal px-1 line-clamp-2">
-                  {r.blurb}
-                </p>
-              </motion.div>
-            )
-          })}
-        </div>
+                  {/* Description */}
+                  <p className="text-[11px] leading-relaxed text-slate-500 font-normal px-1 line-clamp-2">
+                    {r.blurb}
+                  </p>
+
+                  {/* Subtle Phase Pill */}
+                  <div className="mt-3">
+                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                      isHighlighted ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600'
+                    }`}>
+                      Phase {r.phase}
+                    </span>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </motion.div>
 
         {/* Right Circular Arrow Button */}
         <button
           onClick={nextPage}
+          disabled={totalPages <= 1}
           aria-label="Next roles"
-          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all"
+          className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all ${
+            totalPages <= 1 ? 'opacity-40 cursor-not-allowed' : ''
+          }`}
         >
           <ChevronRight className="h-5 w-5 stroke-[2]" />
         </button>
       </div>
 
-      {/* Pagination Dots Matching Screenshot */}
-      <div className="my-4 flex items-center justify-center gap-2">
+      {/* Pagination Dots with Smooth Indicator */}
+      <div className="my-3 flex items-center justify-center gap-2">
         {displayedRoles.map((r, i) => {
           const isDotActive = i === activeIndex
           return (
@@ -1100,8 +1225,15 @@ function RolePickerScreen({
         })}
       </div>
 
+      {/* Mouse Scroll / Drag Hint */}
+      <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold text-slate-400 mb-1">
+        <span>Scroll mouse wheel or drag horizontally to browse roles</span>
+        <span>•</span>
+        <span>Page {currentPage + 1} of {totalPages}</span>
+      </div>
+
       {/* Bottom Slogan Matching Screenshot */}
-      <div className="mt-2 text-center text-xs font-medium tracking-wide text-slate-400">
+      <div className="mt-1 text-center text-xs font-medium tracking-wide text-slate-400">
         Together for a Cleaner, Safer and More Responsible Tomorrow
       </div>
     </div>
