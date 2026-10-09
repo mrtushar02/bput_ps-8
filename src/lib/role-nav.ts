@@ -51,6 +51,18 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'reports', label: 'Reports', icon: FileBarChart },
   ],
 
+  // Finance & Resource Data Contributor — 8 dedicated tabs matching reference screenshot
+  FINANCE_USER: [
+    { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { key: 'fin-assignments', label: 'My Assignments', icon: ClipboardList, badgeTone: 'blue' },
+    { key: 'fin-data', label: 'Financial Data', icon: FileText, badgeTone: 'green' },
+    { key: 'fin-expenditure', label: 'Resource Expenditure', icon: Leaf },
+    { key: 'fin-evidence', label: 'Evidence & Documents', icon: Link2, badgeTone: 'blue' },
+    { key: 'fin-submissions', label: 'My Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'fin-reports', label: 'Reports & Exports', icon: FileBarChart },
+    { key: 'fin-activity', label: 'Activity Log', icon: History },
+  ],
+
   // HR User — 7 HR-specific tabs (NOT generic tabs)
   HR_USER: [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },

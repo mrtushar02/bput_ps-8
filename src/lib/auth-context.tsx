@@ -34,6 +34,7 @@ export type ModuleKey =
   | 'aud-engagements' | 'aud-scope' | 'aud-evidence' | 'aud-testing' | 'aud-brsr-testing' | 'aud-findings' | 'aud-requests' | 'aud-responses' | 'aud-status' | 'aud-reports'
   | 'exec-enterprise' | 'exec-brsr' | 'exec-risks' | 'exec-trends' | 'exec-bus' | 'exec-assurance'
   | 'admin-users' | 'admin-roles' | 'admin-org' | 'admin-projects' | 'admin-periods' | 'admin-workflow' | 'admin-esg-config' | 'admin-security' | 'admin-health' | 'admin-data' | 'admin-notifications' | 'admin-settings'
+  | 'fin-assignments' | 'fin-data' | 'fin-expenditure' | 'fin-evidence' | 'fin-submissions' | 'fin-reports' | 'fin-activity'
 
 interface AppState {
   user: SessionUser | null

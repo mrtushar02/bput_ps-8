@@ -16,7 +16,7 @@ import {
   ChevronDown, ChevronLeft, ChevronRight, Heart, Check, Sparkles, MapPin, Search, Route, Flame,
   SunMedium, Zap, Droplets, Waves, Globe, CheckCircle2,
   Settings2, Package, HeartHandshake, Scale, FileCheck, Briefcase,
-  BarChart3, Gavel, Eye, Crown, Compass, Activity, ShieldAlert
+  BarChart3, Gavel, Eye, Crown, Compass, Activity, ShieldAlert, Wallet
 } from 'lucide-react'
 import { useApp } from '@/lib/auth-context'
 import {
@@ -44,6 +44,7 @@ interface RoleCardDef {
 
 const ROLES: RoleCardDef[] = [
   { key: 'PROJECT_USER', name: 'Rohit Kumar', email: 'rohit@meil-esg.in', role: 'Project / Site User', phase: 1, category: 'operations', icon: Building2, tint: 'from-sky-500 to-blue-600', blurb: 'Site operations & daily ESG metrics' },
+  { key: 'FINANCE_USER', name: 'Rakesh Verma', email: 'finance@meil-esg.in', role: 'Finance & Resource Contributor', phase: 1, category: 'operations', icon: Wallet, tint: 'from-blue-600 to-indigo-600', blurb: 'Financial turnover, CapEx/OpEx & resource expenditure collection' },
   { key: 'HR_USER', name: 'Sunita Rao', email: 'sunita@meil-esg.in', role: 'HR User', phase: 1, category: 'operations', icon: Users, tint: 'from-cyan-500 to-teal-600', blurb: 'Human resources & workforce welfare metrics' },
   { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS / Safety User', phase: 1, category: 'operations', icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Environment, Health & Safety incident reports' },
   { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement User', phase: 1, category: 'operations', icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Supply chain sustainability & vendor ESG scores' },

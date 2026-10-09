@@ -23,11 +23,21 @@ import { EsgAnalystWorkspace } from '@/components/modules/esg-analyst-workspace'
 import { BrsrWorkspace } from '@/components/modules/brsr-workspace'
 import { AuditorWorkspace } from '@/components/modules/auditor-workspace'
 import { ExecutiveWorkspace } from '@/components/modules/executive-workspace'
+import { FinanceWorkspace } from '@/components/modules/finance-workspace'
 
 export function ModuleRouter() {
   const { activeModule, dataEntrySubModule } = useApp()
   const m = activeModule
   switch (m) {
+    // Finance & Resource Data Contributor workspace
+    case 'fin-assignments':
+    case 'fin-data':
+    case 'fin-expenditure':
+    case 'fin-evidence':
+    case 'fin-submissions':
+    case 'fin-reports':
+    case 'fin-activity':
+      return <FinanceWorkspace />
     // Shared modules
     case 'my-project': return <MyProjectModule />
     case 'data-entry': return <DataEntryModule subModule={dataEntrySubModule} />

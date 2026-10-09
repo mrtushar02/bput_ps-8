@@ -55,6 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const roleTint: Record<string, string> = {
     SUPER_ADMIN: 'from-slate-600 to-slate-800',
     PROJECT_USER: 'from-sky-500 to-blue-600',
+    FINANCE_USER: 'from-blue-600 via-indigo-600 to-purple-600',
     HR_USER: 'from-cyan-500 to-teal-600',
     EHS_USER: 'from-amber-500 to-orange-600',
     BU_REVIEWER: 'from-blue-500 to-indigo-600',
