@@ -2,1724 +2,1705 @@
 /**
  * HrWorkspace — MEIL ESG / BRSR Reporting Platform
  *
- * HR User workspace. A single client component that switches content
- * based on `activeModule` from the AppContext. Handles four module
- * keys, each rendering its own dedicated screen:
- *
- *   - 'hr-workforce' → Workforce Registry + Demographics + PwD Inclusion
- *   - 'hr-training'  → Training & Development dashboard
- *   - 'hr-wellbeing' → Wellbeing & Benefits matrix
- *   - 'hr-rights'    → Human Rights & Fair Work registry
- *
- * (The 'overview', 'evidence', and 'submissions' keys are routed
- * elsewhere by the module-router — not handled here.)
- *
- * Color theme: Teal / Cyan (#06b6d4, #14b8a6, #0d9488) — consistent
- * with the existing HrDashboard.
- *
- * Data:
- *   GET /api/overview          → kpis (totalEmployees, totalWorkers,
- *                                 femaleShare, differentlyAbled,
- *                                 trainingHours, totalWorkforce) +
- *                                 trends + periods
- *   GET /api/activity?take=10  → recent activities
- *   GET /api/action-items     → pending HR tasks
+ * HR Data Contributor Workspace:
+ * - Level 0: Universal Common Reporting Fields (all 24 fields)
+ * - Level HR-1: Workforce Profile (Employees & Workers, Gender counts, Source System)
+ * - Level HR-2: Workforce Diversity & Representation (PwD, Diversity, Percentages)
+ * - Level HR-3: Hiring & Turnover (Opening, Joiners, Leavers, Closing, Turnover %)
+ * - Level HR-4: Training & Skill Development (Programmes, Duration, Completion %)
+ * - Level HR-5: Performance & Career Development Reviews (Eligible, Reviewed %)
+ * - Level HR-6: Employee Benefits & Well-being (Parental, Insurance, Coverage %)
+ * - Level HR-7: Wages & Remuneration-Related Disclosures (Median Wage, Aggregates)
+ * - Level HR-8: Grievances & Human Rights (Received, Resolved, Pending, Redressal)
+ * - Level HR-9: Health, Safety & Occupational Well-being Coordination
+ * - Screen 1: HR Data Console (6 Dashboard Cards + My HR Assignments Table)
+ * - Evidence & Documents Repository
+ * - Shared Validation & Multi-state Submission Workflow
  */
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Users, UserRound, HeartHandshake, GraduationCap,
-  ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle,
-  ChevronRight, CircleCheck, Clock, ShieldCheck, Scale,
-  HeartPulse, Stethoscope, Activity as ActivityIcon,
-  ClipboardList, FileText, BadgeCheck, UserCheck,
-  Briefcase, Building2, Lock, AlertTriangle, CheckCircle2,
-  Landmark, Wallet, Gavel, Smile, Sparkles, TrendingUp,
+  Users, UserRound, GraduationCap, HeartPulse, Scale, ShieldCheck,
+  CheckCircle2, Clock, AlertTriangle, ArrowRight, Save, Send, Upload,
+  RefreshCw, Sparkles, Filter, Eye, Edit3, ChevronRight, Layers, FileText,
+  TrendingUp, Building2, UserPlus, FileCheck2, History
 } from 'lucide-react'
-import {
-  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
-  ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
-} from 'recharts'
 import { useApp } from '@/lib/auth-context'
+import {
+  contributorStore,
+  type ContributorAssignment,
+  type ActivityEvent
+} from '@/lib/contributor-store'
+import { CommonLevel0Card } from './common-level0-card'
+import { CommonEvidenceManager } from './common-evidence-manager'
+import { CommonValidationModal } from './common-validation-modal'
 
-/* ============================================================
- * Types — strict API shapes
- * ============================================================ */
-interface Kpis {
-  totalEmployees: number
-  totalWorkers: number
-  totalWorkforce: number
-  femaleShare: number
-  differentlyAbled: number
-  trainingHours: number
-  completion: number
-}
-interface OverviewData {
-  kpis: Kpis
-  trends?: Record<string, Record<string, number>>
-  periods?: { id: string; label: string; year: number; month: number | null; status: string }[]
-  empty?: boolean
-  [key: string]: unknown
-}
+export function HrWorkspace() {
+  const { activeModule, setActiveModule } = useApp()
+  const [activeTab, setActiveTab] = useState<string>('overview')
+  const [hrData, setHrData] = useState(() => contributorStore.getHrData())
+  const [assignments, setAssignments] = useState<ContributorAssignment[]>([])
+  const [activities, setActivities] = useState<ActivityEvent[]>([])
+  const [saveStatus, setSaveStatus] = useState<string>('Saved')
+  const [showValidationModal, setShowValidationModal] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-interface ActivityItem {
-  id: string
-  actorName: string
-  actorRole: string
-  action: string
-  title: string
-  description?: string | null
-  module?: string | null
-  status?: string | null
-  createdAt: string
-}
-interface ActivityResponse { items: ActivityItem[]; total: number; count: number }
+  // Map incoming activeModule from sidebar to activeTab
+  useEffect(() => {
+    if (activeModule === 'hr-workforce') setActiveTab('hr-1')
+    else if (activeModule === 'hr-training') setActiveTab('hr-4')
+    else if (activeModule === 'hr-wellbeing') setActiveTab('hr-6')
+    else if (activeModule === 'hr-rights') setActiveTab('hr-8')
+    else if (activeModule === 'evidence') setActiveTab('evidence')
+    else if (activeModule === 'submissions') setActiveTab('submissions')
+  }, [activeModule])
 
-interface ActionItem {
-  id: string
-  type: string
-  title: string
-  description: string
-  severity: 'critical' | 'warning' | 'info'
-  module: string
-  dueDate?: string
-  status: string
-}
-interface ActionItemsResponse {
-  tasks: ActionItem[]
-  count: number
-  roleKey?: string
-}
+  useEffect(() => {
+    setAssignments(contributorStore.getAssignments('HR_USER'))
+    setActivities(contributorStore.getActivities('HR_USER'))
+  }, [])
 
-/* ============================================================
- * Theme constants — Teal / Cyan
- * ============================================================ */
-const TOOLTIP_STYLE: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.96)',
-  border: '1px solid rgba(20,184,166,0.30)',
-  borderRadius: 12,
-  fontSize: 11,
-  color: '#0f172a',
-  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(13,148,136,0.20)',
-  backdropFilter: 'blur(12px)',
-  padding: '8px 12px',
-}
-
-const TEAL_PRIMARY = '#06b6d4'   // cyan-500
-const TEAL_SECONDARY = '#14b8a6' // teal-500
-const TEAL_DEEP = '#0d9488'      // teal-600
-const TEAL_SOFT = '#5eead4'      // teal-300
-const TEAL_TINT = '#cffafe'      // cyan-100
-const TEAL_MIST = '#99f6e4'      // teal-200
-
-const DONUT_PALETTE = ['#0d9488', '#06b6d4', '#14b8a6']
-
-/* ============================================================
- * Helpers
- * ============================================================ */
-function timeAgo(iso: string): string {
-  const d = new Date(iso)
-  const s = Math.floor((Date.now() - d.getTime()) / 1000)
-  if (s < 30) return 'just now'
-  if (s < 60) return `${s}s ago`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const dd = Math.floor(h / 24)
-  return `${dd}d ago`
-}
-
-function initials(name: string): string {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
-}
-
-function formatNumber(n: number, digits = 1): string {
-  if (!isFinite(n)) return '0'
-  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
-  return n.toFixed(digits)
-}
-
-function statusClass(status?: string | null): string {
-  switch ((status ?? '').toUpperCase()) {
-    case 'APPROVED': case 'COMPLETED': case 'RESOLVED': return 'status-approved'
-    case 'SUBMITTED': return 'status-submitted'
-    case 'UNDER_REVIEW': case 'REVIEW': case 'OPEN': return 'status-review'
-    case 'DRAFT': case 'PENDING': return 'status-draft'
-    case 'LOCKED': return 'status-locked'
-    case 'MISSING': case 'ERROR': case 'BLOCKING': return 'status-missing'
-    case 'WARNING': return 'status-warning'
-    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
-    default: return 'status-draft'
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3000)
   }
-}
 
-/** Filter activities relevant to the HR user. */
-function isHrActivity(a: ActivityItem): boolean {
-  const mod = (a.module ?? '').toUpperCase()
-  const act = (a.action ?? '').toUpperCase()
-  const title = (a.title ?? '').toLowerCase()
-  const desc = (a.description ?? '').toLowerCase()
-  const hrModules = ['PEOPLE', 'WORKFORCE', 'HR']
-  const hrActions = ['WORKFORCE', 'TRAINING', 'EMPLOYEE', 'HIRING', 'ONBOARDING', 'DIVERSITY']
-  const hrKeywords = ['employee', 'workforce', 'training', 'worker', 'gender', 'diversity', 'hired', 'onboard', 'hr ']
+  const handleSaveDraft = (levelLabel: string) => {
+    setSaveStatus('Saving...')
+    contributorStore.saveHrData(hrData)
+    setTimeout(() => {
+      setSaveStatus('Draft Saved')
+      triggerToast(`${levelLabel} draft saved successfully.`)
+      contributorStore.addActivity({
+        id: 'act-' + Date.now(),
+        roleKey: 'HR_USER',
+        timestamp: 'Just now',
+        user: 'Sunil Kumar (HR)',
+        action: 'Saved Draft',
+        target: levelLabel,
+        details: 'Draft updated and persisted to local enterprise store.',
+        badgeTone: 'blue'
+      })
+      setActivities(contributorStore.getActivities('HR_USER'))
+      setTimeout(() => setSaveStatus('Saved'), 2000)
+    }, 400)
+  }
+
+  // Live calculations
+  const totalPermanent = (Number(hrData.workforceProfile.permanentEmployees) || 0) + (Number(hrData.workforceProfile.permanentWorkers) || 0)
+  const totalOther = (Number(hrData.workforceProfile.otherEmployees) || 0) + (Number(hrData.workforceProfile.otherWorkers) || 0)
+  const totalWorkforce = totalPermanent + totalOther
+  const totalGender = (Number(hrData.workforceProfile.maleCount) || 0) + (Number(hrData.workforceProfile.femaleCount) || 0) + (Number(hrData.workforceProfile.otherGenderCount) || 0)
+  const femaleRatio = totalWorkforce > 0 ? (((Number(hrData.workforceProfile.femaleCount) || 0) / totalWorkforce) * 100).toFixed(1) : '0'
+
+  // Turnover calculation
+  const meanHeadcount = ((Number(hrData.turnover.openingHeadcount) || 0) + (Number(hrData.turnover.closingHeadcount) || 0)) / 2
+  const calcTurnoverPct = meanHeadcount > 0 ? (((Number(hrData.turnover.leavingCount) || 0) / meanHeadcount) * 100).toFixed(2) : '0'
+
+  // Review percentage
+  const calcReviewPct = (Number(hrData.reviews.totalEligiblePopulation) || 0) > 0
+    ? (((Number(hrData.reviews.numberReviewed) || 0) / (Number(hrData.reviews.totalEligiblePopulation) || 1)) * 100).toFixed(1)
+    : '0'
+
+  // Benefit coverage
+  const calcBenefitPct = (Number(hrData.benefits.eligiblePopulation) || 0) > 0
+    ? (((Number(hrData.benefits.beneficiariesCount) || 0) / (Number(hrData.benefits.eligiblePopulation) || 1)) * 100).toFixed(1)
+    : '0'
+
+  const tabList = [
+    { id: 'overview', label: 'Console Overview' },
+    { id: 'hr-1', label: 'HR-1: Workforce Profile' },
+    { id: 'hr-2', label: 'HR-2: Diversity' },
+    { id: 'hr-3', label: 'HR-3: Turnover' },
+    { id: 'hr-4', label: 'HR-4: Training' },
+    { id: 'hr-5', label: 'HR-5: Performance' },
+    { id: 'hr-6', label: 'HR-6: Benefits' },
+    { id: 'hr-7', label: 'HR-7: Remuneration' },
+    { id: 'hr-8', label: 'HR-8: Grievances' },
+    { id: 'hr-9', label: 'HR-9: Well-being' },
+    { id: 'evidence', label: 'Evidence & Documents' },
+    { id: 'submissions', label: 'My Submissions' },
+    { id: 'activity', label: 'Activity Log' }
+  ]
+
   return (
-    hrModules.includes(mod) ||
-    hrActions.some(k => act.includes(k)) ||
-    hrKeywords.some(k => title.includes(k) || desc.includes(k))
-  )
-}
-
-/** Filter action-items relevant to HR. */
-function isHrTask(t: ActionItem): boolean {
-  const m = (t.module ?? '').toLowerCase()
-  const type = (t.type ?? '').toUpperCase()
-  const desc = (t.description ?? '').toLowerCase()
-  const title = (t.title ?? '').toLowerCase()
-  return (
-    m === 'submissions' ||
-    type === 'CORRECTION' ||
-    type === 'DRAFT_SUBMISSION' ||
-    type === 'BRSR_GAP' ||
-    title.includes('workforce') || title.includes('employee') ||
-    desc.includes('workforce') || desc.includes('employee') || desc.includes('training')
-  )
-}
-
-/* ============================================================
- * Animation variants — staggered entrance
- * ============================================================ */
-const cardEnter = {
-  hidden: { opacity: 0, y: 16 },
-  visible: (i = 0) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
-  }),
-}
-
-/* ============================================================
- * Shared sub-components
- * ============================================================ */
-
-/** Module header — title + subtitle + icon + live pill. */
-function ModuleHeader({
-  icon: Icon, title, subtitle, completionPct = 0, totalWorkforce = 0,
-}: {
-  icon: React.ElementType
-  title: string
-  subtitle: string
-  completionPct?: number
-  totalWorkforce?: number
-}) {
-  return (
-    <motion.header
-      custom={0}
-      variants={cardEnter}
-      initial="hidden"
-      animate="visible"
-      className="glass glass-shimmer rounded-[20px] px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
-    >
-      <div className="flex items-center gap-3">
-        <span
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl"
-          style={{
-            background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})`,
-            color: '#fff',
-            boxShadow: `0 4px 14px -3px ${TEAL_DEEP}80, inset 0 1px 1px rgba(255,255,255,0.4)`,
-          }}
-        >
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        <div>
-          <h1 className="text-[18px] font-bold text-slate-900 tracking-tight">{title}</h1>
-          <p className="text-[11px] text-slate-700 mt-0.5">{subtitle}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        {totalWorkforce > 0 && (
-          <span className="glass-subtle rounded-xl px-3 py-1.5 text-[10px] font-medium text-slate-700 inline-flex items-center gap-1.5">
-            <Users className="h-3 w-3" style={{ color: TEAL_DEEP }} />
-            {totalWorkforce.toLocaleString()} workforce
-          </span>
+    <div className="space-y-6 pb-12">
+      {/* Toast notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-50 flex items-center gap-2 rounded-2xl border border-teal-200 bg-white/95 px-4 py-3 shadow-xl shadow-teal-500/10 backdrop-blur-xl text-xs font-bold text-teal-800"
+          >
+            <CheckCircle2 className="h-4 w-4 text-teal-600" />
+            <span>{toastMessage}</span>
+          </motion.div>
         )}
-        <span className="status-pill text-[10px] status-approved">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Live
-        </span>
-        <div className="glass-subtle rounded-xl px-3 py-1.5 flex items-center gap-2">
-          <div className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Completion</div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-20 rounded-full bg-slate-200/70 overflow-hidden">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${completionPct}%`,
-                  background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
-                  boxShadow: `0 0 8px -1px ${TEAL_PRIMARY}80`,
-                }}
-              />
+      </AnimatePresence>
+
+      {/* HEADER SECTION */}
+      <div className="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/70 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl md:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/25">
+                <Users className="h-6 w-6" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-3xl">
+                HR Data Contributor Workspace
+              </h1>
+              <span className="inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50/80 px-3 py-1 text-xs font-bold text-teal-700 shadow-xs">
+                <Sparkles className="h-3 w-3 text-teal-600" />
+                BRSR Principle 3 & 5
+              </span>
             </div>
-            <span className="text-[12px] font-bold text-slate-900 tabular-nums">{completionPct.toFixed(0)}%</span>
-          </div>
-        </div>
-      </div>
-    </motion.header>
-  )
-}
-
-/** Compact KPI tile — teal icon tile + label + value + trend pill. */
-function HrKpiTile({
-  icon: Icon, label, value, unit, trend, index = 0,
-}: {
-  icon: React.ElementType
-  label: string
-  value: string
-  unit?: string
-  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
-  index?: number
-}) {
-  return (
-    <motion.div
-      custom={index}
-      variants={cardEnter}
-      initial="hidden"
-      animate="visible"
-      className="glass glass-shimmer rounded-2xl p-3.5 flex flex-col gap-1.5"
-      style={{ maxHeight: 100 }}
-    >
-      <div className="flex items-center justify-between">
-        <span
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
-          style={{
-            background: 'linear-gradient(135deg, rgba(207,250,254,0.85), rgba(153,246,228,0.65))',
-            border: '1px solid rgba(20,184,166,0.30)',
-            color: TEAL_DEEP,
-            boxShadow: '0 2px 8px -2px rgba(13,148,136,0.30), inset 0 1px 1px rgba(255,255,255,0.6)',
-          }}
-        >
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-        {trend && (
-          <span className={`status-pill text-[9px] ${
-            trend.tone ?? (trend.dir === 'up' ? 'status-approved' : trend.dir === 'down' ? 'status-missing' : 'status-draft')
-          }`}>
-            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
-             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
-            {trend.text}
-          </span>
-        )}
-      </div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
-      <div className="flex items-baseline gap-1">
-        <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
-        {unit && <span className="text-[10px] text-slate-700 font-medium">{unit}</span>}
-      </div>
-    </motion.div>
-  )
-}
-
-/** Loading skeleton for the whole workspace. */
-function WorkspaceSkeleton({ tiles = 4 }: { tiles?: number }) {
-  return (
-    <div className="space-y-5">
-      <div className="glass rounded-[20px] h-16 animate-pulse" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {Array.from({ length: tiles }).map((_, i) => (
-          <div key={i} className="glass rounded-2xl h-[100px] animate-pulse" />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="glass rounded-[20px] h-[300px] animate-pulse" />
-        <div className="glass rounded-[20px] h-[300px] animate-pulse" />
-      </div>
-      <div className="glass rounded-[20px] h-[240px] animate-pulse" />
-    </div>
-  )
-}
-
-/** Error state. */
-function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
-  return (
-    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
-      <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
-      <p className="text-[14px] font-semibold text-slate-900 mb-1">Unable to load HR workspace</p>
-      <p className="text-[12px] text-slate-700 mb-4">{error}</p>
-      <button
-        onClick={onRetry}
-        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
-        style={{ background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})` }}
-      >
-        <RefreshCw className="h-3.5 w-3.5" /> Retry
-      </button>
-    </div>
-  )
-}
-
-/** Empty state. */
-function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
-  return (
-    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
-      <Icon className="h-10 w-10 mb-3" style={{ color: TEAL_PRIMARY }} />
-      <p className="text-[14px] font-semibold text-slate-900 mb-1">{title}</p>
-      <p className="text-[12px] text-slate-700 mb-4">{subtitle}</p>
-      <button
-        onClick={() => window.location.reload()}
-        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
-        style={{ background: `linear-gradient(135deg, ${TEAL_PRIMARY}, ${TEAL_DEEP})` }}
-      >
-        <RefreshCw className="h-3.5 w-3.5" /> Reload
-      </button>
-    </div>
-  )
-}
-
-/* ============================================================
- * Screen 1 — Workforce
- * ============================================================ */
-
-/** Derive a deterministic workforce roster from KPI totals. */
-function deriveRoster(k: Kpis): {
-  code: string; name: string; category: 'Employee' | 'Worker';
-  permanent: 'Permanent' | 'Non-Permanent'; gender: 'Male' | 'Female' | 'Other';
-  pwd: boolean; department: string
-}[] {
-  const firstNames = ['Aarav', 'Priya', 'Rohan', 'Ananya', 'Vikram', 'Meera', 'Arjun', 'Isha', 'Karan', 'Sneha',
-    'Nikhil', 'Pooja', 'Rahul', 'Divya', 'Aditya', 'Kavya', 'Sahil', 'Riya', 'Manish', 'Tanvi']
-  const lastNames = ['Sharma', 'Verma', 'Iyer', 'Nair', 'Reddy', 'Patel', 'Singh', 'Gupta', 'Rao', 'Joshi']
-  const departments = ['Operations', 'Finance', 'Engineering', 'HR', 'Safety', 'Logistics', 'Maintenance', 'Administration']
-  const seed = (k.totalWorkforce + k.trainingHours) || 1
-  const total = Math.min(12, Math.max(8, Math.floor(k.totalWorkforce / 50) || 10))
-  const roster: ReturnType<typeof deriveRoster> = []
-  for (let i = 0; i < total; i++) {
-    const r = ((seed * (i + 7)) % 997) / 997
-    const r2 = ((seed * (i + 13)) % 991) / 991
-    const r3 = ((seed * (i + 29)) % 977) / 977
-    const r4 = ((seed * (i + 41)) % 967) / 967
-    const isEmployee = r < 0.55 || i < Math.ceil(total * 0.55)
-    const fn = firstNames[(i * 3 + Math.floor(r2 * 5)) % firstNames.length]
-    const ln = lastNames[(i * 2 + Math.floor(r3 * 5)) % lastNames.length]
-    const gender: 'Male' | 'Female' | 'Other' =
-      r2 < k.femaleShare / 100 ? 'Female' : r2 < 0.96 ? 'Male' : 'Other'
-    const pwd = r4 < (k.differentlyAbled / Math.max(1, k.totalWorkforce)) * 5 + 0.04
-    roster.push({
-      code: `MEIL-${(1000 + i).toString()}`,
-      name: `${fn} ${ln}`,
-      category: isEmployee ? 'Employee' : 'Worker',
-      permanent: r3 < 0.78 ? 'Permanent' : 'Non-Permanent',
-      gender,
-      pwd,
-      department: departments[i % departments.length],
-    })
-  }
-  return roster
-}
-
-function WorkforceScreen({ k, periods }: { k: Kpis; periods: OverviewData['periods'] }) {
-  const roster = useMemo(() => deriveRoster(k), [k])
-  const femaleCount = Math.round(k.totalWorkforce * (k.femaleShare / 100))
-  const maleCount = k.totalWorkforce - femaleCount
-  const otherCount = 0
-  const genderData = [
-    { name: 'Male', value: Math.max(0.1, maleCount), color: DONUT_PALETTE[0] },
-    { name: 'Female', value: Math.max(0.1, femaleCount), color: DONUT_PALETTE[1] },
-    { name: 'Other', value: Math.max(0.1, otherCount), color: DONUT_PALETTE[2] },
-  ]
-  const empWrkData = [
-    { name: 'Employees', value: Math.max(0.1, k.totalEmployees), color: TEAL_DEEP },
-    { name: 'Workers', value: Math.max(0.1, k.totalWorkers), color: TEAL_PRIMARY },
-  ]
-  const inclusionRate = k.totalWorkforce > 0
-    ? (k.differentlyAbled / k.totalWorkforce) * 100
-    : 0
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={Users}
-        title="Workforce Registry"
-        subtitle="Employee & worker registry with ESG demographics"
-        completionPct={k.completion}
-        totalWorkforce={k.totalWorkforce}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <HrKpiTile index={1} icon={Users} label="Total Employees" value={formatNumber(k.totalEmployees, 0)} unit="headcount" trend={{ dir: 'up', text: '+2.1%' }} />
-        <HrKpiTile index={2} icon={UserRound} label="Total Workers" value={formatNumber(k.totalWorkers, 0)} unit="contract" trend={{ dir: 'up', text: '+4.5%' }} />
-        <HrKpiTile index={3} icon={BadgeCheck} label="Permanent" value={formatNumber(Math.round(k.totalWorkforce * 0.78), 0)} unit="~78%" trend={{ dir: 'up', text: '+1.8%' }} />
-        <HrKpiTile index={4} icon={Briefcase} label="Non-Permanent" value={formatNumber(Math.round(k.totalWorkforce * 0.22), 0)} unit="~22%" trend={{ dir: 'down', text: '-0.6%' }} />
-      </div>
-
-      {/* Workforce table */}
-      <motion.section
-        custom={5}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
-              <Users className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-              Workforce Roster
-            </h2>
-            <p className="text-[11px] text-slate-700 mt-0.5">
-              Derived sample from KPI totals · {roster.length} entries shown
+            <p className="text-sm font-medium text-slate-500">
+              Workforce census · Training & skills · Diversity & Inclusion · Benefits & Grievance mechanisms
             </p>
           </div>
-          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1.5">
-            Export <ChevronRight className="h-3 w-3" />
-          </button>
-        </header>
-        <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 z-10" style={{ background: 'rgba(207,250,254,0.92)', backdropFilter: 'blur(8px)' }}>
-              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                <th className="px-3 py-2 text-left font-semibold">Code</th>
-                <th className="px-3 py-2 text-left font-semibold">Name</th>
-                <th className="px-3 py-2 text-left font-semibold">Category</th>
-                <th className="px-3 py-2 text-left font-semibold">Status</th>
-                <th className="px-3 py-2 text-left font-semibold">Gender</th>
-                <th className="px-3 py-2 text-left font-semibold">PwD</th>
-                <th className="px-3 py-2 text-left font-semibold">Department</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roster.map((r, i) => (
-                <motion.tr
-                  key={r.code}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: i * 0.015 }}
-                  className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
-                  style={{ height: 44 }}
-                >
-                  <td className="px-3 py-2 font-mono text-slate-700">{r.code}</td>
-                  <td className="px-3 py-2 font-medium text-slate-900">{r.name}</td>
-                  <td className="px-3 py-2">
-                    <span className="status-pill text-[9px]" style={{
-                      background: r.category === 'Employee' ? 'rgba(13,148,136,0.12)' : 'rgba(6,182,212,0.12)',
-                      color: r.category === 'Employee' ? '#0f766e' : '#0e7490',
-                      borderColor: r.category === 'Employee' ? 'rgba(13,148,136,0.25)' : 'rgba(6,182,212,0.25)',
-                    }}>
-                      {r.category}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">{r.permanent}</td>
-                  <td className="px-3 py-2 text-slate-700">{r.gender}</td>
-                  <td className="px-3 py-2">
-                    {r.pwd ? (
-                      <span className="status-pill text-[9px] status-approved">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> Yes
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-[10px]">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">{r.department}</td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.section>
 
-      {/* Demographics — 2 columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Gender distribution */}
-        <motion.section
-          custom={6}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <UserRound className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Gender Distribution
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Male / Female / Other workforce share</p>
-            </div>
-          </header>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={genderData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }} barCategoryGap="28%">
-                <defs>
-                  <linearGradient id="wf-gender" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={TEAL_DEEP} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0.75} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(20,184,166,0.06)' }} />
-                <Bar dataKey="value" fill="url(#wf-gender)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="rounded-xl border border-slate-200/80 bg-white/80 px-3 py-2 text-xs font-bold text-slate-700 shadow-xs">
+              FY 2026-27 (Assigned)
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSaveDraft(activeTab.toUpperCase())}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white shadow-xs transition-colors"
+            >
+              <Save className="h-3.5 w-3.5 text-slate-500" />
+              <span>{saveStatus}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowValidationModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-teal-500/20 hover:from-teal-700 hover:to-cyan-700 transition-all cursor-pointer"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>Validate & Submit</span>
+            </button>
           </div>
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {genderData.map(d => (
-              <div key={d.name} className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
-                <span className="inline-block h-2 w-2 rounded-full mb-1" style={{ background: d.color }} />
-                <span className="text-[9px] uppercase tracking-wide text-slate-700">{d.name}</span>
-                <span className="text-[11px] font-bold text-slate-900 tabular-nums">{Math.round(d.value).toLocaleString()}</span>
+        </div>
+
+        {/* Tab Sub-Navigation */}
+        <div className="mt-6 flex flex-wrap items-center gap-1.5 pt-4 border-t border-slate-100">
+          {tabList.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                activeTab === tab.id
+                  ? 'bg-teal-600 text-white shadow-md shadow-teal-500/25'
+                  : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* TAB CONTENT */}
+
+      {/* 1. CONSOLE OVERVIEW (SCREEN 1) */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* 6 Dashboard Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+            {[
+              { label: 'Assigned HR Tasks', val: '4 Modules', sub: 'FY 2026-27', icon: Layers, tone: 'text-teal-600 bg-teal-50' },
+              { label: 'Pending Data Entry', val: '2 Forms', sub: 'Turnover & Coord', icon: Clock, tone: 'text-amber-600 bg-amber-50' },
+              { label: 'Submitted Records', val: '1 Level', sub: 'Under BU Review', icon: CheckCircle2, tone: 'text-blue-600 bg-blue-50' },
+              { label: 'Returned for Fix', val: '1 Record', sub: 'Contractor split required', icon: AlertTriangle, tone: 'text-rose-600 bg-rose-50' },
+              { label: 'Workforce Completion', val: '78.5%', sub: 'Target: 100%', icon: TrendingUp, tone: 'text-emerald-600 bg-emerald-50' },
+              { label: 'Evidence Attached', val: '3 / 4 Files', sub: '1 file missing', icon: FileCheck2, tone: 'text-purple-600 bg-purple-50' },
+            ].map((card, i) => (
+              <div key={i} className="rounded-[22px] border border-white/60 bg-white/75 p-4 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500">{card.label}</span>
+                  <div className={`p-1.5 rounded-lg ${card.tone}`}>
+                    <card.icon className="h-3.5 w-3.5" />
+                  </div>
+                </div>
+                <div className="mt-2 text-lg font-black text-slate-900">{card.val}</div>
+                <div className="text-[11px] text-slate-400 font-medium">{card.sub}</div>
               </div>
             ))}
           </div>
-        </motion.section>
 
-        {/* Employee / Worker donut */}
-        <motion.section
-          custom={7}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <Briefcase className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Employee / Worker Split
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Workforce composition by category</p>
-            </div>
-          </header>
-          <div className="relative" style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={empWrkData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={48}
-                  outerRadius={72}
-                  paddingAngle={3}
-                  stroke="none"
-                  isAnimationActive
-                  animationDuration={700}
-                >
-                  {empWrkData.map((d, i) => (
-                    <Cell key={i} fill={d.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [Math.round(v).toLocaleString(), n]} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
-              <span className="tabular-nums text-2xl font-bold text-slate-900">{k.totalWorkforce.toLocaleString()}</span>
-              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Total</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            {empWrkData.map(d => {
-              const pct = k.totalWorkforce > 0 ? (d.value / k.totalWorkforce) * 100 : 0
-              return (
-                <div key={d.name} className="glass-subtle rounded-xl px-3 py-2 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: d.color }} />
-                    <span className="text-[11px] font-semibold text-slate-700">{d.name}</span>
-                  </div>
-                  <span className="text-[12px] font-bold text-slate-900 tabular-nums">{pct.toFixed(1)}%</span>
+          {/* Quick Metrics Strip */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-[24px] border border-white/60 bg-white/75 p-5 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+              <span className="text-xs font-bold text-slate-500">Total Workforce Aggregate</span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900">{totalWorkforce.toLocaleString()}</span>
+                <span className="text-xs font-semibold text-teal-600">Reconciled Headcount</span>
+              </div>
+              <div className="mt-3 text-xs text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Permanent Employees:</span>
+                  <span className="font-bold text-slate-800">{Number(hrData.workforceProfile.permanentEmployees).toLocaleString()}</span>
                 </div>
-              )
-            })}
-          </div>
-        </motion.section>
-      </div>
+                <div className="flex justify-between">
+                  <span>Permanent Workers:</span>
+                  <span className="font-bold text-slate-800">{Number(hrData.workforceProfile.permanentWorkers).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Female Share:</span>
+                  <span className="font-bold text-teal-700">{femaleRatio}%</span>
+                </div>
+              </div>
+            </div>
 
-      {/* PwD inclusion + Entity comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* PwD inclusion */}
-        <motion.section
-          custom={8}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <HeartHandshake className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                PwD Inclusion
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Differently-abled workforce participation</p>
+            <div className="rounded-[24px] border border-white/60 bg-white/75 p-5 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+              <span className="text-xs font-bold text-slate-500">Training Completion Summary</span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900">{hrData.training.participantsCompleting.toLocaleString()}</span>
+                <span className="text-xs font-semibold text-emerald-600">Trained Personnel</span>
+              </div>
+              <div className="mt-3 text-xs text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Total Training Hours:</span>
+                  <span className="font-bold text-slate-800">{hrData.training.durationHours} hrs</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Completion Rate:</span>
+                  <span className="font-bold text-slate-800">
+                    {(((hrData.training.participantsCompleting / hrData.training.participants) || 0) * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Method:</span>
+                  <span className="font-bold text-slate-800">{hrData.training.deliveryMethod}</span>
+                </div>
+              </div>
             </div>
-          </header>
-          <div className="flex items-center gap-5">
-            <div
-              className="relative inline-flex h-24 w-24 items-center justify-center rounded-2xl"
-              style={{
-                background: `linear-gradient(135deg, ${TEAL_TINT}, ${TEAL_MIST})`,
-                border: `1px solid rgba(20,184,166,0.30)`,
-                boxShadow: `0 8px 24px -6px ${TEAL_DEEP}40, inset 0 1px 1px rgba(255,255,255,0.7)`,
-              }}
-            >
-              <HeartHandshake className="h-8 w-8" style={{ color: TEAL_DEEP }} />
-            </div>
-            <div className="flex-1">
-              <div className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Differently-Abled Headcount</div>
-              <div className="text-3xl font-bold text-slate-900 tabular-nums">{k.differentlyAbled}</div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-slate-700">Inclusion rate</span>
-                <span className="status-pill text-[9px] status-approved">
-                  {inclusionRate.toFixed(2)}%
-                </span>
+
+            <div className="rounded-[24px] border border-white/60 bg-white/75 p-5 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+              <span className="text-xs font-bold text-slate-500">Grievance & Resolution Status</span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900">{hrData.grievances.grievancesResolved} / {hrData.grievances.grievancesReceived}</span>
+                <span className="text-xs font-semibold text-emerald-600">Resolved Cases</span>
+              </div>
+              <div className="mt-3 text-xs text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Pending Complaints:</span>
+                  <span className="font-bold text-rose-600">{hrData.grievances.grievancesPending}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Redressal Mechanism:</span>
+                  <span className="font-bold text-slate-800 truncate max-w-[140px]">{hrData.grievances.resolutionMethod}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Audit Evidence:</span>
+                  <span className="font-bold text-teal-700">{hrData.grievances.supportingEvidence}</span>
+                </div>
               </div>
             </div>
           </div>
-          <div className="mt-4 pt-3 border-t border-slate-200/60">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-semibold text-slate-700">Target: 2.0% inclusion</span>
-              <span className="text-[11px] font-medium text-slate-900 tabular-nums">
-                {inclusionRate >= 2 ? 'On Track' : `${(2 - inclusionRate).toFixed(2)}% gap`}
-              </span>
-            </div>
-            <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (inclusionRate / 2) * 100)}%` }}
-                transition={{ duration: 0.8, ease: 'easeOut' }}
-                className="h-full rounded-full"
-                style={{
-                  background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_SOFT})`,
-                  boxShadow: `0 0 8px -1px ${TEAL_DEEP}80`,
-                }}
-              />
-            </div>
-          </div>
-        </motion.section>
 
-        {/* Entity comparison */}
-        <motion.section
-          custom={9}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <Building2 className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Entity / Period Comparison
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">
-                {periods && periods.length > 1
-                  ? `${periods.length} reporting periods available`
-                  : 'Single period — comparison unavailable'}
-              </p>
+          {/* My HR Assignments Table */}
+          <div className="rounded-[24px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">My HR Assignments</h3>
+                <p className="text-xs text-slate-500">Mandatory reporting tasks assigned for current reporting period</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('hr-1')}
+                className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1"
+              >
+                <span>Enter All Disclosures</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
-          </header>
-          {periods && periods.length > 1 ? (
-            <div className="rounded-xl border border-slate-200/50 overflow-hidden">
-              <table className="w-full text-[11px]">
-                <thead className="bg-cyan-50/70">
-                  <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                    <th className="px-3 py-2 text-left font-semibold">Period</th>
-                    <th className="px-3 py-2 text-right font-semibold">Workforce</th>
-                    <th className="px-3 py-2 text-right font-semibold">Female %</th>
-                    <th className="px-3 py-2 text-left font-semibold">Status</th>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3">Entity / Business Unit</th>
+                    <th className="pb-3">Year</th>
+                    <th className="pb-3">HR Module</th>
+                    <th className="pb-3">Completion</th>
+                    <th className="pb-3">Evidence</th>
+                    <th className="pb-3">Status</th>
+                    <th className="pb-3">Last Updated</th>
+                    <th className="pb-3 text-right">Action</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {periods.slice(0, 5).map((p, i) => {
-                    const wf = Math.max(1, Math.round(k.totalWorkforce * (0.82 + i * 0.04)))
-                    const fs = Math.max(0, k.femaleShare - (periods.length - 1 - i) * 1.4)
-                    return (
-                      <tr key={p.id} className="border-t border-slate-100 hover:bg-cyan-50/30 transition-colors" style={{ height: 40 }}>
-                        <td className="px-3 py-2 font-medium text-slate-900">{p.label}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-slate-700">{wf.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right tabular-nums text-slate-700">{fs.toFixed(1)}%</td>
-                        <td className="px-3 py-2">
-                          <span className={`status-pill text-[9px] ${statusClass(p.status)}`}>
-                            {p.status.replace(/_/g, ' ').toLowerCase()}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })}
+                <tbody className="divide-y divide-slate-100">
+                  {assignments.map((asg) => (
+                    <tr key={asg.id} className="hover:bg-slate-50/50">
+                      <td className="py-3 font-semibold text-slate-800">{asg.entityBu}</td>
+                      <td className="py-3 text-slate-600">{asg.reportingYear}</td>
+                      <td className="py-3 font-bold text-teal-700">{asg.module}</td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-16 rounded-full bg-slate-100 overflow-hidden">
+                            <div className="h-full bg-teal-500 rounded-full" style={{ width: `${asg.completionPercentage}%` }} />
+                          </div>
+                          <span className="font-bold text-slate-700">{asg.completionPercentage}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          asg.evidenceStatus === 'Attached' || asg.evidenceStatus === 'Verified'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-rose-50 text-rose-700'
+                        }`}>
+                          {asg.evidenceStatus}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          asg.submissionStatus === 'Submitted' ? 'bg-blue-50 text-blue-700' :
+                          asg.submissionStatus === 'Returned for Correction' ? 'bg-rose-50 text-rose-700' :
+                          asg.submissionStatus === 'Under Review' ? 'bg-purple-50 text-purple-700' :
+                          'bg-amber-50 text-amber-700'
+                        }`}>
+                          {asg.submissionStatus}
+                        </span>
+                      </td>
+                      <td className="py-3 text-slate-400">{asg.lastUpdated}</td>
+                      <td className="py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (asg.levelKey === 'HR-1') setActiveTab('hr-1')
+                            else if (asg.levelKey === 'HR-2') setActiveTab('hr-2')
+                            else if (asg.levelKey === 'HR-4') setActiveTab('hr-4')
+                            else if (asg.levelKey === 'HR-8') setActiveTab('hr-8')
+                            else setActiveTab('hr-1')
+                          }}
+                          className="rounded-lg bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-700 hover:bg-teal-100 transition-colors"
+                        >
+                          {asg.submissionStatus === 'Returned for Correction' ? 'Fix Corrections' : 'Enter Data'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="py-8 text-center">
-              <Building2 className="mx-auto h-7 w-7 text-slate-300" />
-              <p className="text-[11px] text-slate-700 mt-2">Only one reporting period detected</p>
-              <p className="text-[10px] text-slate-500">Add more periods to enable comparison</p>
-            </div>
-          )}
-        </motion.section>
-      </div>
-    </div>
-  )
-}
-
-/* ============================================================
- * Screen 2 — Training & Development
- * ============================================================ */
-
-/** Derive a monthly training-hours trend from the trends object + trainingHours. */
-function deriveTrainingTrend(trends: Record<string, Record<string, number>> | undefined, k: Kpis): { label: string; hours: number }[] {
-  const labels = trends ? Object.keys(trends) : []
-  if (labels.length === 0) {
-    // synthesize 6 months
-    const months = ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep']
-    const per = k.trainingHours / 6
-    return months.map((m, i) => ({
-      label: m,
-      hours: Math.round(per * (0.7 + (i % 3) * 0.18)),
-    }))
-  }
-  return labels.map((label, i) => {
-    const total = k.trainingHours || 0
-    const share = 0.55 + ((i * 7) % 9) * 0.05
-    return { label, hours: Math.round(total * share / Math.max(1, labels.length)) }
-  })
-}
-
-/** Derive training programs from trainingHours KPI. */
-function derivePrograms(k: Kpis): { name: string; type: 'Safety' | 'Skill' | 'Compliance'; hours: number; participants: number; completion: number }[] {
-  const total = k.trainingHours || 0
-  const head = k.totalWorkforce || 1
-  return [
-    { name: 'Fire & Emergency Safety Drill', type: 'Safety', hours: Math.round(total * 0.22), participants: Math.round(head * 0.85), completion: 92 },
-    { name: 'PPE & Hazard Communication', type: 'Safety', hours: Math.round(total * 0.14), participants: Math.round(head * 0.78), completion: 88 },
-    { name: 'Operator Skill Certification', type: 'Skill', hours: Math.round(total * 0.18), participants: Math.round(head * 0.45), completion: 76 },
-    { name: 'First-Aid & CPR Training', type: 'Safety', hours: Math.round(total * 0.08), participants: Math.round(head * 0.32), completion: 95 },
-    { name: 'Code of Conduct & Ethics', type: 'Compliance', hours: Math.round(total * 0.12), participants: Math.round(head * 0.95), completion: 99 },
-    { name: 'Anti-Harassment & POSH', type: 'Compliance', hours: Math.round(total * 0.10), participants: Math.round(head * 0.92), completion: 97 },
-    { name: 'Digital Literacy Program', type: 'Skill', hours: Math.round(total * 0.16), participants: Math.round(head * 0.40), completion: 71 },
-  ]
-}
-
-function TrainingScreen({ k, trends }: { k: Kpis; trends?: Record<string, Record<string, number>> }) {
-  const trendData = useMemo(() => deriveTrainingTrend(trends, k), [trends, k])
-  const programs = useMemo(() => derivePrograms(k), [k])
-  const perHead = k.totalWorkforce > 0 ? k.trainingHours / k.totalWorkforce : 0
-  const coverage = Math.min(100, Math.round((perHead / 16) * 100)) // 16h = full coverage
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={GraduationCap}
-        title="Training & Development"
-        subtitle="Skill development, health & safety training"
-        completionPct={k.completion}
-        totalWorkforce={k.totalWorkforce}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <HrKpiTile index={1} icon={GraduationCap} label="Total Training Hours" value={formatNumber(k.trainingHours, 0)} unit="h" trend={{ dir: 'up', text: '+12.3%' }} />
-        <HrKpiTile index={2} icon={UserCheck} label="Training / Employee" value={perHead.toFixed(1)} unit="h/head" trend={{ dir: 'up', text: '+8.4%' }} />
-        <HrKpiTile index={3} icon={BadgeCheck} label="Coverage" value={`${coverage}`} unit="%" trend={{ dir: coverage >= 75 ? 'up' : 'down', text: `${coverage >= 75 ? '+' : '-'}${(coverage - 70).toFixed(0)}%` }} />
-      </div>
-
-      {/* Training trend area chart */}
-      <motion.section
-        custom={4}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-              Monthly Training Hours Trend
-            </h2>
-            <p className="text-[11px] text-slate-700 mt-0.5">Aggregated training hours across periods</p>
           </div>
-          <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-teal-700 transition-colors inline-flex items-center gap-1.5">
-            Details <ChevronRight className="h-3 w-3" />
-          </button>
-        </header>
-        <div style={{ height: 260 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trendData} margin={{ top: 6, right: 8, bottom: 0, left: -16 }}>
-              <defs>
-                <linearGradient id="train-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={TEAL_PRIMARY} stopOpacity={0.45} />
-                  <stop offset="100%" stopColor={TEAL_PRIMARY} stopOpacity={0.02} />
-                </linearGradient>
-                <linearGradient id="train-line" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor={TEAL_DEEP} />
-                  <stop offset="100%" stopColor={TEAL_PRIMARY} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
-              <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [`${Math.round(v).toLocaleString()} h`, 'Hours']} cursor={{ stroke: TEAL_PRIMARY, strokeDasharray: '4 4' }} />
-              <Area
-                type="monotone"
-                dataKey="hours"
-                stroke="url(#train-line)"
-                strokeWidth={2.5}
-                fill="url(#train-area)"
-                dot={{ r: 3, fill: TEAL_DEEP, stroke: '#fff', strokeWidth: 1.5 }}
-                activeDot={{ r: 5, fill: TEAL_DEEP, stroke: '#fff', strokeWidth: 2 }}
-                isAnimationActive
-                animationDuration={800}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
         </div>
-      </motion.section>
+      )}
 
-      {/* Training programs + Performance review */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5">
-        <motion.section
-          custom={5}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Training Programs
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Active programs · derived from training hours</p>
-            </div>
-            <span className="status-pill text-[9px] status-approved">
-              {programs.length} active
-            </span>
-          </header>
-          <div className="max-h-80 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-            <table className="w-full text-[11px]">
-              <thead className="sticky top-0 z-10" style={{ background: 'rgba(207,250,254,0.92)', backdropFilter: 'blur(8px)' }}>
-                <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                  <th className="px-3 py-2 text-left font-semibold">Program</th>
-                  <th className="px-3 py-2 text-left font-semibold">Type</th>
-                  <th className="px-3 py-2 text-right font-semibold">Hours</th>
-                  <th className="px-3 py-2 text-right font-semibold">Participants</th>
-                  <th className="px-3 py-2 text-right font-semibold">Completion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {programs.map((p, i) => {
-                  const typeColor = p.type === 'Safety' ? '#dc2626' : p.type === 'Skill' ? TEAL_DEEP : '#7c3aed'
-                  return (
-                    <motion.tr
-                      key={p.name}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: i * 0.025 }}
-                      className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
-                      style={{ height: 40 }}
-                    >
-                      <td className="px-3 py-2 font-medium text-slate-900">{p.name}</td>
-                      <td className="px-3 py-2">
-                        <span className="status-pill text-[9px]" style={{
-                          background: `${typeColor}1a`, color: typeColor, borderColor: `${typeColor}33`,
-                        }}>
-                          {p.type}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-slate-700">{p.hours.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-slate-700">{p.participants.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="h-1.5 w-12 rounded-full bg-slate-200/70 overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${p.completion}%`,
-                                background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
-                              }}
-                            />
-                          </div>
-                          <span className="text-[10px] font-semibold text-slate-900 tabular-nums w-8 text-right">{p.completion}%</span>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </motion.section>
-
-        {/* Performance review */}
-        <motion.section
-          custom={6}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <FileText className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Performance Review Cycle
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Annual appraisal status</p>
-            </div>
-          </header>
-          <div className="space-y-3">
-            {[
-              { label: 'Reviews Completed', value: Math.round(k.totalEmployees * 0.62), total: k.totalEmployees, tone: 'approved' as const, icon: CheckCircle2 },
-              { label: 'Reviews In Progress', value: Math.round(k.totalEmployees * 0.28), total: k.totalEmployees, tone: 'review' as const, icon: Clock },
-              { label: 'Reviews Due', value: Math.round(k.totalEmployees * 0.10), total: k.totalEmployees, tone: 'missing' as const, icon: AlertTriangle },
-            ].map((r, i) => {
-              const pct = r.total > 0 ? (r.value / r.total) * 100 : 0
-              const color = r.tone === 'approved' ? '#10b981' : r.tone === 'review' ? '#a855f7' : '#ef4444'
-              return (
-                <motion.div
-                  key={r.label}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: i * 0.06 }}
-                  className="glass-subtle rounded-xl p-3"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md" style={{ background: `${color}1a`, color }}>
-                        <r.icon className="h-3.5 w-3.5" />
-                      </span>
-                      <span className="text-[12px] font-semibold text-slate-700">{r.label}</span>
-                    </div>
-                    <span className="text-[13px] font-bold text-slate-900 tabular-nums">{r.value.toLocaleString()}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.8, ease: 'easeOut', delay: i * 0.06 }}
-                      className="h-full rounded-full"
-                      style={{ background: `linear-gradient(90deg, ${color}, ${TEAL_SOFT})`, boxShadow: `0 0 6px -1px ${color}80` }}
-                    />
-                  </div>
-                  <div className="text-[9px] text-slate-700 mt-1">{pct.toFixed(1)}% of total employees</div>
-                </motion.div>
-              )
+      {/* 2. LEVEL HR-1 — WORKFORCE PROFILE */}
+      {activeTab === 'hr-1' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.workforceProfile.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              workforceProfile: { ...hrData.workforceProfile, common: { ...hrData.workforceProfile.common, ...upd } }
             })}
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-200/60 glass-subtle rounded-xl px-3 py-2 flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Next cycle</span>
-            <span className="text-[11px] font-bold text-slate-900">Q2 FY 25-26</span>
-          </div>
-        </motion.section>
-      </div>
-    </div>
-  )
-}
+          />
 
-/* ============================================================
- * Screen 3 — Wellbeing & Benefits
- * ============================================================ */
-
-function WellbeingScreen({ k }: { k: Kpis }) {
-  const benefits = [
-    { type: 'Health Insurance', coverage: 98, status: 'Active' },
-    { type: 'Life Insurance', coverage: 96, status: 'Active' },
-    { type: 'Medical Check-up', coverage: 88, status: 'Active' },
-    { type: 'Mental Health', coverage: 72, status: 'Active' },
-    { type: 'Maternity', coverage: 100, status: 'Active' },
-    { type: 'Paternity', coverage: 100, status: 'Active' },
-  ]
-  const programs = [
-    { name: 'Morning Yoga Sessions', participants: Math.round(k.totalWorkforce * 0.18), icon: Smile },
-    { name: 'Mental Health Support', participants: Math.round(k.totalWorkforce * 0.12), icon: HeartPulse },
-    { name: 'Fitness Challenge', participants: Math.round(k.totalWorkforce * 0.25), icon: TrendingUp },
-    { name: 'Nutrition & Diet Coaching', participants: Math.round(k.totalWorkforce * 0.15), icon: Stethoscope },
-  ]
-  const rtwCases = Math.max(0, Math.round(k.differentlyAbled * 0.4))
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={HeartPulse}
-        title="Wellbeing & Benefits"
-        subtitle="Employee health, insurance, and wellbeing programs"
-        completionPct={k.completion}
-        totalWorkforce={k.totalWorkforce}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <HrKpiTile index={1} icon={ShieldCheck} label="Health Coverage" value="98" unit="%" trend={{ dir: 'up', text: '+1.2%' }} />
-        <HrKpiTile index={2} icon={BadgeCheck} label="Insurance Enrolled" value={formatNumber(Math.round(k.totalWorkforce * 0.96), 0)} unit="headcount" trend={{ dir: 'up', text: '+3.0%' }} />
-        <HrKpiTile index={3} icon={HeartPulse} label="Wellbeing Programs" value="4" unit="active" trend={{ dir: 'up', text: '+1 new' }} />
-      </div>
-
-      {/* Benefits matrix + Programs */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-5">
-        <motion.section
-          custom={4}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
             <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Benefits Matrix
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Coverage by benefit type</p>
+              <h3 className="text-lg font-black text-slate-900">Level HR-1 — Workforce Profile</h3>
+              <p className="text-xs text-slate-500">Collect workforce counts and classifications required by BRSR Principle 3</p>
             </div>
-          </header>
-          <div className="rounded-xl border border-slate-200/50 overflow-hidden">
-            <table className="w-full text-[11px]">
-              <thead className="bg-cyan-50/70">
-                <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                  <th className="px-3 py-2 text-left font-semibold">Benefit Type</th>
-                  <th className="px-3 py-2 text-right font-semibold">Coverage</th>
-                  <th className="px-3 py-2 text-center font-semibold">Progress</th>
-                  <th className="px-3 py-2 text-left font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {benefits.map((b, i) => (
-                  <motion.tr
-                    key={b.type}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: i * 0.04 }}
-                    className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
-                    style={{ height: 42 }}
-                  >
-                    <td className="px-3 py-2 font-medium text-slate-900">{b.type}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-slate-900">{b.coverage}%</td>
-                    <td className="px-3 py-2">
-                      <div className="h-1.5 rounded-full bg-slate-200/70 overflow-hidden max-w-[100px] mx-auto">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${b.coverage}%`,
-                            background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})`,
-                          }}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="status-pill text-[9px] status-approved">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> {b.status}
-                      </span>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.section>
 
-        {/* Wellbeing programs */}
-        <motion.section
-          custom={5}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <Sparkles className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Wellbeing Programs
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Active engagement initiatives</p>
+            {/* Reconciliation Banner */}
+            <div className={`p-4 rounded-2xl border text-xs flex flex-wrap items-center justify-between gap-3 ${
+              totalWorkforce === totalGender && totalWorkforce > 0
+                ? 'border-emerald-200 bg-emerald-50/60 text-emerald-900'
+                : 'border-rose-200 bg-rose-50/60 text-rose-900'
+            }`}>
+              <div>
+                <span className="font-bold">Workforce Reconciliation: </span>
+                <span>Employees & Workers Total: <strong className="font-bold">{totalWorkforce.toLocaleString()}</strong> | Gender Sum: <strong className="font-bold">{totalGender.toLocaleString()}</strong></span>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full font-bold text-[11px] ${
+                totalWorkforce === totalGender && totalWorkforce > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+              }`}>
+                {totalWorkforce === totalGender && totalWorkforce > 0 ? 'Reconciled 100%' : 'Mismatch Detected'}
+              </span>
             </div>
-          </header>
-          <div className="space-y-2">
-            {programs.map((p, i) => (
-              <motion.div
-                key={p.name}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: i * 0.06 }}
-                className="glass-subtle rounded-xl p-3 flex items-center gap-3 hover:bg-white/70 transition-colors"
-              >
-                <span
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0"
-                  style={{
-                    background: `linear-gradient(135deg, ${TEAL_TINT}, ${TEAL_MIST})`,
-                    border: '1px solid rgba(20,184,166,0.30)',
-                    color: TEAL_DEEP,
-                  }}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Employee Category</label>
+                <input
+                  type="text"
+                  value={hrData.workforceProfile.employeeCategory}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, employeeCategory: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Worker Category</label>
+                <input
+                  type="text"
+                  value={hrData.workforceProfile.workerCategory}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, workerCategory: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Permanent Employees Count</label>
+                <input
+                  type="number"
+                  value={hrData.workforceProfile.permanentEmployees}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, permanentEmployees: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Permanent Workers Count</label>
+                <input
+                  type="number"
+                  value={hrData.workforceProfile.permanentWorkers}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, permanentWorkers: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Other / Contract Employees</label>
+                <input
+                  type="number"
+                  value={hrData.workforceProfile.otherEmployees}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, otherEmployees: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Other / Casual Workers</label>
+                <input
+                  type="number"
+                  value={hrData.workforceProfile.otherWorkers}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, otherWorkers: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Male Count</label>
+                <input
+                  type="number"
+                  value={hrData.workforceProfile.maleCount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, maleCount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Female Count</label>
+                <input
+                  type="number"
+                  value={hrData.workforceProfile.femaleCount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, femaleCount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Other Gender Count</label>
+                <input
+                  type="number"
+                  value={hrData.workforceProfile.otherGenderCount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, otherGenderCount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Workforce Source System</label>
+                <input
+                  type="text"
+                  value={hrData.workforceProfile.workforceSourceSystem}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, workforceSourceSystem: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Source Report Reference</label>
+                <input
+                  type="text"
+                  value={hrData.workforceProfile.sourceReportReference}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, sourceReportReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Supporting Evidence</label>
+                <input
+                  type="text"
+                  value={hrData.workforceProfile.supportingEvidence}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    workforceProfile: { ...hrData.workforceProfile, supportingEvidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Remarks & Data Note</label>
+              <textarea
+                rows={2}
+                value={hrData.workforceProfile.remarks}
+                onChange={(e) => setHrData({
+                  ...hrData,
+                  workforceProfile: { ...hrData.workforceProfile, remarks: e.target.value }
+                })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-teal-500/20"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. LEVEL HR-2 — DIVERSITY & REPRESENTATION */}
+      {activeTab === 'hr-2' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.diversity.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              diversity: { ...hrData.diversity, common: { ...hrData.diversity.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-2 — Workforce Diversity & Representation</h3>
+              <p className="text-xs text-slate-500">Track differently abled and under-represented demographics lawfully collected</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Reporting Population</label>
+                <input
+                  type="text"
+                  value={hrData.diversity.reportingPopulation}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    diversity: { ...hrData.diversity, reportingPopulation: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Workforce Category</label>
+                <input
+                  type="text"
+                  value={hrData.diversity.workforceCategory}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    diversity: { ...hrData.diversity, workforceCategory: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Diversity Category</label>
+                <select
+                  value={hrData.diversity.diversityCategory}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    diversity: { ...hrData.diversity, diversityCategory: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
                 >
-                  <p.icon className="h-4 w-4" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-semibold text-slate-900 truncate">{p.name}</div>
-                  <div className="text-[10px] text-slate-700">{p.participants.toLocaleString()} participants</div>
+                  <option value="Differently Abled (PwD)">Differently Abled (PwD)</option>
+                  <option value="General">General</option>
+                  <option value="Minority">Minority</option>
+                  <option value="SC/ST/OBC">SC/ST/OBC</option>
+                  <option value="Ex-Servicemen">Ex-Servicemen</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Count by Category</label>
+                <input
+                  type="number"
+                  value={hrData.diversity.countByCategory}
+                  onChange={(e) => {
+                    const cnt = Number(e.target.value)
+                    const total = hrData.diversity.totalWorkforceCount || 1
+                    setHrData({
+                      ...hrData,
+                      diversity: {
+                        ...hrData.diversity,
+                        countByCategory: cnt,
+                        calculatedPercentage: Number(((cnt / total) * 100).toFixed(2))
+                      }
+                    })
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Total Population Count</label>
+                <input
+                  type="number"
+                  value={hrData.diversity.totalWorkforceCount}
+                  onChange={(e) => {
+                    const total = Number(e.target.value)
+                    const cnt = hrData.diversity.countByCategory
+                    setHrData({
+                      ...hrData,
+                      diversity: {
+                        ...hrData.diversity,
+                        totalWorkforceCount: total,
+                        calculatedPercentage: total > 0 ? Number(((cnt / total) * 100).toFixed(2)) : 0
+                      }
+                    })
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Percentage (Calculated)</label>
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-teal-700">
+                  {hrData.diversity.calculatedPercentage}%
                 </div>
-                <div className="text-right">
-                  <div className="text-[10px] text-slate-700">Engagement</div>
-                  <div className="text-[12px] font-bold text-slate-900 tabular-nums">
-                    {((p.participants / Math.max(1, k.totalWorkforce)) * 100).toFixed(0)}%
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Source Report</label>
+                <input
+                  type="text"
+                  value={hrData.diversity.sourceReport}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    diversity: { ...hrData.diversity, sourceReport: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Evidence Reference</label>
+                <input
+                  type="text"
+                  value={hrData.diversity.evidence}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    diversity: { ...hrData.diversity, evidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. LEVEL HR-3 — HIRING & TURNOVER */}
+      {activeTab === 'hr-3' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.turnover.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              turnover: { ...hrData.turnover, common: { ...hrData.turnover.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-3 — Hiring & Turnover</h3>
+              <p className="text-xs text-slate-500">Calculate annual attrition and hiring additions across workforce categories</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Employee / Worker Category</label>
+                <input
+                  type="text"
+                  value={hrData.turnover.category}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    turnover: { ...hrData.turnover, category: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Opening Headcount</label>
+                <input
+                  type="number"
+                  value={hrData.turnover.openingHeadcount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    turnover: { ...hrData.turnover, openingHeadcount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">New Joiners</label>
+                <input
+                  type="number"
+                  value={hrData.turnover.newJoiners}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    turnover: { ...hrData.turnover, newJoiners: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Employees / Workers Leaving</label>
+                <input
+                  type="number"
+                  value={hrData.turnover.leavingCount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    turnover: { ...hrData.turnover, leavingCount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Closing Headcount</label>
+                <input
+                  type="number"
+                  value={hrData.turnover.closingHeadcount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    turnover: { ...hrData.turnover, closingHeadcount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Turnover Calculation Method</label>
+                <select
+                  value={hrData.turnover.turnoverCalculationMethod}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    turnover: { ...hrData.turnover, turnoverCalculationMethod: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Average Headcount Formula">Average Headcount Formula</option>
+                  <option value="Opening/Closing Mean">Opening/Closing Mean</option>
+                  <option value="Statutory Rate">Statutory Rate</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Calculated Turnover %</label>
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-teal-700">
+                  {calcTurnoverPct}%
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Source HRMS Report</label>
+                <input
+                  type="text"
+                  value={hrData.turnover.sourceHrmsReport}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    turnover: { ...hrData.turnover, sourceHrmsReport: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. LEVEL HR-4 — TRAINING & DEVELOPMENT */}
+      {activeTab === 'hr-4' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.training.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              training: { ...hrData.training, common: { ...hrData.training.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-4 — Training & Skill Development</h3>
+              <p className="text-xs text-slate-500">Record health & safety, skill upgradation, human rights, and ESG training hours</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Training Programme Name</label>
+                <input
+                  type="text"
+                  value={hrData.training.trainingProgramme}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, trainingProgramme: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Training Category</label>
+                <select
+                  value={hrData.training.trainingCategory}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, trainingCategory: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Health & Safety">Health & Safety</option>
+                  <option value="Skill Upgradation">Skill Upgradation</option>
+                  <option value="POSH & Human Rights">POSH & Human Rights</option>
+                  <option value="Ethics & ESG">Ethics & ESG</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Target Classification</label>
+                <select
+                  value={hrData.training.classification}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, classification: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Employees">Employees</option>
+                  <option value="Workers">Workers</option>
+                  <option value="Both">Both Employees & Workers</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Training Date</label>
+                <input
+                  type="date"
+                  value={hrData.training.trainingDate}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, trainingDate: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Total Sessions</label>
+                <input
+                  type="number"
+                  value={hrData.training.numberOfSessions}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, numberOfSessions: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Duration (Hours)</label>
+                <input
+                  type="number"
+                  value={hrData.training.durationHours}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, durationHours: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Participants Enrolled</label>
+                <input
+                  type="number"
+                  value={hrData.training.participants}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, participants: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Participants Completed</label>
+                <input
+                  type="number"
+                  value={hrData.training.participantsCompleting}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, participantsCompleting: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Delivery Method</label>
+                <select
+                  value={hrData.training.deliveryMethod}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, deliveryMethod: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Classroom">Classroom</option>
+                  <option value="Online/LMS">Online/LMS</option>
+                  <option value="On-the-job">On-the-job</option>
+                  <option value="Hybrid">Hybrid</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Trainer / Agency</label>
+                <input
+                  type="text"
+                  value={hrData.training.trainerAgency}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, trainerAgency: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Assessment Result</label>
+                <input
+                  type="text"
+                  value={hrData.training.assessmentResult}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    training: { ...hrData.training, assessmentResult: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. LEVEL HR-5 — PERFORMANCE REVIEWS */}
+      {activeTab === 'hr-5' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.reviews.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              reviews: { ...hrData.reviews, common: { ...hrData.reviews.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-5 — Performance & Career Reviews</h3>
+              <p className="text-xs text-slate-500">Track coverage percentage of regular performance appraisals</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Reporting Population</label>
+                <input
+                  type="text"
+                  value={hrData.reviews.reportingPopulation}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    reviews: { ...hrData.reviews, reportingPopulation: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Total Eligible Population</label>
+                <input
+                  type="number"
+                  value={hrData.reviews.totalEligiblePopulation}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    reviews: { ...hrData.reviews, totalEligiblePopulation: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Number Reviewed</label>
+                <input
+                  type="number"
+                  value={hrData.reviews.numberReviewed}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    reviews: { ...hrData.reviews, numberReviewed: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Review Completion % (Calculated)</label>
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-teal-700">
+                  {calcReviewPct}%
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Review Period</label>
+                <input
+                  type="text"
+                  value={hrData.reviews.reviewPeriod}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    reviews: { ...hrData.reviews, reviewPeriod: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Review Process Reference</label>
+                <input
+                  type="text"
+                  value={hrData.reviews.reviewProcessReference}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    reviews: { ...hrData.reviews, reviewProcessReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Source HR Report</label>
+                <input
+                  type="text"
+                  value={hrData.reviews.sourceHrReport}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    reviews: { ...hrData.reviews, sourceHrReport: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Supporting Evidence</label>
+                <input
+                  type="text"
+                  value={hrData.reviews.supportingEvidence}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    reviews: { ...hrData.reviews, supportingEvidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. LEVEL HR-6 — EMPLOYEE BENEFITS */}
+      {activeTab === 'hr-6' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.benefits.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              benefits: { ...hrData.benefits, common: { ...hrData.benefits.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-6 — Employee Benefits & Well-being</h3>
+              <p className="text-xs text-slate-500">Collect health insurance, maternity/paternity, PF, and well-being coverage</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Benefit Category</label>
+                <select
+                  value={hrData.benefits.benefitCategory}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    benefits: { ...hrData.benefits, benefitCategory: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Health Insurance">Health Insurance</option>
+                  <option value="Accident Insurance">Accident Insurance</option>
+                  <option value="Maternity Benefits">Maternity Benefits</option>
+                  <option value="Paternity Benefits">Paternity Benefits</option>
+                  <option value="PF & Gratuity">PF & Gratuity</option>
+                  <option value="Day Care Facilities">Day Care Facilities</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Eligible Population</label>
+                <input
+                  type="number"
+                  value={hrData.benefits.eligiblePopulation}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    benefits: { ...hrData.benefits, eligiblePopulation: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Beneficiaries / Recipients</label>
+                <input
+                  type="number"
+                  value={hrData.benefits.beneficiariesCount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    benefits: { ...hrData.benefits, beneficiariesCount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Benefit Coverage % (Calculated)</label>
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-teal-700">
+                  {calcBenefitPct}%
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Benefit Policy Reference</label>
+                <input
+                  type="text"
+                  value={hrData.benefits.benefitPolicyReference}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    benefits: { ...hrData.benefits, benefitPolicyReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Supporting Evidence</label>
+                <input
+                  type="text"
+                  value={hrData.benefits.supportingEvidence}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    benefits: { ...hrData.benefits, supportingEvidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. LEVEL HR-7 — WAGES & REMUNERATION */}
+      {activeTab === 'hr-7' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.wages.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              wages: { ...hrData.wages, common: { ...hrData.wages.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-7 — Wages & Remuneration Disclosures</h3>
+              <p className="text-xs text-slate-500">Collect authorized aggregate remuneration metrics without sensitive personal data</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Reporting Population</label>
+                <input
+                  type="text"
+                  value={hrData.wages.reportingPopulation}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, reportingPopulation: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Wage / Remuneration Metric</label>
+                <select
+                  value={hrData.wages.wageRemunerationMetric}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, wageRemunerationMetric: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Median Remuneration">Median Remuneration</option>
+                  <option value="Minimum Wage Compliance">Minimum Wage Compliance</option>
+                  <option value="Equal Pay Ratio (F:M)">Equal Pay Ratio (F:M)</option>
+                  <option value="Gross Wage Aggregate">Gross Wage Aggregate</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Measurement Period</label>
+                <input
+                  type="text"
+                  value={hrData.wages.measurementPeriod}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, measurementPeriod: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Aggregate Amount / Value</label>
+                <input
+                  type="number"
+                  value={hrData.wages.aggregateAmount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, aggregateAmount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Currency / Unit</label>
+                <input
+                  type="text"
+                  value={hrData.wages.currencyUnit}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, currencyUnit: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Calculation Method</label>
+                <input
+                  type="text"
+                  value={hrData.wages.calculationMethod}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, calculationMethod: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Source Payroll Report</label>
+                <input
+                  type="text"
+                  value={hrData.wages.sourcePayrollReport}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, sourcePayrollReport: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Supporting Evidence</label>
+                <input
+                  type="text"
+                  value={hrData.wages.evidence}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    wages: { ...hrData.wages, evidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. LEVEL HR-8 — GRIEVANCES & HUMAN RIGHTS */}
+      {activeTab === 'hr-8' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.grievances.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              grievances: { ...hrData.grievances, common: { ...hrData.grievances.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-8 — Grievances & Human Rights</h3>
+              <p className="text-xs text-slate-500">Record complaint redressal counts while preserving individual complainant confidentiality</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Grievance Category</label>
+                <select
+                  value={hrData.grievances.grievanceCategory}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    grievances: { ...hrData.grievances, grievanceCategory: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Working Conditions">Working Conditions</option>
+                  <option value="Health & Safety">Health & Safety</option>
+                  <option value="Child Labour / Forced Labour">Child Labour / Forced Labour</option>
+                  <option value="Discrimination / Harassment">Discrimination / Harassment</option>
+                  <option value="Wage Issues">Wage Issues</option>
+                  <option value="POSH">POSH (Prevention of Sexual Harassment)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Grievances Received</label>
+                <input
+                  type="number"
+                  value={hrData.grievances.grievancesReceived}
+                  onChange={(e) => {
+                    const rcv = Number(e.target.value)
+                    const rslv = hrData.grievances.grievancesResolved
+                    setHrData({
+                      ...hrData,
+                      grievances: {
+                        ...hrData.grievances,
+                        grievancesReceived: rcv,
+                        grievancesPending: Math.max(0, rcv - rslv)
+                      }
+                    })
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Grievances Resolved</label>
+                <input
+                  type="number"
+                  value={hrData.grievances.grievancesResolved}
+                  onChange={(e) => {
+                    const rslv = Number(e.target.value)
+                    const rcv = hrData.grievances.grievancesReceived
+                    setHrData({
+                      ...hrData,
+                      grievances: {
+                        ...hrData.grievances,
+                        grievancesResolved: rslv,
+                        grievancesPending: Math.max(0, rcv - rslv)
+                      }
+                    })
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Grievances Pending (Calculated)</label>
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-rose-600">
+                  {hrData.grievances.grievancesPending}
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Resolution Method</label>
+                <input
+                  type="text"
+                  value={hrData.grievances.resolutionMethod}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    grievances: { ...hrData.grievances, resolutionMethod: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Responsible Department</label>
+                <input
+                  type="text"
+                  value={hrData.grievances.responsibleDepartment}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    grievances: { ...hrData.grievances, responsibleDepartment: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Source Register</label>
+                <input
+                  type="text"
+                  value={hrData.grievances.sourceRegister}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    grievances: { ...hrData.grievances, sourceRegister: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Supporting Evidence</label>
+                <input
+                  type="text"
+                  value={hrData.grievances.supportingEvidence}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    grievances: { ...hrData.grievances, supportingEvidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. LEVEL HR-9 — SAFETY & OCCUPATIONAL WELL-BEING */}
+      {activeTab === 'hr-9' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={hrData.safetyCoord.common}
+            accentColor="teal"
+            onChange={(upd) => setHrData({
+              ...hrData,
+              safetyCoord: { ...hrData.safetyCoord, common: { ...hrData.safetyCoord.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level HR-9 — Occupational Safety Coordination</h3>
+              <p className="text-xs text-slate-500">Coordinate HR-owned workforce well-being programs and medical coverage</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Employee / Worker Population</label>
+                <input
+                  type="text"
+                  value={hrData.safetyCoord.population}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    safetyCoord: { ...hrData.safetyCoord, population: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Participation Count</label>
+                <input
+                  type="number"
+                  value={hrData.safetyCoord.participationCount}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    safetyCoord: { ...hrData.safetyCoord, participationCount: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Workforce Well-being Programme Details</label>
+                <input
+                  type="text"
+                  value={hrData.safetyCoord.workforceWellbeingProgramme}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    safetyCoord: { ...hrData.safetyCoord, workforceWellbeingProgramme: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Health & Safety Training Summary</label>
+                <textarea
+                  rows={2}
+                  value={hrData.safetyCoord.healthSafetyTrainingSummary}
+                  onChange={(e) => setHrData({
+                    ...hrData,
+                    safetyCoord: { ...hrData.safetyCoord, healthSafetyTrainingSummary: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 11. EVIDENCE TAB */}
+      {activeTab === 'evidence' && (
+        <CommonEvidenceManager roleKey="HR_USER" accentColor="teal" />
+      )}
+
+      {/* 12. SUBMISSIONS TAB */}
+      {activeTab === 'submissions' && (
+        <div className="space-y-6">
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl">
+            <h3 className="text-lg font-black text-slate-900 mb-1">My HR Submissions History</h3>
+            <p className="text-xs text-slate-500 mb-4">Complete audit trail of submitted packages and reviewer signoffs</p>
+            <div className="divide-y divide-slate-100 text-xs">
+              {assignments.map((asg) => (
+                <div key={asg.id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-800 text-sm">{asg.module}</span>
+                      <span className="text-[11px] font-semibold text-slate-500">({asg.reportingYear})</span>
+                    </div>
+                    <p className="text-slate-500 text-xs mt-0.5">{asg.description}</p>
+                    {asg.criticalWarning && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md inline-block">
+                        <AlertTriangle className="h-3 w-3" />
+                        <span>{asg.criticalWarning}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2.5 py-1 rounded-full font-bold text-[11px] ${
+                      asg.submissionStatus === 'Submitted' ? 'bg-blue-100 text-blue-800' :
+                      asg.submissionStatus === 'Returned for Correction' ? 'bg-rose-100 text-rose-800' :
+                      asg.submissionStatus === 'Under Review' ? 'bg-purple-100 text-purple-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {asg.submissionStatus}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowValidationModal(true)}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Audit Trail
+                    </button>
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.section>
-      </div>
-
-      {/* Return-to-Work + EAP */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <motion.section
-          custom={6}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <Stethoscope className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Return-to-Work Cases
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Post-medical-leave reintegration</p>
-            </div>
-          </header>
-          {rtwCases > 0 ? (
-            <div className="grid grid-cols-3 gap-2">
-              <div className="glass-subtle rounded-xl px-3 py-2 text-center">
-                <div className="text-[10px] uppercase tracking-wide text-slate-700">Active</div>
-                <div className="text-[18px] font-bold text-slate-900 tabular-nums">{rtwCases}</div>
-              </div>
-              <div className="glass-subtle rounded-xl px-3 py-2 text-center">
-                <div className="text-[10px] uppercase tracking-wide text-slate-700">Cleared</div>
-                <div className="text-[18px] font-bold text-slate-900 tabular-nums">{Math.round(rtwCases * 0.6)}</div>
-              </div>
-              <div className="glass-subtle rounded-xl px-3 py-2 text-center">
-                <div className="text-[10px] uppercase tracking-wide text-slate-700">Pending</div>
-                <div className="text-[18px] font-bold text-slate-900 tabular-nums">{Math.round(rtwCases * 0.4)}</div>
-              </div>
-            </div>
-          ) : (
-            <div className="py-6 text-center">
-              <CheckCircle2 className="mx-auto h-7 w-7" style={{ color: TEAL_SECONDARY }} />
-              <p className="text-[11px] text-slate-700 mt-2 font-medium">No active RTW cases</p>
-              <p className="text-[10px] text-slate-500">All cleared medically</p>
-            </div>
-          )}
-        </motion.section>
-
-        {/* EAP & Wellness spend */}
-        <motion.section
-          custom={7}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <HeartHandshake className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Employee Assistance Program
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Confidential counseling & support</p>
-            </div>
-          </header>
-          <div className="space-y-3">
-            <div className="glass-subtle rounded-xl px-3 py-2.5 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-700">Counseling sessions (YTD)</span>
-              <span className="text-[13px] font-bold text-slate-900 tabular-nums">{Math.round(k.totalWorkforce * 0.05).toLocaleString()}</span>
-            </div>
-            <div className="glass-subtle rounded-xl px-3 py-2.5 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-700">Wellness spend / head</span>
-              <span className="text-[13px] font-bold text-slate-900 tabular-nums">₹{(k.trainingHours > 0 ? 1850 : 1200).toLocaleString()}</span>
-            </div>
-            <div className="glass-subtle rounded-xl px-3 py-2.5 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-700">Satisfaction Index</span>
-              <span className="status-pill text-[9px] status-approved">8.4 / 10</span>
-            </div>
-          </div>
-        </motion.section>
-      </div>
-    </div>
-  )
-}
-
-/* ============================================================
- * Screen 4 — Human Rights & Fair Work
- * ============================================================ */
-
-function RightsScreen({ k }: { k: Kpis }) {
-  // Derive grievances deterministically from KPIs
-  const grievancesOpen = Math.max(1, Math.round(k.totalWorkforce * 0.004))
-  const grievancesResolved = Math.max(2, Math.round(k.totalWorkforce * 0.012))
-  const totalGrievances = grievancesOpen + grievancesResolved
-  const resolutionRate = totalGrievances > 0 ? (grievancesResolved / totalGrievances) * 100 : 0
-
-  const grievanceTypes = ['Harassment', 'Wage Dispute', 'Working Hours', 'Discrimination', 'Safety Concern']
-  const statuses = ['OPEN', 'UNDER_REVIEW', 'RESOLVED', 'OPEN', 'RESOLVED']
-  const grievanceRows = Array.from({ length: 6 }).map((_, i) => {
-    const r = ((k.totalWorkforce + i * 17) % 997) / 997
-    return {
-      id: `GRV-${(2400 + i).toString()}`,
-      type: grievanceTypes[i % grievanceTypes.length],
-      filedBy: ['Anon. Employee', 'Worker Rep', 'Anon. Worker', 'Supervisor', 'Union Rep', 'HR Desk'][i % 6],
-      date: new Date(Date.now() - (i + 1) * 86400_000 * (i + 2)).toISOString(),
-      status: statuses[i % statuses.length],
-      resolution: statuses[i % statuses.length] === 'RESOLVED'
-        ? 'Mediated & closed'
-        : statuses[i % statuses.length] === 'OPEN'
-        ? 'Awaiting inquiry'
-        : 'Under investigation',
-    }
-  })
-
-  const rightsTraining = Math.min(100, Math.round((k.trainingHours / Math.max(1, k.totalWorkforce * 4)) * 100))
-
-  const checklist = [
-    { label: 'Child Labour', status: 'None Reported', ok: true },
-    { label: 'Forced Labour', status: 'None Reported', ok: true },
-    { label: 'Discrimination', status: 'None Reported', ok: true },
-    { label: 'Freedom of Association', status: 'Upheld', ok: true },
-    { label: 'Minimum Wage Compliance', status: '100% Compliant', ok: true },
-    { label: 'Working Hours Limits', status: 'Within Limits', ok: true },
-  ]
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={Scale}
-        title="Human Rights & Fair Work"
-        subtitle="Labour rights, grievances, equal opportunity"
-        completionPct={k.completion}
-        totalWorkforce={k.totalWorkforce}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <HrKpiTile index={1} icon={AlertTriangle} label="Grievances Open" value={grievancesOpen.toString()} unit="cases" trend={{ dir: grievancesOpen < 5 ? 'down' : 'up', text: `${grievancesOpen < 5 ? '-' : '+'}${grievancesOpen - 3}` }} />
-        <HrKpiTile index={2} icon={CheckCircle2} label="Grievances Resolved" value={grievancesResolved.toString()} unit="cases" trend={{ dir: 'up', text: `+${Math.max(1, Math.round(grievancesResolved * 0.2))}` }} />
-        <HrKpiTile index={3} icon={BadgeCheck} label="Resolution Rate" value={resolutionRate.toFixed(1)} unit="%" trend={{ dir: 'up', text: `+${(resolutionRate - 70).toFixed(0)}%` }} />
-      </div>
-
-      {/* Rights training + Fair wages */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <motion.section
-          custom={4}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Human Rights Training Coverage
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Workforce trained on rights & policies</p>
-            </div>
-          </header>
-          <div className="flex items-end gap-4 mb-3">
-            <div>
-              <div className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Coverage</div>
-              <div className="text-3xl font-bold text-slate-900 tabular-nums">{rightsTraining}%</div>
-            </div>
-            <div className="flex-1 pb-1">
-              <div className="h-3 rounded-full bg-slate-200/70 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${rightsTraining}%` }}
-                  transition={{ duration: 0.9, ease: 'easeOut' }}
-                  className="h-full rounded-full"
-                  style={{
-                    background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY}, ${TEAL_SOFT})`,
-                    boxShadow: `0 0 10px -1px ${TEAL_DEEP}80`,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/60">
-            <div className="glass-subtle rounded-xl px-2 py-1.5 text-center">
-              <div className="text-[9px] uppercase tracking-wide text-slate-700">Trained</div>
-              <div className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.round(k.totalWorkforce * rightsTraining / 100).toLocaleString()}</div>
-            </div>
-            <div className="glass-subtle rounded-xl px-2 py-1.5 text-center">
-              <div className="text-[9px] uppercase tracking-wide text-slate-700">Pending</div>
-              <div className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.round(k.totalWorkforce * (100 - rightsTraining) / 100).toLocaleString()}</div>
-            </div>
-            <div className="glass-subtle rounded-xl px-2 py-1.5 text-center">
-              <div className="text-[9px] uppercase tracking-wide text-slate-700">Sessions</div>
-              <div className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.max(1, Math.round(rightsTraining / 12))}</div>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Fair wages */}
-        <motion.section
-          custom={5}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <Wallet className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Fair Wages & Minimum Wage
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Statutory wage compliance status</p>
-            </div>
-          </header>
-          <div className="flex items-center gap-4">
-            <div
-              className="relative inline-flex h-24 w-24 items-center justify-center rounded-2xl"
-              style={{
-                background: `linear-gradient(135deg, ${TEAL_TINT}, ${TEAL_MIST})`,
-                border: `1px solid rgba(20,184,166,0.30)`,
-                boxShadow: `0 8px 24px -6px ${TEAL_DEEP}40, inset 0 1px 1px rgba(255,255,255,0.7)`,
-              }}
-            >
-              <BadgeCheck className="h-8 w-8" style={{ color: TEAL_DEEP }} />
-            </div>
-            <div className="flex-1">
-              <div className="text-[10px] uppercase tracking-wide text-slate-700 font-semibold">Compliance Status</div>
-              <div className="text-2xl font-bold text-slate-900">100% Compliant</div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="status-pill text-[9px] status-approved">
-                  <CheckCircle2 className="h-2.5 w-2.5" /> Above MW
-                </span>
-                <span className="text-[10px] text-slate-700">All entities · All categories</span>
-              </div>
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-slate-200/60 grid grid-cols-2 gap-2">
-            <div className="glass-subtle rounded-xl px-3 py-2">
-              <div className="text-[9px] uppercase tracking-wide text-slate-700">Avg. Entry Wage</div>
-              <div className="text-[13px] font-bold text-slate-900 tabular-nums">₹18,450 / mo</div>
-            </div>
-            <div className="glass-subtle rounded-xl px-3 py-2">
-              <div className="text-[9px] uppercase tracking-wide text-slate-700">Statutory Minimum</div>
-              <div className="text-[13px] font-bold text-slate-900 tabular-nums">₹15,000 / mo</div>
-            </div>
-          </div>
-        </motion.section>
-      </div>
-
-      {/* Grievance registry */}
-      <motion.section
-        custom={6}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <FileText className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-              Grievance Registry
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">All filed grievances · last 6 entries</p>
-          </div>
-          <span className="status-pill text-[9px] status-warning">
-            {grievancesOpen} open
-          </span>
-        </header>
-        <div className="max-h-80 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 z-10" style={{ background: 'rgba(207,250,254,0.92)', backdropFilter: 'blur(8px)' }}>
-              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                <th className="px-3 py-2 text-left font-semibold">ID</th>
-                <th className="px-3 py-2 text-left font-semibold">Type</th>
-                <th className="px-3 py-2 text-left font-semibold">Filed By</th>
-                <th className="px-3 py-2 text-left font-semibold">Date</th>
-                <th className="px-3 py-2 text-left font-semibold">Status</th>
-                <th className="px-3 py-2 text-left font-semibold">Resolution</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grievanceRows.map((g, i) => (
-                <motion.tr
-                  key={g.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: i * 0.025 }}
-                  className="border-t border-slate-100 hover:bg-cyan-50/40 transition-colors"
-                  style={{ height: 40 }}
-                >
-                  <td className="px-3 py-2 font-mono text-slate-700">{g.id}</td>
-                  <td className="px-3 py-2 font-medium text-slate-900">{g.type}</td>
-                  <td className="px-3 py-2 text-slate-700">{g.filedBy}</td>
-                  <td className="px-3 py-2 text-slate-700">
-                    {new Date(g.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`status-pill text-[9px] ${statusClass(g.status)}`}>
-                      {g.status.replace(/_/g, ' ').toLowerCase()}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-700">{g.resolution}</td>
-                </motion.tr>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.section>
-
-      {/* Equal opportunity + Labour rights checklist */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Equal opportunity */}
-        <motion.section
-          custom={7}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <Landmark className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Equal Opportunity Metrics
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Pay equity & promotion parity</p>
-            </div>
-          </header>
-          <div className="space-y-3">
-            <div className="glass-subtle rounded-xl p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-semibold text-slate-700">Gender Pay Gap</span>
-                <span className="text-[12px] font-bold text-slate-900 tabular-nums">3.2%</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '32%' }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                  className="h-full rounded-full"
-                  style={{ background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})` }}
-                />
-              </div>
-              <div className="text-[9px] text-slate-700 mt-1">Target: &lt; 5% · Within threshold</div>
-            </div>
-            <div className="glass-subtle rounded-xl p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-semibold text-slate-700">Promotion Equity (Female)</span>
-                <span className="text-[12px] font-bold text-slate-900 tabular-nums">42%</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: '42%' }}
-                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
-                  className="h-full rounded-full"
-                  style={{ background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})` }}
-                />
-              </div>
-              <div className="text-[9px] text-slate-700 mt-1">Share of promotions · Target: ≥ 35%</div>
-            </div>
-            <div className="glass-subtle rounded-xl p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11px] font-semibold text-slate-700">Female Leadership</span>
-                <span className="text-[12px] font-bold text-slate-900 tabular-nums">{Math.max(15, Math.round(k.femaleShare * 0.7))}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-slate-200/70 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${Math.max(15, Math.round(k.femaleShare * 0.7))}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
-                  className="h-full rounded-full"
-                  style={{ background: `linear-gradient(90deg, ${TEAL_DEEP}, ${TEAL_PRIMARY})` }}
-                />
-              </div>
-              <div className="text-[9px] text-slate-700 mt-1">Women in managerial roles</div>
             </div>
           </div>
-        </motion.section>
+        </div>
+      )}
 
-        {/* Labour rights checklist */}
-        <motion.section
-          custom={8}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-                <Gavel className="h-4 w-4" style={{ color: TEAL_DEEP }} />
-                Labour Rights Compliance
-              </h2>
-              <p className="text-[10px] text-slate-700 mt-0.5">Statutory & policy checklist</p>
-            </div>
-            <span className="status-pill text-[9px] status-approved">
-              <Lock className="h-2.5 w-2.5" /> All Clear
-            </span>
-          </header>
-          <div className="space-y-2">
-            {checklist.map((c, i) => (
-              <motion.div
-                key={c.label}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
-                className="glass-subtle rounded-xl p-3 flex items-center gap-3"
-              >
-                <span
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-md flex-shrink-0"
-                  style={{
-                    background: 'rgba(16,185,129,0.12)',
-                    color: '#047857',
-                    border: '1px solid rgba(16,185,129,0.25)',
-                  }}
-                >
-                  <CheckCircle2 className="h-4 w-4" />
-                </span>
-                <div className="flex-1">
-                  <div className="text-[12px] font-semibold text-slate-900">{c.label}</div>
-                  <div className="text-[10px] text-slate-700">{c.status}</div>
+      {/* 13. ACTIVITY LOG TAB */}
+      {activeTab === 'activity' && (
+        <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl">
+          <div className="flex items-center gap-2 mb-4">
+            <History className="h-5 w-5 text-teal-600" />
+            <h3 className="text-base font-bold text-slate-900">HR Contributor Activity Log</h3>
+          </div>
+          <div className="space-y-3">
+            {activities.map((act) => (
+              <div key={act.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 flex items-start justify-between gap-3 text-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">{act.user}</span>
+                    <span className="rounded-md bg-teal-100 text-teal-800 px-1.5 py-0.5 text-[10px] font-bold">{act.action}</span>
+                    <span className="font-semibold text-slate-600">• {act.target}</span>
+                  </div>
+                  <p className="text-slate-500 mt-1">{act.details}</p>
                 </div>
-                <span className="status-pill text-[9px] status-approved">
-                  ✓ Compliant
-                </span>
-              </motion.div>
+                <span className="text-[11px] text-slate-400 whitespace-nowrap">{act.timestamp}</span>
+              </div>
             ))}
           </div>
-        </motion.section>
-      </div>
-    </div>
-  )
-}
+        </div>
+      )}
 
-/* ============================================================
- * Main component
- * ============================================================ */
-export function HrWorkspace() {
-  const { activeModule } = useApp()
-  const [overview, setOverview] = useState<OverviewData | null>(null)
-  const [activities, setActivities] = useState<ActivityItem[]>([])
-  const [tasks, setTasks] = useState<ActionItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const mountedRef = useRef(true)
-
-  /* ---- fetchers ---- */
-  const fetchOverview = useCallback(async () => {
-    try {
-      const res = await fetch('/api/overview', { cache: 'no-store' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as OverviewData
-      if (!mountedRef.current) return
-      setOverview(data)
-      setError('')
-    } catch (e) {
-      if (!mountedRef.current) return
-      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
-    }
-  }, [overview])
-
-  const fetchActivities = useCallback(async () => {
-    try {
-      const res = await fetch('/api/activity?take=10', { cache: 'no-store' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as ActivityResponse
-      if (!mountedRef.current) return
-      const filtered = (Array.isArray(data.items) ? data.items : []).filter(isHrActivity).slice(0, 5)
-      setActivities(filtered)
-    } catch {
-      /* silent — keep existing feed on poll error */
-    }
-  }, [])
-
-  const fetchTasks = useCallback(async () => {
-    try {
-      const res = await fetch('/api/action-items', { cache: 'no-store' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as ActionItemsResponse
-      if (!mountedRef.current) return
-      const filtered = (Array.isArray(data.tasks) ? data.tasks : []).filter(isHrTask).slice(0, 6)
-      setTasks(filtered)
-    } catch {
-      /* silent */
-    }
-  }, [])
-
-  /* ---- initial load ---- */
-  useEffect(() => {
-    mountedRef.current = true
-    ;(async () => {
-      setLoading(true)
-      await Promise.all([fetchOverview(), fetchActivities(), fetchTasks()])
-      if (mountedRef.current) setLoading(false)
-    })()
-    return () => { mountedRef.current = false }
-  }, [])
-
-  /* ---- polling: activity every 30s, overview & tasks every 60s ---- */
-  useEffect(() => {
-    const activityTimer = setInterval(fetchActivities, 30_000)
-    const overviewTimer = setInterval(fetchOverview, 60_000)
-    const tasksTimer = setInterval(fetchTasks, 60_000)
-    return () => {
-      clearInterval(activityTimer)
-      clearInterval(overviewTimer)
-      clearInterval(tasksTimer)
-    }
-  }, [fetchActivities, fetchOverview, fetchTasks])
-
-  const k = useMemo<Kpis | null>(() => {
-    if (!overview?.kpis) return null
-    return overview.kpis
-  }, [overview])
-
-  const trends = useMemo<Record<string, Record<string, number>> | undefined>(() => {
-    const t = overview?.trends as Record<string, Record<string, number>> | undefined
-    return t && typeof t === 'object' ? t : undefined
-  }, [overview])
-
-  const periods = overview?.periods
-
-  // ---- Loading skeleton ----
-  if (loading && !overview) {
-    return <WorkspaceSkeleton tiles={activeModule === 'hr-workforce' ? 4 : 3} />
-  }
-
-  // ---- Error state ----
-  if (error && !overview) {
-    return <ErrorState error={error} onRetry={() => window.location.reload()} />
-  }
-
-  // ---- Empty state ----
-  if (!overview || !k) {
-    return (
-      <EmptyState
-        icon={Users}
-        title="No workforce data yet"
-        subtitle="Set up a reporting period to populate the HR workspace."
+      {/* Validation & Submit Modal */}
+      <CommonValidationModal
+        isOpen={showValidationModal}
+        onClose={() => setShowValidationModal(false)}
+        roleKey="HR_USER"
+        levelName={activeTab.toUpperCase()}
+        onSubmitSuccess={() => {
+          setAssignments(contributorStore.getAssignments('HR_USER'))
+          setActivities(contributorStore.getActivities('HR_USER'))
+        }}
       />
-    )
-  }
-
-  // ---- Dispatch by module ----
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={activeModule}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
-      >
-        {activeModule === 'hr-workforce' && <WorkforceScreen k={k} periods={periods} />}
-        {activeModule === 'hr-training' && <TrainingScreen k={k} trends={trends} />}
-        {activeModule === 'hr-wellbeing' && <WellbeingScreen k={k} />}
-        {activeModule === 'hr-rights' && <RightsScreen k={k} />}
-      </motion.div>
-    </AnimatePresence>
+    </div>
   )
 }

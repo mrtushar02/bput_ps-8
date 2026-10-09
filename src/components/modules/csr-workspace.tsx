@@ -2,1767 +2,1302 @@
 /**
  * CsrWorkspace — MEIL ESG / BRSR Reporting Platform
  *
- * CSR workspace. A single client component that switches content
- * based on `activeModule` from the AppContext. Handles six module keys,
- * each rendering its own dedicated screen:
- *
- *   - 'csr-projects'      → CSR Projects registry + status
- *   - 'csr-budgets'       → Budget allocation & utilization
- *   - 'csr-beneficiaries'  → Beneficiary demographics
- *   - 'csr-impact'        → Impact metrics & outcomes
- *   - 'csr-community'      → Community engagement programs
- *   - 'csr-local'         → Local area development
- *
- * (The 'overview', 'evidence', and 'submissions' keys are routed
- * elsewhere by the module-router — not handled here.)
- *
- * Color theme: Rose / Pink (#f43f5e, #ec4899, #e11d48) — warm,
- * people-centric palette aligned with the social-impact domain.
- *
- * Data:
- *   GET /api/overview          → kpis + trends + periods
- *   GET /api/activity?take=10  → recent activities (CSR-filtered client-side)
+ * CSR & Social Impact Contributor Workspace:
+ * - Level 0: Universal Common Reporting Fields (all 24 fields)
+ * - Level CSR-1: CSR Project Master (Schedule VII, Locations, Approvals)
+ * - Level CSR-2: Programme Activities & Beneficiaries (Planned vs Actual, rolls)
+ * - Level CSR-3: CSR Expenditure References (Finance reconciliation, vouchers)
+ * - Level CSR-4: Project Outcomes & Social Impact (Baseline vs Target vs Actual)
+ * - Level CSR-5: Community Engagement & Grievances (Locality redressal)
+ * - Level CSR-6: Social Impact Assessment (Third-party agency, SROI, web disclosure)
+ * - Level CSR-7: Rehabilitation & Resettlement (PAFs, Compensation disbursements)
+ * - Screen 1: CSR & Social Impact Console (6 Dashboard Cards + My CSR Assignments Table)
+ * - Evidence & Documents Repository
+ * - Shared Validation & Multi-state Submission Workflow
  */
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  HeartHandshake, Wallet, Users, TrendingUp, MapPin, Building2,
-  ArrowUpRight, ArrowDownRight, RefreshCw, AlertCircle,
-  ChevronRight, CheckCircle2, Clock, HandHeart, Sprout,
-  GraduationCap, Stethoscope, Droplets, School, HeartPulse,
-  Sparkles, BadgeCheck, Target, Megaphone, Activity as ActivityIcon,
+  HeartHandshake, Users, Wallet, BarChart3, MessageCircle, MapPin,
+  ShieldCheck, CheckCircle2, Clock, AlertTriangle, ArrowRight, Save, Send,
+  Upload, RefreshCw, Sparkles, Filter, Eye, Edit3, ChevronRight, Layers,
+  FileText, TrendingUp, Building2, FileCheck2, History, Award
 } from 'lucide-react'
-import {
-  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
-  ResponsiveContainer, Tooltip, XAxis, YAxis, RadialBarChart,
-  RadialBar, Legend,
-} from 'recharts'
 import { useApp } from '@/lib/auth-context'
+import {
+  contributorStore,
+  type ContributorAssignment,
+  type ActivityEvent
+} from '@/lib/contributor-store'
+import { CommonLevel0Card } from './common-level0-card'
+import { CommonEvidenceManager } from './common-evidence-manager'
+import { CommonValidationModal } from './common-validation-modal'
 
-/* ============================================================
- * Types — strict API shapes
- * ============================================================ */
-interface Kpis {
-  totalEmissions: number
-  energyGJ: number
-  waterWithdrawalKL: number
-  wasteGeneratedT: number
-  totalEmployees: number
-  totalWorkers: number
-  totalWorkforce: number
-  trainingHours: number
-  completion: number
-  totalSubs: number
-  approvedSubs: number
-  draftSubs: number
-  reviewSubs: number
-  evidenceTotal: number
-  evidenceVerified: number
-  projects: number
-  orgs: number
-  brsrReadiness: number
-  openExceptions: number
-  [key: string]: unknown
-}
-interface OverviewData {
-  kpis: Kpis
-  trends?: Record<string, Record<string, number>>
-  periods?: { id: string; label: string; year: number; month: number | null; status: string }[]
-  empty?: boolean
-  [key: string]: unknown
-}
-
-interface ActivityItem {
-  id: string
-  actorName: string
-  actorRole: string
-  action: string
-  title: string
-  description?: string | null
-  module?: string | null
-  status?: string | null
-  createdAt: string
-}
-interface ActivityResponse { items: ActivityItem[]; total: number; count: number }
-
-/* ============================================================
- * Theme constants — Rose / Pink
- * ============================================================ */
-const TOOLTIP_STYLE: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.96)',
-  border: '1px solid rgba(244,63,94,0.30)',
-  borderRadius: 12,
-  fontSize: 11,
-  color: '#0f172a',
-  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.06), 0 10px 24px -6px rgba(225,29,72,0.22)',
-  backdropFilter: 'blur(12px)',
-  padding: '8px 12px',
-}
-
-const ROSE_PRIMARY = '#f43f5e'    // rose-500
-const ROSE_SECONDARY = '#ec4899' // pink-500
-const ROSE_DEEP = '#e11d48'      // rose-600
-const ROSE_SOFT = '#fda4af'     // rose-300
-const ROSE_TINT = '#ffe4e6'     // rose-100
-const ROSE_MIST = '#fecdd3'     // rose-200
-
-const DONUT_PALETTE = [ROSE_DEEP, ROSE_PRIMARY, ROSE_SECONDARY]
-
-/* ============================================================
- * Helpers
- * ============================================================ */
-function timeAgo(iso: string): string {
-  const d = new Date(iso)
-  const s = Math.floor((Date.now() - d.getTime()) / 1000)
-  if (s < 30) return 'just now'
-  if (s < 60) return `${s}s ago`
-  const m = Math.floor(s / 60)
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const dd = Math.floor(h / 24)
-  return `${dd}d ago`
-}
-
-function initials(name: string): string {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase() ?? '').join('') || '?'
-}
-
-function formatNumber(n: number, digits = 1): string {
-  if (!isFinite(n)) return '0'
-  if (n >= 1000) return (n / 1000).toFixed(digits) + 'k'
-  return n.toFixed(digits)
-}
-
-function formatCurrency(n: number): string {
-  if (!isFinite(n)) return '₹0'
-  if (n >= 10000000) return '₹' + (n / 10000000).toFixed(2) + 'Cr'
-  if (n >= 100000) return '₹' + (n / 100000).toFixed(2) + 'L'
-  if (n >= 1000) return '₹' + (n / 1000).toFixed(1) + 'k'
-  return '₹' + n.toFixed(0)
-}
-
-function statusClass(status?: string | null): string {
-  switch ((status ?? '').toUpperCase()) {
-    case 'APPROVED': case 'COMPLETED': case 'RESOLVED': return 'status-approved'
-    case 'SUBMITTED': return 'status-submitted'
-    case 'UNDER_REVIEW': case 'REVIEW': case 'OPEN': return 'status-review'
-    case 'DRAFT': case 'PENDING': return 'status-draft'
-    case 'LOCKED': return 'status-locked'
-    case 'MISSING': case 'ERROR': case 'BLOCKING': return 'status-missing'
-    case 'WARNING': return 'status-warning'
-    case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
-    default: return 'status-draft'
-  }
-}
-
-/** Filter activities relevant to CSR. */
-function isCsrActivity(a: ActivityItem): boolean {
-  const mod = (a.module ?? '').toUpperCase()
-  const act = (a.action ?? '').toUpperCase()
-  const title = (a.title ?? '').toLowerCase()
-  const desc = (a.description ?? '').toLowerCase()
-  const csrModules = ['CSR', 'COMMUNITY', 'SOCIAL', 'IMPACT', 'BENEFICIARY']
-  const csrActions = ['CSR', 'COMMUNITY', 'IMPACT', 'PROJECT_', 'BENEFICIARY', 'OUTREACH']
-  const csrKeywords = ['csr', 'community', 'beneficiary', 'social', 'impact', 'outreach', 'local area', 'ngo']
-  return (
-    csrModules.some(k => mod.includes(k)) ||
-    csrActions.some(k => act.includes(k)) ||
-    csrKeywords.some(k => title.includes(k) || desc.includes(k))
-  )
-}
-
-/* ============================================================
- * Animation variants — staggered entrance
- * ============================================================ */
-const cardEnter = {
-  hidden: { opacity: 0, y: 16 },
-  visible: (i = 0) => ({
-    opacity: 1, y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const, delay: i * 0.05 },
-  }),
-}
-
-/* ============================================================
- * Shared sub-components
- * ============================================================ */
-
-/** Module header — title + subtitle + icon + live pill. */
-function ModuleHeader({
-  icon: Icon, title, subtitle, completionPct = 0, badgeText,
-}: {
-  icon: React.ElementType
-  title: string
-  subtitle: string
-  completionPct?: number
-  badgeText?: string
-}) {
-  return (
-    <motion.header
-      custom={0}
-      variants={cardEnter}
-      initial="hidden"
-      animate="visible"
-      className="glass glass-shimmer rounded-[20px] px-5 py-3.5 flex items-center justify-between gap-3 flex-wrap"
-    >
-      <div className="flex items-center gap-3">
-        <span
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl"
-          style={{
-            background: `linear-gradient(135deg, ${ROSE_PRIMARY}, ${ROSE_DEEP})`,
-            color: '#fff',
-            boxShadow: `0 4px 14px -3px ${ROSE_DEEP}80, inset 0 1px 1px rgba(255,255,255,0.4)`,
-          }}
-        >
-          <Icon className="h-4.5 w-4.5" />
-        </span>
-        <div>
-          <h1 className="text-[18px] font-bold text-slate-900 tracking-tight">{title}</h1>
-          <p className="text-[11px] text-slate-700 mt-0.5">{subtitle}</p>
-        </div>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        {badgeText && (
-          <span className="glass-subtle rounded-xl px-3 py-1.5 text-[10px] font-medium text-slate-700 inline-flex items-center gap-1.5">
-            <Building2 className="h-3 w-3" style={{ color: ROSE_DEEP }} />
-            {badgeText}
-          </span>
-        )}
-        <span className="status-pill text-[10px] status-approved">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          Live
-        </span>
-        <div className="glass-subtle rounded-xl px-3 py-1.5 flex items-center gap-2">
-          <div className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Progress</div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-1.5 w-20 rounded-full bg-slate-200/70 overflow-hidden">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${completionPct}%`,
-                  background: `linear-gradient(90deg, ${ROSE_DEEP}, ${ROSE_PRIMARY})`,
-                  boxShadow: `0 0 8px -1px ${ROSE_PRIMARY}80`,
-                }}
-              />
-            </div>
-            <span className="text-[12px] font-bold text-slate-900 tabular-nums">{completionPct.toFixed(0)}%</span>
-          </div>
-        </div>
-      </div>
-    </motion.header>
-  )
-}
-
-/** Compact KPI tile — rose icon tile + label + value + trend pill. */
-function CsrKpiTile({
-  icon: Icon, label, value, unit, trend, index = 0,
-}: {
-  icon: React.ElementType
-  label: string
-  value: string
-  unit?: string
-  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
-  index?: number
-}) {
-  return (
-    <motion.div
-      custom={index}
-      variants={cardEnter}
-      initial="hidden"
-      animate="visible"
-      className="glass glass-shimmer rounded-2xl p-3.5 flex flex-col gap-1.5"
-      style={{ maxHeight: 100 }}
-    >
-      <div className="flex items-center justify-between">
-        <span
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255,228,230,0.90), rgba(254,205,211,0.70))',
-            border: '1px solid rgba(244,63,94,0.30)',
-            color: ROSE_DEEP,
-            boxShadow: '0 2px 8px -2px rgba(225,29,72,0.30), inset 0 1px 1px rgba(255,255,255,0.6)',
-          }}
-        >
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-        {trend && (
-          <span className={`status-pill text-[9px] ${
-            trend.tone ?? (trend.dir === 'up' ? 'status-approved' : trend.dir === 'down' ? 'status-missing' : 'status-draft')
-          }`}>
-            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
-             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
-            {trend.text}
-          </span>
-        )}
-      </div>
-      <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
-      <div className="flex items-baseline gap-1">
-        <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
-        {unit && <span className="text-[10px] text-slate-700 font-medium">{unit}</span>}
-      </div>
-    </motion.div>
-  )
-}
-
-/** Loading skeleton for the whole workspace. */
-function WorkspaceSkeleton({ tiles = 4 }: { tiles?: number }) {
-  return (
-    <div className="space-y-5">
-      <div className="glass rounded-[20px] h-16 animate-pulse" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {Array.from({ length: tiles }).map((_, i) => (
-          <div key={i} className="glass rounded-2xl h-[100px] animate-pulse" />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 glass rounded-[20px] h-[320px] animate-pulse" />
-        <div className="glass rounded-[20px] h-[320px] animate-pulse" />
-      </div>
-      <div className="glass rounded-[20px] h-[200px] animate-pulse" />
-    </div>
-  )
-}
-
-/** Error state. */
-function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
-  return (
-    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
-      <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
-      <p className="text-[14px] font-semibold text-slate-900 mb-1">Unable to load CSR workspace</p>
-      <p className="text-[12px] text-slate-700 mb-4">{error}</p>
-      <button
-        onClick={onRetry}
-        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
-        style={{ background: `linear-gradient(135deg, ${ROSE_PRIMARY}, ${ROSE_DEEP})` }}
-      >
-        <RefreshCw className="h-3.5 w-3.5" /> Retry
-      </button>
-    </div>
-  )
-}
-
-/** Empty state. */
-function EmptyState({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) {
-  return (
-    <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
-      <Icon className="h-10 w-10 mb-3" style={{ color: ROSE_PRIMARY }} />
-      <p className="text-[14px] font-semibold text-slate-900 mb-1">{title}</p>
-      <p className="text-[12px] text-slate-700 mb-4">{subtitle}</p>
-      <button
-        onClick={() => window.location.reload()}
-        className="btn-glass-primary rounded-xl px-4 py-2 text-[12px] font-medium inline-flex items-center gap-2"
-        style={{ background: `linear-gradient(135deg, ${ROSE_PRIMARY}, ${ROSE_DEEP})` }}
-      >
-        <RefreshCw className="h-3.5 w-3.5" /> Reload
-      </button>
-    </div>
-  )
-}
-
-/** Activity feed — timeline of recent CSR activities. */
-function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
-  return (
-    <motion.section
-      custom={10}
-      variants={cardEnter}
-      initial="hidden"
-      animate="visible"
-      className="glass glass-shimmer rounded-[20px] p-5"
-    >
-      <header className="flex items-start justify-between gap-3 mb-3">
-        <div>
-          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-            <ActivityIcon className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-            Recent Activity
-          </h2>
-          <p className="text-[10px] text-slate-700 mt-0.5">CSR & community feed · live</p>
-        </div>
-        <span className="status-pill text-[9px] status-approved">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          {activities.length} new
-        </span>
-      </header>
-      {activities.length === 0 ? (
-        <div className="py-10 text-center">
-          <Clock className="mx-auto h-7 w-7 text-slate-300" />
-          <p className="text-[11px] text-slate-700 mt-2">No recent CSR activity</p>
-        </div>
-      ) : (
-        <div className="max-h-80 overflow-y-auto scroll-elegant pr-1">
-          <ol className="relative space-y-1 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-px before:bg-gradient-to-b before:from-rose-200/70 before:via-rose-100/40 before:to-transparent">
-            <AnimatePresence initial={false}>
-              {activities.map((a, i) => (
-                <motion.li
-                  key={a.id}
-                  layout
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 8 }}
-                  transition={{ duration: 0.3, delay: i * 0.02 }}
-                  className="relative flex gap-3 py-2.5 px-1 rounded-xl hover:bg-rose-50/40 transition-colors"
-                >
-                  <div className="relative z-10 flex-shrink-0">
-                    <div
-                      className="h-10 w-10 rounded-full text-white flex items-center justify-center text-[11px] font-semibold ring-2 ring-white/80"
-                      style={{ background: `linear-gradient(135deg, ${ROSE_PRIMARY}, ${ROSE_DEEP})` }}
-                    >
-                      {initials(a.actorName)}
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[13px] font-semibold text-slate-900 truncate">{a.title}</span>
-                      {a.status && (
-                        <span className={`status-pill text-[9px] ${statusClass(a.status)}`}>
-                          {a.status.replace(/_/g, ' ').toLowerCase()}
-                        </span>
-                      )}
-                    </div>
-                    {a.description && (
-                      <p className="text-[11px] text-slate-700 mt-0.5 line-clamp-2">{a.description}</p>
-                    )}
-                    <div className="text-[10px] text-slate-600 mt-1 flex items-center gap-1.5">
-                      <span className="font-medium text-slate-600">{a.actorName}</span>
-                      <span>·</span>
-                      <span>{a.actorRole}</span>
-                      <span>·</span>
-                      <span>{timeAgo(a.createdAt)}</span>
-                      {a.module && (
-                        <>
-                          <span>·</span>
-                          <span className="px-1.5 py-0.5 rounded bg-rose-50/80 text-rose-700">{a.module}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </motion.li>
-              ))}
-            </AnimatePresence>
-          </ol>
-        </div>
-      )}
-    </motion.section>
-  )
-}
-
-/* ============================================================
- * Screen 1 — CSR Projects
- * ============================================================ */
-function deriveProjects(k: Kpis): {
-  code: string; name: string; theme: string; status: 'Active' | 'Planned' | 'Completed' | 'On Hold';
-  beneficiaries: number; budget: number; location: string
-}[] {
-  const names = ['Vidya Jyoti Education', 'Aarogya Health Camp', 'Jal Sanrakshan Water', 'Kaushal Skill Centre',
-    'Harit Vriksh Plantation', 'Shakti Women Empower', 'Swachh Village Sanitation', 'Annapurna Midday Meal']
-  const themes = ['Education', 'Healthcare', 'Water & Sanitation', 'Skill Development', 'Environment', 'Women Empower']
-  const locations = ['Pune District', 'Nagpur Rural', 'Aurangabad Block', 'Thane Cluster', 'Nashik Tribal', 'Raigad Coast']
-  const seed = (k.totalWorkforce + k.projects + k.orgs) || 23
-  const total = Math.min(8, Math.max(6, Math.floor(seed / 40) || 7))
-  const rows: ReturnType<typeof deriveProjects> = []
-  for (let i = 0; i < total; i++) {
-    const r = ((seed * (i + 7)) % 997) / 997
-    const r2 = ((seed * (i + 13)) % 991) / 991
-    const r3 = ((seed * (i + 29)) % 977) / 977
-    rows.push({
-      code: `CSR-${(6000 + i).toString()}`,
-      name: names[i % names.length],
-      theme: themes[i % themes.length],
-      status: r < 0.55 ? 'Active' : r < 0.78 ? 'Completed' : r < 0.9 ? 'Planned' : 'On Hold',
-      beneficiaries: Math.round(800 + r2 * 8500),
-      budget: Math.round(1500000 + r3 * 4500000),
-      location: locations[i % locations.length],
-    })
-  }
-  return rows
-}
-
-function ProjectsScreen({ k, activities }: { k: Kpis; activities: ActivityItem[] }) {
-  const projects = useMemo(() => deriveProjects(k), [k])
-  const active = projects.filter(p => p.status === 'Active').length
-  const completed = projects.filter(p => p.status === 'Completed').length
-  const totalBeneficiaries = projects.reduce((s, p) => s + p.beneficiaries, 0)
-  const totalBudget = projects.reduce((s, p) => s + p.budget, 0)
-
-  const statusData = [
-    { name: 'Active', value: Math.max(0.1, projects.filter(p => p.status === 'Active').length), color: ROSE_DEEP },
-    { name: 'Completed', value: Math.max(0.1, projects.filter(p => p.status === 'Completed').length), color: ROSE_PRIMARY },
-    { name: 'Planned', value: Math.max(0.1, projects.filter(p => p.status === 'Planned').length), color: ROSE_SECONDARY },
-    { name: 'On Hold', value: Math.max(0.1, projects.filter(p => p.status === 'On Hold').length), color: ROSE_SOFT },
-  ]
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={HeartHandshake}
-        title="CSR Projects"
-        subtitle="Registered CSR projects with status, beneficiaries & budget"
-        completionPct={k.completion}
-        badgeText={`${projects.length} projects`}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <CsrKpiTile index={1} icon={HeartHandshake} label="Total Projects" value={projects.length.toString()} unit="registered" trend={{ dir: 'up', text: '+2' }} />
-        <CsrKpiTile index={2} icon={BadgeCheck} label="Active" value={active.toString()} unit="in progress" trend={{ dir: 'up', text: '+1' }} />
-        <CsrKpiTile index={3} icon={Users} label="Beneficiaries" value={formatNumber(totalBeneficiaries, 0)} unit="reached" trend={{ dir: 'up', text: '+12.4%' }} />
-        <CsrKpiTile index={4} icon={Wallet} label="Total Budget" value={formatCurrency(totalBudget)} unit="FY" trend={{ dir: 'up', text: '+8.6%' }} />
-      </div>
-
-      {/* Projects table + status donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <motion.section
-          custom={5}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="lg:col-span-2 glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="flex items-start justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
-                <HeartHandshake className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-                CSR Project Registry
-              </h2>
-              <p className="text-[11px] text-slate-700 mt-0.5">
-                {projects.length} projects · {themes_count(projects)} themes
-              </p>
-            </div>
-            <button className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-rose-700 transition-colors inline-flex items-center gap-1.5">
-              Export <ChevronRight className="h-3 w-3" />
-            </button>
-          </header>
-          <div className="max-h-96 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-            <table className="w-full text-[11px]">
-              <thead className="sticky top-0 z-10" style={{ background: 'rgba(255,228,230,0.92)', backdropFilter: 'blur(8px)' }}>
-                <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                  <th className="px-3 py-2 text-left font-semibold">Code</th>
-                  <th className="px-3 py-2 text-left font-semibold">Project</th>
-                  <th className="px-3 py-2 text-left font-semibold">Theme</th>
-                  <th className="px-3 py-2 text-left font-semibold">Beneficiaries</th>
-                  <th className="px-3 py-2 text-left font-semibold">Budget</th>
-                  <th className="px-3 py-2 text-left font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projects.map((p, i) => (
-                  <motion.tr
-                    key={p.code}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: i * 0.015 }}
-                    className="border-t border-slate-100 hover:bg-rose-50/40 transition-colors"
-                    style={{ height: 42 }}
-                  >
-                    <td className="px-3 py-2 font-mono text-slate-700">{p.code}</td>
-                    <td className="px-3 py-2 font-medium text-slate-900">
-                      <div className="truncate">{p.name}</div>
-                      <div className="text-[9px] text-slate-500">{p.location}</div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className="status-pill text-[9px]" style={{
-                        background: 'rgba(244,63,94,0.12)',
-                        color: '#be123c',
-                        borderColor: 'rgba(244,63,94,0.25)',
-                      }}>
-                        {p.theme}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-slate-700 tabular-nums">{p.beneficiaries.toLocaleString()}</td>
-                    <td className="px-3 py-2 font-medium text-slate-900 tabular-nums">{formatCurrency(p.budget)}</td>
-                    <td className="px-3 py-2">
-                      <span className={`status-pill text-[9px] ${p.status === 'Active' ? 'status-submitted' : p.status === 'Completed' ? 'status-approved' : p.status === 'Planned' ? 'status-draft' : 'status-warning'}`}>
-                        {p.status}
-                      </span>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.section>
-
-        {/* Status donut */}
-        <motion.section
-          custom={6}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <Target className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Status Breakdown
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Projects by lifecycle status</p>
-          </header>
-          <div className="relative" style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={48}
-                  outerRadius={72}
-                  paddingAngle={3}
-                  stroke="none"
-                  isAnimationActive
-                  animationDuration={700}
-                >
-                  {statusData.map((d, i) => (
-                    <Cell key={i} fill={d.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [`${Math.round(v)} projects`, n]} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
-              <span className="tabular-nums text-2xl font-bold text-slate-900">{projects.length}</span>
-              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Projects</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-3">
-            {statusData.map(d => (
-              <div key={d.name} className="glass-subtle rounded-xl px-2 py-1.5 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 rounded-full" style={{ background: d.color }} />
-                  <span className="text-[10px] uppercase tracking-wide text-slate-700">{d.name}</span>
-                </div>
-                <span className="text-[11px] font-bold text-slate-900 tabular-nums">{Math.round(d.value)}</span>
-              </div>
-            ))}
-          </div>
-        </motion.section>
-      </div>
-
-      <ActivityFeed activities={activities} />
-    </div>
-  )
-}
-
-/** count distinct themes for the subtitle */
-function themes_count(projects: { theme: string }[]): number {
-  return new Set(projects.map(p => p.theme)).size
-}
-
-/* ============================================================
- * Screen 2 — Budgets
- * ============================================================ */
-function deriveBudgets(k: Kpis): {
-  theme: string; allocated: number; utilised: number; committed: number; beneficiaries: number
-}[] {
-  const themes = ['Education', 'Healthcare', 'Water & Sanitation', 'Skill Development', 'Environment', 'Women Empower']
-  const seed = (k.totalWorkforce + k.orgs + k.projects) || 29
-  return themes.map((theme, i) => {
-    const r = ((seed * (i + 7)) % 997) / 997
-    const r2 = ((seed * (i + 13)) % 991) / 991
-    const allocated = Math.round(2500000 + r * 5200000)
-    const utilised = Math.round(allocated * (0.45 + r2 * 0.45))
-    return {
-      theme,
-      allocated,
-      utilised,
-      committed: Math.round(allocated * (0.08 + r2 * 0.20)),
-      beneficiaries: Math.round(600 + r2 * 6500),
-    }
-  })
-}
-
-function BudgetsScreen({ k, activities, trends }: { k: Kpis; activities: ActivityItem[]; trends?: Record<string, Record<string, number>> }) {
-  const budgets = useMemo(() => deriveBudgets(k), [k])
-  const totalAllocated = budgets.reduce((s, b) => s + b.allocated, 0)
-  const totalUtilised = budgets.reduce((s, b) => s + b.utilised, 0)
-  const totalCommitted = budgets.reduce((s, b) => s + b.committed, 0)
-  const utilisationRate = totalAllocated > 0 ? (totalUtilised / totalAllocated) * 100 : 0
-  const fyTarget = totalAllocated + totalCommitted + Math.round(totalAllocated * 0.15)
-
-  // Quarterly utilisation trend
-  const quarterlyData = useMemo(() => {
-    if (trends && typeof trends === 'object') {
-      const entries = Object.entries(trends).slice(-4)
-      if (entries.length >= 2) {
-        return entries.map(([label, vals]) => ({
-          quarter: label.slice(0, 3),
-          utilised: Math.round(((vals as Record<string, number>).water ?? 0) * 420 + 1200000),
-        }))
-      }
-    }
-    const seed = (k.totalWorkforce + k.orgs) || 29
-    return ['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => ({
-      quarter: q,
-      utilised: Math.round((totalUtilised / 4) * (0.7 + ((seed * (i + 3)) % 977) / 977 * 0.45)),
-    }))
-  }, [trends, k, totalUtilised])
-
-  const budgetBarData = budgets.map(b => ({
-    theme: b.theme.split(' ')[0],
-    Allocated: b.allocated,
-    Utilised: b.utilised,
-  }))
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={Wallet}
-        title="CSR Budget Allocation"
-        subtitle="Theme-wise budget, utilisation & commitment tracking"
-        completionPct={utilisationRate}
-        badgeText={`₹${(totalAllocated / 10000000).toFixed(2)}Cr allocated`}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <CsrKpiTile index={1} icon={Wallet} label="Allocated" value={formatCurrency(totalAllocated)} unit="FY" trend={{ dir: 'up', text: '+7.2%' }} />
-        <CsrKpiTile index={2} icon={CheckCircle2} label="Utilised" value={formatCurrency(totalUtilised)} unit={`${utilisationRate.toFixed(0)}%`} trend={{ dir: 'up', text: '+11.5%' }} />
-        <CsrKpiTile index={3} icon={Clock} label="Committed" value={formatCurrency(totalCommitted)} unit="pipeline" trend={{ dir: 'up', text: '+3.4%' }} />
-        <CsrKpiTile index={4} icon={Target} label="FY Target" value={formatCurrency(fyTarget)} unit="planned" trend={{ dir: 'up', text: '+9.8%' }} />
-      </div>
-
-      {/* Budget by theme bar chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <motion.section
-          custom={5}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="lg:col-span-2 glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Allocated vs Utilised by Theme
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Theme-wise budget consumption (₹)</p>
-          </header>
-          <div style={{ height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={budgetBarData} margin={{ top: 4, right: 12, bottom: 0, left: -8 }} barCategoryGap="22%">
-                <defs>
-                  <linearGradient id="csr-alloc" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={ROSE_DEEP} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={ROSE_PRIMARY} stopOpacity={0.75} />
-                  </linearGradient>
-                  <linearGradient id="csr-util" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={ROSE_SECONDARY} stopOpacity={0.85} />
-                    <stop offset="100%" stopColor={ROSE_SOFT} stopOpacity={0.65} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="theme" tick={{ fontSize: 10, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={48}
-                  tickFormatter={(v: number) => formatCurrency(v)} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(244,63,94,0.06)' }} formatter={(v: number, n: string) => [formatCurrency(v), n]} />
-                <Bar dataKey="Allocated" fill="url(#csr-alloc)" radius={[5, 5, 0, 0]} />
-                <Bar dataKey="Utilised" fill="url(#csr-util)" radius={[5, 5, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.section>
-
-        {/* Utilisation radial */}
-        <motion.section
-          custom={6}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <Target className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Utilisation Rate
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Of total allocated budget</p>
-          </header>
-          <div className="relative" style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <RadialBarChart innerRadius="60%" outerRadius="100%" data={[{ name: 'Utilised', value: Math.round(utilisationRate), fill: ROSE_PRIMARY }]} startAngle={90} endAngle={-270}>
-                <defs>
-                  <linearGradient id="csr-radial" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0%" stopColor={ROSE_DEEP} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={ROSE_PRIMARY} stopOpacity={0.75} />
-                  </linearGradient>
-                </defs>
-                <RadialBar dataKey="value" fill="url(#csr-radial)" cornerRadius={12} background={{ fill: 'rgba(244,63,94,0.08)' }} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 10, color: '#475569' }} />
-              </RadialBarChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="tabular-nums text-3xl font-bold text-slate-900">{utilisationRate.toFixed(0)}%</span>
-              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Utilised</span>
-            </div>
-          </div>
-        </motion.section>
-      </div>
-
-      {/* Quarterly trend + budget table */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <motion.section
-          custom={7}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Quarterly Utilisation
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Spend by quarter (₹)</p>
-          </header>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={quarterlyData} margin={{ top: 4, right: 12, bottom: 0, left: -8 }}>
-                <defs>
-                  <linearGradient id="csr-q-util" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={ROSE_PRIMARY} stopOpacity={0.55} />
-                    <stop offset="100%" stopColor={ROSE_PRIMARY} stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="quarter" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={48}
-                  tickFormatter={(v: number) => formatCurrency(v)} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [formatCurrency(v), 'Utilised']} />
-                <Area type="monotone" dataKey="utilised" stroke={ROSE_DEEP} strokeWidth={2.5} fill="url(#csr-q-util)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.section>
-
-        <motion.section
-          custom={8}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <Wallet className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Theme Budget Summary
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Allocated · utilised · committed per theme</p>
-          </header>
-          <div className="max-h-64 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-            <table className="w-full text-[11px]">
-              <thead className="sticky top-0 z-10" style={{ background: 'rgba(255,228,230,0.92)', backdropFilter: 'blur(8px)' }}>
-                <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                  <th className="px-3 py-2 text-left font-semibold">Theme</th>
-                  <th className="px-3 py-2 text-left font-semibold">Allocated</th>
-                  <th className="px-3 py-2 text-left font-semibold">Utilised</th>
-                  <th className="px-3 py-2 text-left font-semibold">%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {budgets.map((b, i) => {
-                  const pct = b.allocated > 0 ? (b.utilised / b.allocated) * 100 : 0
-                  return (
-                    <motion.tr
-                      key={b.theme}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: i * 0.03 }}
-                      className="border-t border-slate-100 hover:bg-rose-50/40 transition-colors"
-                      style={{ height: 38 }}
-                    >
-                      <td className="px-3 py-2 font-medium text-slate-900">{b.theme}</td>
-                      <td className="px-3 py-2 text-slate-700 tabular-nums">{formatCurrency(b.allocated)}</td>
-                      <td className="px-3 py-2 font-medium text-slate-900 tabular-nums">{formatCurrency(b.utilised)}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-1.5">
-                          <div className="h-1.5 w-10 rounded-full bg-slate-200/70 overflow-hidden">
-                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${ROSE_DEEP}, ${ROSE_PRIMARY})` }} />
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-900 tabular-nums">{pct.toFixed(0)}%</span>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </motion.section>
-      </div>
-
-      <ActivityFeed activities={activities} />
-    </div>
-  )
-}
-
-/* ============================================================
- * Screen 3 — Beneficiaries
- * ============================================================ */
-function deriveBeneficiaryBreakdown(k: Kpis): {
-  gender: 'Male' | 'Female' | 'Other'; count: number
-}[] {
-  const total = (k.totalWorkforce || 500) * 6
-  const female = Math.round(total * (k.totalWorkforce > 0 ? 0.46 : 0.45))
-  const male = Math.round(total * 0.52)
-  const other = Math.max(50, total - female - male)
-  return [
-    { gender: 'Male', count: male },
-    { gender: 'Female', count: female },
-    { gender: 'Other', count: other },
-  ]
-}
-
-function deriveBeneficiarySegments(k: Kpis): {
-  segment: string; count: number; color: string
-}[] {
-  const seed = (k.totalWorkforce + k.orgs) || 31
-  const total = (k.totalWorkforce || 500) * 6
-  const children = Math.round(total * 0.36)
-  const women = Math.round(total * 0.30)
-  const youth = Math.round(total * 0.18)
-  const elderly = Math.round(total * 0.08)
-  const divyang = Math.round(total * 0.08)
-  void seed
-  return [
-    { segment: 'Children', count: children, color: ROSE_DEEP },
-    { segment: 'Women', count: women, color: ROSE_PRIMARY },
-    { segment: 'Youth', count: youth, color: ROSE_SECONDARY },
-    { segment: 'Elderly', count: elderly, color: ROSE_SOFT },
-    { segment: 'Divyang', count: divyang, color: '#f9a8d4' },
-  ]
-}
-
-function BeneficiariesScreen({ k, activities }: { k: Kpis; activities: ActivityItem[] }) {
-  const genderData = useMemo(() => deriveBeneficiaryBreakdown(k), [k])
-  const segmentData = useMemo(() => deriveBeneficiarySegments(k), [k])
-  const totalBeneficiaries = genderData.reduce((s, g) => s + g.count, 0)
-  const femaleCount = genderData.find(g => g.gender === 'Female')?.count ?? 0
-  const femaleShare = totalBeneficiaries > 0 ? (femaleCount / totalBeneficiaries) * 100 : 0
-  const divyangCount = segmentData.find(s => s.segment === 'Divyang')?.count ?? 0
-  const divyangShare = totalBeneficiaries > 0 ? (divyangCount / totalBeneficiaries) * 100 : 0
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={Users}
-        title="Beneficiary Demographics"
-        subtitle="Reach by gender, age-segment & inclusion group"
-        completionPct={k.completion}
-        badgeText={`${formatNumber(totalBeneficiaries, 0)} reached`}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <CsrKpiTile index={1} icon={Users} label="Total Beneficiaries" value={formatNumber(totalBeneficiaries, 0)} unit="persons" trend={{ dir: 'up', text: '+14.2%' }} />
-        <CsrKpiTile index={2} icon={HandHeart} label="Female Reach" value={formatNumber(femaleCount, 0)} unit={`${femaleShare.toFixed(0)}%`} trend={{ dir: 'up', text: '+5.1%' }} />
-        <CsrKpiTile index={3} icon={GraduationCap} label="Children" value={formatNumber(segmentData[0].count, 0)} unit="reached" trend={{ dir: 'up', text: '+8.7%' }} />
-        <CsrKpiTile index={4} icon={HeartPulse} label="Divyang Inclusion" value={formatNumber(divyangCount, 0)} unit={`${divyangShare.toFixed(1)}%`} trend={{ dir: 'up', text: '+0.4%' }} />
-      </div>
-
-      {/* Gender bar + segment donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <motion.section
-          custom={5}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <Users className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Gender Distribution
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Beneficiaries reached by gender</p>
-          </header>
-          <div style={{ height: 240 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={genderData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }} barCategoryGap="28%">
-                <defs>
-                  <linearGradient id="csr-gender" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={ROSE_DEEP} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={ROSE_PRIMARY} stopOpacity={0.75} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="gender" tick={{ fontSize: 11, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(244,63,94,0.06)' }} formatter={(v: number) => [`${Math.round(v).toLocaleString()} persons`, 'Beneficiaries']} />
-                <Bar dataKey="count" fill="url(#csr-gender)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            {genderData.map(g => (
-              <div key={g.gender} className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
-                <span className="text-[9px] uppercase tracking-wide text-slate-700">{g.gender}</span>
-                <span className="text-[12px] font-bold text-slate-900 tabular-nums">{formatNumber(g.count, 0)}</span>
-                <span className="text-[9px] text-slate-500">{totalBeneficiaries > 0 ? ((g.count / totalBeneficiaries) * 100).toFixed(0) : 0}%</span>
-              </div>
-            ))}
-          </div>
-        </motion.section>
-
-        <motion.section
-          custom={6}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <HeartHandshake className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Beneficiary Segments
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Reach by vulnerable / focus group</p>
-          </header>
-          <div className="relative" style={{ height: 240 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={segmentData}
-                  dataKey="count"
-                  nameKey="segment"
-                  innerRadius={48}
-                  outerRadius={76}
-                  paddingAngle={2}
-                  stroke="none"
-                  isAnimationActive
-                  animationDuration={700}
-                >
-                  {segmentData.map((d, i) => (
-                    <Cell key={i} fill={d.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [`${Math.round(v).toLocaleString()}`, n]} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
-              <span className="tabular-nums text-lg font-bold text-slate-900">{formatNumber(totalBeneficiaries, 0)}</span>
-              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Total</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-5 gap-1.5 mt-3">
-            {segmentData.map(s => (
-              <div key={s.segment} className="glass-subtle rounded-lg px-1 py-1 flex flex-col items-center text-center">
-                <span className="inline-block h-2 w-2 rounded-full mb-0.5" style={{ background: s.color }} />
-                <span className="text-[8px] uppercase tracking-wide text-slate-700">{s.segment}</span>
-                <span className="text-[10px] font-bold text-slate-900 tabular-nums">{formatNumber(s.count, 0)}</span>
-              </div>
-            ))}
-          </div>
-        </motion.section>
-      </div>
-
-      {/* Outreach summary table */}
-      <motion.section
-        custom={7}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <MapPin className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Outreach by Segment & Geography
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Beneficiary count per segment across locations</p>
-          </div>
-          <span className="status-pill text-[9px] status-approved">{segmentData.length} segments</span>
-        </header>
-        <div className="max-h-64 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 z-10" style={{ background: 'rgba(255,228,230,0.92)', backdropFilter: 'blur(8px)' }}>
-              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                <th className="px-3 py-2 text-left font-semibold">Segment</th>
-                <th className="px-3 py-2 text-left font-semibold">Reach</th>
-                <th className="px-3 py-2 text-left font-semibold">Share</th>
-                <th className="px-3 py-2 text-left font-semibold">Primary Location</th>
-                <th className="px-3 py-2 text-left font-semibold">Inclusion</th>
-              </tr>
-            </thead>
-            <tbody>
-              {segmentData.map((s, i) => {
-                const locations = ['Pune District', 'Nagpur Rural', 'Aurangabad Block', 'Thane Cluster', 'Nashik Tribal']
-                const share = totalBeneficiaries > 0 ? (s.count / totalBeneficiaries) * 100 : 0
-                return (
-                  <motion.tr
-                    key={s.segment}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: i * 0.03 }}
-                    className="border-t border-slate-100 hover:bg-rose-50/40 transition-colors"
-                    style={{ height: 38 }}
-                  >
-                    <td className="px-3 py-2 font-medium text-slate-900">{s.segment}</td>
-                    <td className="px-3 py-2 text-slate-900 tabular-nums">{Math.round(s.count).toLocaleString()}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1.5">
-                        <div className="h-1.5 w-14 rounded-full bg-slate-200/70 overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${share}%`, background: `linear-gradient(90deg, ${ROSE_DEEP}, ${ROSE_PRIMARY})` }} />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-900 tabular-nums">{share.toFixed(1)}%</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-slate-700">{locations[i % locations.length]}</td>
-                    <td className="px-3 py-2">
-                      <span className="status-pill text-[9px] status-approved">
-                        <CheckCircle2 className="h-2.5 w-2.5" /> Tracked
-                      </span>
-                    </td>
-                  </motion.tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </motion.section>
-
-      <ActivityFeed activities={activities} />
-    </div>
-  )
-}
-
-/* ============================================================
- * Screen 4 — Impact
- * ============================================================ */
-function deriveImpactMetrics(k: Kpis): {
-  metric: string; value: number; unit: string; baseline: number; target: number; icon: string
-}[] {
-  const seed = (k.totalWorkforce + k.projects) || 37
-  const r = (n: number) => ((seed * (n + 7)) % 977) / 977
-  return [
-    { metric: 'School Enrolment', value: Math.round(4200 + r(1) * 1800), unit: 'children', baseline: 3800, target: 6500, icon: 'school' },
-    { metric: 'Health Camps', value: Math.round(180 + r(2) * 90), unit: 'camps', baseline: 150, target: 300, icon: 'health' },
-    { metric: 'Patients Treated', value: Math.round(24000 + r(3) * 16000), unit: 'persons', baseline: 21000, target: 45000, icon: 'patients' },
-    { metric: 'Trees Planted', value: Math.round(12000 + r(4) * 8000), unit: 'trees', baseline: 10000, target: 25000, icon: 'trees' },
-    { metric: 'Skill Trainees', value: Math.round(850 + r(5) * 600), unit: 'youth', baseline: 700, target: 1500, icon: 'skill' },
-    { metric: 'Water Recharge (KL)', value: Math.round(1800 + r(6) * 1400), unit: 'KL', baseline: 1500, target: 3500, icon: 'water' },
-  ]
-}
-
-function ImpactScreen({ k, activities }: { k: Kpis; activities: ActivityItem[] }) {
-  const metrics = useMemo(() => deriveImpactMetrics(k), [k])
-  const totalReach = metrics.reduce((s, m) => s + m.value, 0)
-  const achieved = metrics.filter(m => m.value >= m.target).length
-  const onTrack = metrics.filter(m => m.value >= m.baseline && m.value < m.target).length
-  const lagging = metrics.filter(m => m.value < m.baseline).length
-  const avgProgress = metrics.length > 0
-    ? metrics.reduce((s, m) => s + Math.min(100, (m.value / m.target) * 100), 0) / metrics.length
-    : 0
-
-  const impactIcon = (icon: string): React.ElementType => {
-    switch (icon) {
-      case 'school': return School
-      case 'health': return HeartPulse
-      case 'patients': return Stethoscope
-      case 'trees': return Sprout
-      case 'skill': return GraduationCap
-      case 'water': return Droplets
-      default: return Target
-    }
-  }
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={TrendingUp}
-        title="CSR Impact Metrics"
-        subtitle="Outcomes & target attainment across thematic interventions"
-        completionPct={avgProgress}
-        badgeText={`${achieved}/${metrics.length} achieved`}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <CsrKpiTile index={1} icon={Sparkles} label="Total Impact Reach" value={formatNumber(totalReach, 0)} unit="outcomes" trend={{ dir: 'up', text: '+16.8%' }} />
-        <CsrKpiTile index={2} icon={BadgeCheck} label="Targets Achieved" value={achieved.toString()} unit={`of ${metrics.length}`} trend={{ dir: 'up', text: `+${achieved}` }} />
-        <CsrKpiTile index={3} icon={Clock} label="On Track" value={onTrack.toString()} unit="metrics" trend={{ dir: 'up', text: '+1' }} />
-        <CsrKpiTile index={4} icon={Target} label="Avg Attainment" value={avgProgress.toFixed(1)} unit="%" trend={{ dir: 'up', text: '+4.2' }} />
-      </div>
-
-      {/* Impact metrics grid */}
-      <motion.section
-        custom={5}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <Target className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Outcome Tracker
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Actual vs target attainment per metric</p>
-          </div>
-          <span className="status-pill text-[9px] status-warning">{lagging} lagging</span>
-        </header>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {metrics.map((m, i) => {
-            const Icon = impactIcon(m.icon)
-            const pct = Math.min(100, (m.value / m.target) * 100)
-            return (
-              <motion.div
-                key={m.metric}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
-                className="glass-subtle rounded-2xl p-4"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(255,228,230,0.90), rgba(254,205,211,0.70))',
-                      border: '1px solid rgba(244,63,94,0.30)',
-                      color: ROSE_DEEP,
-                    }}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className={`status-pill text-[9px] ${pct >= 100 ? 'status-approved' : pct >= 70 ? 'status-submitted' : 'status-warning'}`}>
-                    {pct.toFixed(0)}%
-                  </span>
-                </div>
-                <div className="text-[11px] uppercase tracking-wide text-slate-700 font-medium">{m.metric}</div>
-                <div className="flex items-baseline gap-1 mt-0.5">
-                  <span className="text-xl font-bold text-slate-900 tabular-nums">{formatNumber(m.value, 0)}</span>
-                  <span className="text-[10px] text-slate-700 font-medium">{m.unit}</span>
-                </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-200/70 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pct}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut', delay: i * 0.04 }}
-                    className="h-full rounded-full"
-                    style={{ background: `linear-gradient(90deg, ${ROSE_DEEP}, ${ROSE_PRIMARY})` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between mt-1.5 text-[9px] text-slate-600">
-                  <span>Baseline: {formatNumber(m.baseline, 0)}</span>
-                  <span>Target: {formatNumber(m.target, 0)}</span>
-                </div>
-              </motion.div>
-            )
-          })}
-        </div>
-      </motion.section>
-
-      <ActivityFeed activities={activities} />
-    </div>
-  )
-}
-
-/* ============================================================
- * Screen 5 — Community
- * ============================================================ */
-function deriveCommunityPrograms(k: Kpis): {
-  name: string; type: string; participants: number; engagement: number; sessions: number; status: string
-}[] {
-  const programs = [
-    { name: 'Self-Help Groups', type: 'Women Empower' },
-    { name: 'Farmer Field Schools', type: 'Agriculture' },
-    { name: 'Youth Clubs', type: 'Skill' },
-    { name: 'Village Sanitation Drives', type: 'WASH' },
-    { name: 'Health Awareness', type: 'Health' },
-    { name: 'Digital Literacy', type: 'Education' },
-  ]
-  const seed = (k.totalWorkforce + k.orgs + k.projects) || 41
-  return programs.map((p, i) => {
-    const r = ((seed * (i + 7)) % 997) / 997
-    const r2 = ((seed * (i + 13)) % 991) / 991
-    return {
-      ...p,
-      participants: Math.round(120 + r * 980),
-      engagement: Math.round(55 + r2 * 40),
-      sessions: Math.round(4 + r2 * 22),
-      status: r < 0.6 ? 'Active' : r < 0.85 ? 'Seasonal' : 'Concluded',
-    }
-  })
-}
-
-function CommunityScreen({ k, activities }: { k: Kpis; activities: ActivityItem[] }) {
-  const programs = useMemo(() => deriveCommunityPrograms(k), [k])
-  const totalParticipants = programs.reduce((s, p) => s + p.participants, 0)
-  const totalSessions = programs.reduce((s, p) => s + p.sessions, 0)
-  const activeCount = programs.filter(p => p.status === 'Active').length
-  const avgEngagement = programs.length > 0
-    ? programs.reduce((s, p) => s + p.engagement, 0) / programs.length
-    : 0
-
-  const engagementData = programs.map(p => ({
-    name: p.name.split(' ')[0],
-    engagement: p.engagement,
-    participants: p.participants,
-    fill: ROSE_PRIMARY,
-  }))
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={Megaphone}
-        title="Community Engagement"
-        subtitle="Grassroots programs, participation & engagement metrics"
-        completionPct={avgEngagement}
-        badgeText={`${programs.length} programs`}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <CsrKpiTile index={1} icon={Megaphone} label="Active Programs" value={activeCount.toString()} unit="ongoing" trend={{ dir: 'up', text: '+1' }} />
-        <CsrKpiTile index={2} icon={Users} label="Participants" value={formatNumber(totalParticipants, 0)} unit="persons" trend={{ dir: 'up', text: '+9.3%' }} />
-        <CsrKpiTile index={3} icon={HandHeart} label="Sessions Held" value={totalSessions.toString()} unit="sessions" trend={{ dir: 'up', text: `+${Math.max(1, Math.round(totalSessions * 0.15))}` }} />
-        <CsrKpiTile index={4} icon={HeartPulse} label="Avg Engagement" value={avgEngagement.toFixed(1)} unit="%" trend={{ dir: 'up', text: '+3.1' }} />
-      </div>
-
-      {/* Engagement bar chart */}
-      <motion.section
-        custom={5}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="mb-3">
-          <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-            <HeartPulse className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-            Engagement Rate by Program
-          </h2>
-          <p className="text-[10px] text-slate-700 mt-0.5">% of participants actively engaging</p>
-        </header>
-        <div style={{ height: 260 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={engagementData} margin={{ top: 4, right: 12, bottom: 0, left: -20 }} barCategoryGap="22%">
-              <defs>
-                <linearGradient id="csr-eng" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={ROSE_DEEP} stopOpacity={0.95} />
-                  <stop offset="100%" stopColor={ROSE_PRIMARY} stopOpacity={0.75} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={36} unit="%" />
-              <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(244,63,94,0.06)' }} formatter={(v: number) => [`${v}%`, 'Engagement']} />
-              <Bar dataKey="engagement" fill="url(#csr-eng)" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.section>
-
-      {/* Programs table */}
-      <motion.section
-        custom={6}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <Megaphone className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Community Programs
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Grassroots programs · participants · engagement · status</p>
-          </div>
-          <span className="status-pill text-[9px] status-approved">{activeCount} active</span>
-        </header>
-        <div className="max-h-80 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 z-10" style={{ background: 'rgba(255,228,230,0.92)', backdropFilter: 'blur(8px)' }}>
-              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                <th className="px-3 py-2 text-left font-semibold">Program</th>
-                <th className="px-3 py-2 text-left font-semibold">Type</th>
-                <th className="px-3 py-2 text-left font-semibold">Participants</th>
-                <th className="px-3 py-2 text-left font-semibold">Sessions</th>
-                <th className="px-3 py-2 text-left font-semibold">Engagement</th>
-                <th className="px-3 py-2 text-left font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {programs.map((p, i) => (
-                <motion.tr
-                  key={p.name}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: i * 0.03 }}
-                  className="border-t border-slate-100 hover:bg-rose-50/40 transition-colors"
-                  style={{ height: 40 }}
-                >
-                  <td className="px-3 py-2 font-medium text-slate-900">{p.name}</td>
-                  <td className="px-3 py-2">
-                    <span className="status-pill text-[9px]" style={{
-                      background: 'rgba(244,63,94,0.12)',
-                      color: '#be123c',
-                      borderColor: 'rgba(244,63,94,0.25)',
-                    }}>
-                      {p.type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-700 tabular-nums">{p.participants.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-slate-700 tabular-nums">{p.sessions}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-1.5 w-14 rounded-full bg-slate-200/70 overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${p.engagement}%`, background: `linear-gradient(90deg, ${ROSE_DEEP}, ${ROSE_PRIMARY})` }} />
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-900 tabular-nums">{p.engagement}%</span>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`status-pill text-[9px] ${p.status === 'Active' ? 'status-submitted' : p.status === 'Seasonal' ? 'status-warning' : 'status-approved'}`}>
-                      {p.status}
-                    </span>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.section>
-
-      <ActivityFeed activities={activities} />
-    </div>
-  )
-}
-
-/* ============================================================
- * Screen 6 — Local Area Development
- * ============================================================ */
-function deriveLocalInitiatives(k: Kpis): {
-  id: string; name: string; category: string; village: string;
-  investment: number; beneficiaries: number; status: 'Completed' | 'Ongoing' | 'Planned'
-}[] {
-  const names = ['Road Construction', 'Anganwadi Upgrade', 'Drinking Water Plant', 'Solar Streetlights',
-    'Community Hall', 'School Digital Lab', 'Health Sub-Centre', 'Drainage System']
-  const categories = ['Infrastructure', 'Education', 'Water', 'Energy', 'Civic', 'Education', 'Health', 'Sanitation']
-  const villages = ['Belwadi', 'Sukhwadi', 'Nimgaon', 'Karanjgaon', 'Pimpalgaon', 'Wadivere', 'Shivare', 'Junnar']
-  const seed = (k.totalWorkforce + k.projects + k.orgs) || 43
-  const total = Math.min(8, Math.max(6, Math.floor(seed / 35) || 7))
-  const rows: ReturnType<typeof deriveLocalInitiatives> = []
-  for (let i = 0; i < total; i++) {
-    const r = ((seed * (i + 7)) % 997) / 997
-    const r2 = ((seed * (i + 13)) % 991) / 991
-    const r3 = ((seed * (i + 29)) % 977) / 977
-    rows.push({
-      id: `LAD-${(7000 + i).toString()}`,
-      name: names[i % names.length],
-      category: categories[i % categories.length],
-      village: villages[i % villages.length],
-      investment: Math.round(450000 + r2 * 3200000),
-      beneficiaries: Math.round(180 + r3 * 2200),
-      status: r < 0.45 ? 'Completed' : r < 0.82 ? 'Ongoing' : 'Planned',
-    })
-  }
-  return rows
-}
-
-function LocalScreen({ k, activities }: { k: Kpis; activities: ActivityItem[] }) {
-  const initiatives = useMemo(() => deriveLocalInitiatives(k), [k])
-  const totalInvestment = initiatives.reduce((s, i) => s + i.investment, 0)
-  const totalBeneficiaries = initiatives.reduce((s, i) => s + i.beneficiaries, 0)
-  const completed = initiatives.filter(i => i.status === 'Completed').length
-  const ongoing = initiatives.filter(i => i.status === 'Ongoing').length
-  const villages = new Set(initiatives.map(i => i.village)).size
-
-  const categoryData = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const it of initiatives) {
-      map[it.category] = (map[it.category] ?? 0) + it.investment
-    }
-    return Object.entries(map).map(([name, value], i) => ({
-      name, value, color: DONUT_PALETTE[i % DONUT_PALETTE.length],
-    }))
-  }, [initiatives])
-
-  return (
-    <div className="space-y-5">
-      <ModuleHeader
-        icon={MapPin}
-        title="Local Area Development"
-        subtitle="Infrastructure & village-level CSR investments"
-        completionPct={k.completion}
-        badgeText={`${villages} villages`}
-      />
-
-      {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <CsrKpiTile index={1} icon={Building2} label="Initiatives" value={initiatives.length.toString()} unit="projects" trend={{ dir: 'up', text: '+2' }} />
-        <CsrKpiTile index={2} icon={MapPin} label="Villages Reached" value={villages.toString()} unit="locations" trend={{ dir: 'up', text: '+1' }} />
-        <CsrKpiTile index={3} icon={Wallet} label="Total Investment" value={formatCurrency(totalInvestment)} unit="FY" trend={{ dir: 'up', text: '+12.1%' }} />
-        <CsrKpiTile index={4} icon={Users} label="Beneficiaries" value={formatNumber(totalBeneficiaries, 0)} unit="persons" trend={{ dir: 'up', text: '+7.8%' }} />
-      </div>
-
-      {/* Investment by category + status split */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <motion.section
-          custom={5}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="lg:col-span-2 glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <Wallet className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Investment by Category
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Capital deployed by development category (₹)</p>
-          </header>
-          <div style={{ height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryData} margin={{ top: 4, right: 12, bottom: 0, left: -8 }} barCategoryGap="22%">
-                <defs>
-                  <linearGradient id="csr-lad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={ROSE_DEEP} stopOpacity={0.95} />
-                    <stop offset="100%" stopColor={ROSE_PRIMARY} stopOpacity={0.75} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#334155', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} width={48}
-                  tickFormatter={(v: number) => formatCurrency(v)} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(244,63,94,0.06)' }} formatter={(v: number) => [formatCurrency(v), 'Investment']} />
-                <Bar dataKey="value" fill="url(#csr-lad)" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.section>
-
-        <motion.section
-          custom={6}
-          variants={cardEnter}
-          initial="hidden"
-          animate="visible"
-          className="glass glass-shimmer rounded-[20px] p-5"
-        >
-          <header className="mb-3">
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Status Split
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Initiatives by lifecycle stage</p>
-          </header>
-          <div className="relative" style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Completed', value: Math.max(0.1, completed), color: ROSE_DEEP },
-                    { name: 'Ongoing', value: Math.max(0.1, ongoing), color: ROSE_PRIMARY },
-                    { name: 'Planned', value: Math.max(0.1, initiatives.length - completed - ongoing), color: ROSE_SOFT },
-                  ]}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={48}
-                  outerRadius={72}
-                  paddingAngle={3}
-                  stroke="none"
-                  isAnimationActive
-                  animationDuration={700}
-                >
-                  <Cell fill={ROSE_DEEP} />
-                  <Cell fill={ROSE_PRIMARY} />
-                  <Cell fill={ROSE_SOFT} />
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number, n: string) => [`${Math.round(v)} initiatives`, n]} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-10px' }}>
-              <span className="tabular-nums text-2xl font-bold text-slate-900">{initiatives.length}</span>
-              <span className="text-[9px] uppercase tracking-wide text-slate-700 font-semibold">Initiatives</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            <div className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
-              <span className="inline-block h-2 w-2 rounded-full mb-1" style={{ background: ROSE_DEEP }} />
-              <span className="text-[9px] uppercase tracking-wide text-slate-700">Done</span>
-              <span className="text-[11px] font-bold text-slate-900 tabular-nums">{completed}</span>
-            </div>
-            <div className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
-              <span className="inline-block h-2 w-2 rounded-full mb-1" style={{ background: ROSE_PRIMARY }} />
-              <span className="text-[9px] uppercase tracking-wide text-slate-700">Ongoing</span>
-              <span className="text-[11px] font-bold text-slate-900 tabular-nums">{ongoing}</span>
-            </div>
-            <div className="glass-subtle rounded-xl px-2 py-1.5 flex flex-col items-center text-center">
-              <span className="inline-block h-2 w-2 rounded-full mb-1" style={{ background: ROSE_SOFT }} />
-              <span className="text-[9px] uppercase tracking-wide text-slate-700">Planned</span>
-              <span className="text-[11px] font-bold text-slate-900 tabular-nums">{initiatives.length - completed - ongoing}</span>
-            </div>
-          </div>
-        </motion.section>
-      </div>
-
-      {/* Local initiatives table */}
-      <motion.section
-        custom={7}
-        variants={cardEnter}
-        initial="hidden"
-        animate="visible"
-        className="glass glass-shimmer rounded-[20px] p-5"
-      >
-        <header className="flex items-start justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-[15px] font-semibold text-slate-900 flex items-center gap-2">
-              <MapPin className="h-4 w-4" style={{ color: ROSE_DEEP }} />
-              Village Initiatives Registry
-            </h2>
-            <p className="text-[10px] text-slate-700 mt-0.5">Local infrastructure & welfare initiatives</p>
-          </div>
-          <span className="status-pill text-[9px] status-approved">{completed} completed</span>
-        </header>
-        <div className="max-h-80 overflow-y-auto scroll-elegant rounded-xl border border-slate-200/50">
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 z-10" style={{ background: 'rgba(255,228,230,0.92)', backdropFilter: 'blur(8px)' }}>
-              <tr className="text-[10px] uppercase tracking-wide text-slate-700">
-                <th className="px-3 py-2 text-left font-semibold">ID</th>
-                <th className="px-3 py-2 text-left font-semibold">Initiative</th>
-                <th className="px-3 py-2 text-left font-semibold">Village</th>
-                <th className="px-3 py-2 text-left font-semibold">Category</th>
-                <th className="px-3 py-2 text-left font-semibold">Investment</th>
-                <th className="px-3 py-2 text-left font-semibold">Beneficiaries</th>
-                <th className="px-3 py-2 text-left font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {initiatives.map((it, i) => (
-                <motion.tr
-                  key={it.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: i * 0.025 }}
-                  className="border-t border-slate-100 hover:bg-rose-50/40 transition-colors"
-                  style={{ height: 40 }}
-                >
-                  <td className="px-3 py-2 font-mono text-slate-700">{it.id}</td>
-                  <td className="px-3 py-2 font-medium text-slate-900">{it.name}</td>
-                  <td className="px-3 py-2 text-slate-700">{it.village}</td>
-                  <td className="px-3 py-2 text-slate-700">{it.category}</td>
-                  <td className="px-3 py-2 font-medium text-slate-900 tabular-nums">{formatCurrency(it.investment)}</td>
-                  <td className="px-3 py-2 text-slate-700 tabular-nums">{it.beneficiaries.toLocaleString()}</td>
-                  <td className="px-3 py-2">
-                    <span className={`status-pill text-[9px] ${it.status === 'Completed' ? 'status-approved' : it.status === 'Ongoing' ? 'status-submitted' : 'status-draft'}`}>
-                      {it.status}
-                    </span>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </motion.section>
-
-      <ActivityFeed activities={activities} />
-    </div>
-  )
-}
-
-/* ============================================================
- * Main component
- * ============================================================ */
 export function CsrWorkspace() {
   const { activeModule } = useApp()
-  const [overview, setOverview] = useState<OverviewData | null>(null)
-  const [activities, setActivities] = useState<ActivityItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const mountedRef = useRef(true)
+  const [activeTab, setActiveTab] = useState<string>('overview')
+  const [csrData, setCsrData] = useState(() => contributorStore.getCsrData())
+  const [assignments, setAssignments] = useState<ContributorAssignment[]>([])
+  const [activities, setActivities] = useState<ActivityEvent[]>([])
+  const [saveStatus, setSaveStatus] = useState<string>('Saved')
+  const [showValidationModal, setShowValidationModal] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
-  /* ---- fetchers ---- */
-  const fetchOverview = useCallback(async () => {
-    try {
-      const res = await fetch('/api/overview', { cache: 'no-store' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as OverviewData
-      if (!mountedRef.current) return
-      setOverview(data)
-      setError('')
-    } catch (e) {
-      if (!mountedRef.current) return
-      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
-    }
-  }, [overview])
+  useEffect(() => {
+    if (activeModule === 'csr-projects') setActiveTab('csr-1')
+    else if (activeModule === 'csr-beneficiaries') setActiveTab('csr-2')
+    else if (activeModule === 'csr-budgets') setActiveTab('csr-3')
+    else if (activeModule === 'csr-impact') setActiveTab('csr-4')
+    else if (activeModule === 'csr-community') setActiveTab('csr-5')
+    else if (activeModule === 'evidence') setActiveTab('evidence')
+    else if (activeModule === 'submissions') setActiveTab('submissions')
+  }, [activeModule])
 
-  const fetchActivities = useCallback(async () => {
-    try {
-      const res = await fetch('/api/activity?take=10', { cache: 'no-store' })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = (await res.json()) as ActivityResponse
-      if (!mountedRef.current) return
-      const filtered = (Array.isArray(data.items) ? data.items : []).filter(isCsrActivity).slice(0, 6)
-      setActivities(filtered)
-    } catch {
-      /* silent — keep existing feed on poll error */
-    }
+  useEffect(() => {
+    setAssignments(contributorStore.getAssignments('CSR_USER'))
+    setActivities(contributorStore.getActivities('CSR_USER'))
   }, [])
 
-  /* ---- initial load ---- */
-  useEffect(() => {
-    mountedRef.current = true
-    ;(async () => {
-      setLoading(true)
-      await Promise.all([fetchOverview(), fetchActivities()])
-      if (mountedRef.current) setLoading(false)
-    })()
-    return () => { mountedRef.current = false }
-  }, [])
-
-  /* ---- polling: activity every 30s, overview every 60s ---- */
-  useEffect(() => {
-    const activityTimer = setInterval(fetchActivities, 30_000)
-    const overviewTimer = setInterval(fetchOverview, 60_000)
-    return () => {
-      clearInterval(activityTimer)
-      clearInterval(overviewTimer)
-    }
-  }, [fetchActivities, fetchOverview])
-
-  const k = useMemo<Kpis | null>(() => {
-    if (!overview?.kpis) return null
-    return overview.kpis
-  }, [overview])
-
-  const trends = useMemo<Record<string, Record<string, number>> | undefined>(() => {
-    const t = overview?.trends as Record<string, Record<string, number>> | undefined
-    return t && typeof t === 'object' ? t : undefined
-  }, [overview])
-
-  // ---- Loading skeleton ----
-  if (loading && !overview) {
-    return <WorkspaceSkeleton tiles={4} />
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(null), 3000)
   }
 
-  // ---- Error state ----
-  if (error && !overview) {
-    return <ErrorState error={error} onRetry={() => window.location.reload()} />
+  const handleSaveDraft = (levelLabel: string) => {
+    setSaveStatus('Saving...')
+    contributorStore.saveCsrData(csrData)
+    setTimeout(() => {
+      setSaveStatus('Draft Saved')
+      triggerToast(`${levelLabel} draft saved successfully.`)
+      contributorStore.addActivity({
+        id: 'act-' + Date.now(),
+        roleKey: 'CSR_USER',
+        timestamp: 'Just now',
+        user: 'Deepika Rao (CSR)',
+        action: 'Saved Draft',
+        target: levelLabel,
+        details: 'Community beneficiary records and CSR expenditures saved.',
+        badgeTone: 'rose'
+      })
+      setActivities(contributorStore.getActivities('CSR_USER'))
+      setTimeout(() => setSaveStatus('Saved'), 2000)
+    }, 400)
   }
 
-  // ---- Empty state ----
-  if (!overview || !k) {
-    return (
-      <EmptyState
-        icon={HeartHandshake}
-        title="No CSR data yet"
-        subtitle="Set up a reporting period to populate the CSR workspace."
-      />
-    )
-  }
+  // Beneficiary achievement percentage
+  const beneficiaryPct = (Number(csrData.activities.plannedBeneficiaries) || 0) > 0
+    ? (((Number(csrData.activities.actualBeneficiaries) || 0) / (Number(csrData.activities.plannedBeneficiaries) || 1)) * 100).toFixed(1)
+    : '0'
 
-  // ---- Dispatch by module ----
+  const tabList = [
+    { id: 'overview', label: 'CSR Console' },
+    { id: 'csr-1', label: 'CSR-1: Project Master' },
+    { id: 'csr-2', label: 'CSR-2: Beneficiaries' },
+    { id: 'csr-3', label: 'CSR-3: Spend References' },
+    { id: 'csr-4', label: 'CSR-4: Project Outcomes' },
+    { id: 'csr-5', label: 'CSR-5: Grievances' },
+    { id: 'csr-6', label: 'CSR-6: Social Impact SIA' },
+    { id: 'csr-7', label: 'CSR-7: R&R' },
+    { id: 'evidence', label: 'Evidence & Documents' },
+    { id: 'submissions', label: 'My Submissions' },
+    { id: 'activity', label: 'Activity Log' }
+  ]
+
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={activeModule}
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -8 }}
-        transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] as const }}
-      >
-        {activeModule === 'csr-projects' && <ProjectsScreen k={k} activities={activities} />}
-        {activeModule === 'csr-budgets' && <BudgetsScreen k={k} activities={activities} trends={trends} />}
-        {activeModule === 'csr-beneficiaries' && <BeneficiariesScreen k={k} activities={activities} />}
-        {activeModule === 'csr-impact' && <ImpactScreen k={k} activities={activities} />}
-        {activeModule === 'csr-community' && <CommunityScreen k={k} activities={activities} />}
-        {activeModule === 'csr-local' && <LocalScreen k={k} activities={activities} />}
-      </motion.div>
-    </AnimatePresence>
+    <div className="space-y-6 pb-12">
+      {/* Toast */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-50 flex items-center gap-2 rounded-2xl border border-rose-200 bg-white/95 px-4 py-3 shadow-xl shadow-rose-500/10 backdrop-blur-xl text-xs font-bold text-rose-800"
+          >
+            <CheckCircle2 className="h-4 w-4 text-rose-600" />
+            <span>{toastMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* HEADER SECTION */}
+      <div className="relative overflow-hidden rounded-[28px] border border-white/60 bg-white/70 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl md:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-md shadow-rose-500/25">
+                <HeartHandshake className="h-6 w-6" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-3xl">
+                CSR & Social Impact Contributor Workspace
+              </h1>
+              <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50/80 px-3 py-1 text-xs font-bold text-rose-700 shadow-xs">
+                <Sparkles className="h-3 w-3 text-rose-600" />
+                BRSR Principle 8
+              </span>
+            </div>
+            <p className="text-sm font-medium text-slate-500">
+              Schedule VII programmes · Clean water & health clinics · Verified beneficiaries · Social return on investment (SIA)
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="rounded-xl border border-slate-200/80 bg-white/80 px-3 py-2 text-xs font-bold text-slate-700 shadow-xs">
+              FY 2026-27 (Assigned)
+            </span>
+            <button
+              type="button"
+              onClick={() => handleSaveDraft(activeTab.toUpperCase())}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white shadow-xs transition-colors"
+            >
+              <Save className="h-3.5 w-3.5 text-slate-500" />
+              <span>{saveStatus}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowValidationModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-rose-500/20 hover:from-rose-600 hover:to-pink-700 transition-all cursor-pointer"
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span>Validate & Submit</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Sub-Navigation */}
+        <div className="mt-6 flex flex-wrap items-center gap-1.5 pt-4 border-t border-slate-100">
+          {tabList.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                activeTab === tab.id
+                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/25'
+                  : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 1. CSR CONSOLE OVERVIEW */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* 6 Dashboard Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5">
+            {[
+              { label: 'Assigned CSR Projects', val: '3 Projects', sub: 'Schedule VII Scope', icon: Layers, tone: 'text-rose-600 bg-rose-50' },
+              { label: 'Projects in Progress', val: '2 Active', sub: 'Phase 2 RO Plants', icon: Clock, tone: 'text-amber-600 bg-amber-50' },
+              { label: 'Pending Data Entry', val: '1 Form', sub: 'Q2 Signoffs', icon: Edit3, tone: 'text-blue-600 bg-blue-50' },
+              { label: 'Evidence Missing', val: '0 Files', sub: 'All Rolls Attached', icon: ShieldCheck, tone: 'text-emerald-600 bg-emerald-50' },
+              { label: 'Beneficiary Complete', val: '94.7%', sub: '118,400 People', icon: Users, tone: 'text-purple-600 bg-purple-50' },
+              { label: 'Returned Records', val: '0 Items', sub: 'Clean Audit Trail', icon: FileCheck2, tone: 'text-emerald-600 bg-emerald-50' },
+            ].map((card, i) => (
+              <div key={i} className="rounded-[22px] border border-white/60 bg-white/75 p-4 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-500">{card.label}</span>
+                  <div className={`p-1.5 rounded-lg ${card.tone}`}>
+                    <card.icon className="h-3.5 w-3.5" />
+                  </div>
+                </div>
+                <div className="mt-2 text-lg font-black text-slate-900">{card.val}</div>
+                <div className="text-[11px] text-slate-400 font-medium truncate">{card.sub}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Highlights */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-[24px] border border-white/60 bg-white/75 p-5 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+              <span className="text-xs font-bold text-slate-500">Flagship CSR Programme</span>
+              <div className="mt-2 text-lg font-black text-slate-900 truncate">
+                {csrData.projectMaster.projectName}
+              </div>
+              <div className="mt-3 text-xs text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Category:</span>
+                  <span className="font-bold text-rose-700">{csrData.projectMaster.programmeCategory}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Implementing Agency:</span>
+                  <span className="font-bold text-slate-800 truncate max-w-[150px]">{csrData.projectMaster.implementingAgency}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Target Beneficiaries:</span>
+                  <span className="font-bold text-slate-800">{csrData.projectMaster.targetBeneficiaries.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/60 bg-white/75 p-5 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+              <span className="text-xs font-bold text-slate-500">Beneficiaries Reached</span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900">{Number(csrData.activities.actualBeneficiaries).toLocaleString()}</span>
+                <span className="text-xs font-semibold text-emerald-600">{beneficiaryPct}% of target</span>
+              </div>
+              <div className="mt-3 text-xs text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Classification:</span>
+                  <span className="font-bold text-slate-800">{csrData.activities.beneficiaryClassification}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Sessions Held:</span>
+                  <span className="font-bold text-slate-800">{csrData.activities.numberOfSessions} sessions</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Finance Spend Ref:</span>
+                  <span className="font-bold text-blue-700">₹ {csrData.expenditure.expenditureAmountCr} Cr</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-white/60 bg-white/75 p-5 shadow-lg shadow-sky-500/5 backdrop-blur-xl">
+              <span className="text-xs font-bold text-slate-500">Social Impact Assessment (SIA)</span>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-900">4.2x SROI</span>
+                <span className="text-xs font-semibold text-emerald-600">TISS Evaluated</span>
+              </div>
+              <div className="mt-3 text-xs text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Public Disclosure:</span>
+                  <span className="font-bold text-emerald-700">{csrData.sia.publicDisclosureStatus}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Community Grievances:</span>
+                  <span className="font-bold text-slate-800">100% Resolved</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>R&R Compliance:</span>
+                  <span className="font-bold text-teal-700">{csrData.rr.status}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* My CSR Assignments Table */}
+          <div className="rounded-[24px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">My CSR Assignments</h3>
+                <p className="text-xs text-slate-500">Community development tasks assigned for reporting</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab('csr-1')}
+                className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
+              >
+                <span>Enter CSR Data</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3">Implementing Trust</th>
+                    <th className="pb-3">Year</th>
+                    <th className="pb-3">CSR Module</th>
+                    <th className="pb-3">Completion</th>
+                    <th className="pb-3">Evidence</th>
+                    <th className="pb-3">Status</th>
+                    <th className="pb-3">Last Updated</th>
+                    <th className="pb-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {assignments.map((asg) => (
+                    <tr key={asg.id} className="hover:bg-slate-50/50">
+                      <td className="py-3 font-semibold text-slate-800">{asg.entityBu}</td>
+                      <td className="py-3 text-slate-600">{asg.reportingYear}</td>
+                      <td className="py-3 font-bold text-rose-700">{asg.module}</td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-16 rounded-full bg-slate-100 overflow-hidden">
+                            <div className="h-full bg-rose-500 rounded-full" style={{ width: `${asg.completionPercentage}%` }} />
+                          </div>
+                          <span className="font-bold text-slate-700">{asg.completionPercentage}%</span>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          asg.evidenceStatus === 'Attached' || asg.evidenceStatus === 'Verified'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-rose-50 text-rose-700'
+                        }`}>
+                          {asg.evidenceStatus}
+                        </span>
+                      </td>
+                      <td className="py-3">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                          asg.submissionStatus === 'Accepted' ? 'bg-emerald-50 text-emerald-700' :
+                          asg.submissionStatus === 'Submitted' ? 'bg-blue-50 text-blue-700' :
+                          asg.submissionStatus === 'Under Review' ? 'bg-purple-50 text-purple-700' :
+                          'bg-amber-50 text-amber-700'
+                        }`}>
+                          {asg.submissionStatus}
+                        </span>
+                      </td>
+                      <td className="py-3 text-slate-400">{asg.lastUpdated}</td>
+                      <td className="py-3 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (asg.levelKey === 'CSR-1') setActiveTab('csr-1')
+                            else if (asg.levelKey === 'CSR-2') setActiveTab('csr-2')
+                            else if (asg.levelKey === 'CSR-6') setActiveTab('csr-6')
+                            else setActiveTab('csr-1')
+                          }}
+                          className="rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors"
+                        >
+                          Enter Data
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. LEVEL CSR-1 — CSR PROJECT MASTER */}
+      {activeTab === 'csr-1' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={csrData.projectMaster.common}
+            accentColor="rose"
+            onChange={(upd) => setCsrData({
+              ...csrData,
+              projectMaster: { ...csrData.projectMaster, common: { ...csrData.projectMaster.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level CSR-1 — CSR Project Master</h3>
+              <p className="text-xs text-slate-500">Maintain corporate CSR project portfolio sanctioned under Companies Act Schedule VII</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">CSR Project ID</label>
+                <input
+                  type="text"
+                  value={csrData.projectMaster.csrProjectId}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, csrProjectId: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Project Name</label>
+                <input
+                  type="text"
+                  value={csrData.projectMaster.projectName}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, projectName: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Programme Category</label>
+                <select
+                  value={csrData.projectMaster.programmeCategory}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, programmeCategory: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Safe Drinking Water">Safe Drinking Water</option>
+                  <option value="Education & Skill Development">Education & Skill Development</option>
+                  <option value="Healthcare & Sanitation">Healthcare & Sanitation</option>
+                  <option value="Rural Infrastructure">Rural Infrastructure</option>
+                  <option value="Environmental Sustainability">Environmental Sustainability</option>
+                  <option value="Women Empowerment">Women Empowerment</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Implementing Agency</label>
+                <input
+                  type="text"
+                  value={csrData.projectMaster.implementingAgency}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, implementingAgency: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Project Location</label>
+                <input
+                  type="text"
+                  value={csrData.projectMaster.projectLocation}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, projectLocation: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">State / District</label>
+                <input
+                  type="text"
+                  value={csrData.projectMaster.stateDistrict}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, stateDistrict: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Target Beneficiaries</label>
+                <input
+                  type="number"
+                  value={csrData.projectMaster.targetBeneficiaries}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, targetBeneficiaries: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={csrData.projectMaster.startDate}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, startDate: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Planned Completion Date</label>
+                <input
+                  type="date"
+                  value={csrData.projectMaster.plannedCompletionDate}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, plannedCompletionDate: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Project Status</label>
+                <select
+                  value={csrData.projectMaster.projectStatus}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, projectStatus: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Active Implementation">Active Implementation</option>
+                  <option value="Planning">Planning</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Multi-Year Ongoing">Multi-Year Ongoing</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Board Approval Reference</label>
+                <input
+                  type="text"
+                  value={csrData.projectMaster.approvalReference}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    projectMaster: { ...csrData.projectMaster, approvalReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. LEVEL CSR-2 — BENEFICIARIES & ACTIVITIES */}
+      {activeTab === 'csr-2' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={csrData.activities.common}
+            accentColor="rose"
+            onChange={(upd) => setCsrData({
+              ...csrData,
+              activities: { ...csrData.activities, common: { ...csrData.activities.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level CSR-2 — Programme Activities & Beneficiaries</h3>
+              <p className="text-xs text-slate-500">Track community engagement sessions, actual beneficiaries, and attendance rolls</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">CSR Project ID</label>
+                <input
+                  type="text"
+                  value={csrData.activities.csrProjectId}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    activities: { ...csrData.activities, csrProjectId: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Activity Name</label>
+                <input
+                  type="text"
+                  value={csrData.activities.activityName}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    activities: { ...csrData.activities, activityName: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Planned Beneficiaries</label>
+                <input
+                  type="number"
+                  value={csrData.activities.plannedBeneficiaries}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    activities: { ...csrData.activities, plannedBeneficiaries: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Actual Beneficiaries</label>
+                <input
+                  type="number"
+                  value={csrData.activities.actualBeneficiaries}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    activities: { ...csrData.activities, actualBeneficiaries: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Beneficiary Classification</label>
+                <select
+                  value={csrData.activities.beneficiaryClassification}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    activities: { ...csrData.activities, beneficiaryClassification: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Local Villagers / Farmers">Local Villagers / Farmers</option>
+                  <option value="Women">Women</option>
+                  <option value="Children & Students">Children & Students</option>
+                  <option value="Elderly / Marginalized">Elderly / Marginalized</option>
+                  <option value="General Community">General Community</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Achievement % (Calculated)</label>
+                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-rose-700">
+                  {beneficiaryPct}%
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Number of Sessions / Events</label>
+                <input
+                  type="number"
+                  value={csrData.activities.numberOfSessions}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    activities: { ...csrData.activities, numberOfSessions: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Attendance / Roll Evidence</label>
+                <input
+                  type="text"
+                  value={csrData.activities.attendanceEvidence}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    activities: { ...csrData.activities, attendanceEvidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. LEVEL CSR-3 — EXPENDITURE REFERENCES */}
+      {activeTab === 'csr-3' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={csrData.expenditure.common}
+            accentColor="rose"
+            onChange={(upd) => setCsrData({
+              ...csrData,
+              expenditure: { ...csrData.expenditure, common: { ...csrData.expenditure.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level CSR-3 — CSR Expenditure References</h3>
+              <p className="text-xs text-slate-500">Link verified disbursement records with Finance-approved accounting ledgers</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Approved Budget Reference</label>
+                <input
+                  type="text"
+                  value={csrData.expenditure.approvedBudgetReference}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    expenditure: { ...csrData.expenditure, approvedBudgetReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Actual Expenditure Reference</label>
+                <input
+                  type="text"
+                  value={csrData.expenditure.actualExpenditureReference}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    expenditure: { ...csrData.expenditure, actualExpenditureReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Disbursed Spend (₹ Crore)</label>
+                <input
+                  type="number"
+                  value={csrData.expenditure.expenditureAmountCr}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    expenditure: { ...csrData.expenditure, expenditureAmountCr: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Financial Reconciliation Status</label>
+                <select
+                  value={csrData.expenditure.financialReconciliationStatus}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    expenditure: { ...csrData.expenditure, financialReconciliationStatus: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Reconciled with Finance">Reconciled with Finance</option>
+                  <option value="Pending Verification">Pending Verification</option>
+                  <option value="Variance Detected">Variance Detected</option>
+                </select>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Ledger / Payment GL Reference</label>
+                <input
+                  type="text"
+                  value={csrData.expenditure.ledgerPaymentRef}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    expenditure: { ...csrData.expenditure, ledgerPaymentRef: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Supporting Payment Evidence</label>
+                <input
+                  type="text"
+                  value={csrData.expenditure.supportingEvidence}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    expenditure: { ...csrData.expenditure, supportingEvidence: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. LEVEL CSR-4 — PROJECT OUTCOMES & SOCIAL IMPACT */}
+      {activeTab === 'csr-4' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={csrData.outcomes.common}
+            accentColor="rose"
+            onChange={(upd) => setCsrData({
+              ...csrData,
+              outcomes: { ...csrData.outcomes, common: { ...csrData.outcomes.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level CSR-4 — Project Outcomes & Social Impact</h3>
+              <p className="text-xs text-slate-500">Distinguish outputs (sessions held) from measurable community health and livelihood outcomes</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Outcome / Impact Indicator</label>
+                <input
+                  type="text"
+                  value={csrData.outcomes.outcomeImpactIndicator}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    outcomes: { ...csrData.outcomes, outcomeImpactIndicator: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Measurement Unit</label>
+                <input
+                  type="text"
+                  value={csrData.outcomes.measurementUnit}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    outcomes: { ...csrData.outcomes, measurementUnit: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Result Status</label>
+                <select
+                  value={csrData.outcomes.resultStatus}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    outcomes: { ...csrData.outcomes, resultStatus: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Target Exceeded">Target Exceeded</option>
+                  <option value="Target Achieved">Target Achieved</option>
+                  <option value="On Track">On Track</option>
+                  <option value="Partially Met">Partially Met</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Baseline Value</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={csrData.outcomes.baselineValue}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    outcomes: { ...csrData.outcomes, baselineValue: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Target Value</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={csrData.outcomes.targetValue}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    outcomes: { ...csrData.outcomes, targetValue: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Actual Value Achieved</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={csrData.outcomes.actualValue}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    outcomes: { ...csrData.outcomes, actualValue: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Data Collection Method</label>
+                <select
+                  value={csrData.outcomes.dataCollectionMethod}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    outcomes: { ...csrData.outcomes, dataCollectionMethod: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Government Health Center Records">Government Health Center Records</option>
+                  <option value="Baseline-Endline Household Survey">Baseline-Endline Household Survey</option>
+                  <option value="School Enrollment Registers">School Enrollment Registers</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. LEVEL CSR-5 — COMMUNITY ENGAGEMENT & GRIEVANCES */}
+      {activeTab === 'csr-5' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={csrData.grievances.common}
+            accentColor="rose"
+            onChange={(upd) => setCsrData({
+              ...csrData,
+              grievances: { ...csrData.grievances, common: { ...csrData.grievances.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level CSR-5 — Community Engagement & Grievances</h3>
+              <p className="text-xs text-slate-500">Record community feedback, village complaints, and resolution timelines</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Grievance / Feedback ID</label>
+                <input
+                  type="text"
+                  value={csrData.grievances.grievanceId}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    grievances: { ...csrData.grievances, grievanceId: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Category</label>
+                <select
+                  value={csrData.grievances.category}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    grievances: { ...csrData.grievances, category: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Water Supply Interruption">Water Supply Interruption</option>
+                  <option value="Infrastructure Inconvenience">Infrastructure Inconvenience</option>
+                  <option value="Dust / Noise Impact">Dust / Noise Impact</option>
+                  <option value="Local Employment Concern">Local Employment Concern</option>
+                  <option value="General Query">General Query</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Affected Community / Village</label>
+                <input
+                  type="text"
+                  value={csrData.grievances.affectedCommunityLocation}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    grievances: { ...csrData.grievances, affectedCommunityLocation: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Resolution Status</label>
+                <select
+                  value={csrData.grievances.resolutionStatus}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    grievances: { ...csrData.grievances, resolutionStatus: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Resolved">Resolved</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Escalated to CSR Head">Escalated to CSR Head</option>
+                  <option value="Closed with Agreement">Closed with Agreement</option>
+                </select>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Description</label>
+                <input
+                  type="text"
+                  value={csrData.grievances.description}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    grievances: { ...csrData.grievances, description: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Action Taken</label>
+                <input
+                  type="text"
+                  value={csrData.grievances.actionTaken}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    grievances: { ...csrData.grievances, actionTaken: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. LEVEL CSR-6 — SOCIAL IMPACT ASSESSMENT (SIA) */}
+      {activeTab === 'csr-6' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={csrData.sia.common}
+            accentColor="rose"
+            onChange={(upd) => setCsrData({
+              ...csrData,
+              sia: { ...csrData.sia, common: { ...csrData.sia.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level CSR-6 — Social Impact Assessment (SIA)</h3>
+              <p className="text-xs text-slate-500">Statutory independent evaluations under Section 135 for projects &gt;= ₹1 Crore</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">SIA Applicability</label>
+                <select
+                  value={csrData.sia.siaApplicability}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    sia: { ...csrData.sia, siaApplicability: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Mandatory (Project >= ₹1 Cr + Completed 1 Yr)">Mandatory (&gt;= ₹1 Cr)</option>
+                  <option value="Voluntary Good Practice">Voluntary Good Practice</option>
+                  <option value="Exempted">Exempted</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Assessment Agency</label>
+                <input
+                  type="text"
+                  value={csrData.sia.assessmentAgency}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    sia: { ...csrData.sia, assessmentAgency: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Assessment Date</label>
+                <input
+                  type="date"
+                  value={csrData.sia.assessmentDate}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    sia: { ...csrData.sia, assessmentDate: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Public Disclosure Status</label>
+                <select
+                  value={csrData.sia.publicDisclosureStatus}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    sia: { ...csrData.sia, publicDisclosureStatus: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="Published on Company Website">Published on Company Website</option>
+                  <option value="Draft Under Board Review">Draft Under Board Review</option>
+                  <option value="Exempted">Exempted</option>
+                </select>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Key Findings</label>
+                <input
+                  type="text"
+                  value={csrData.sia.assessmentFindings}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    sia: { ...csrData.sia, assessmentFindings: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Public Report URL</label>
+                <input
+                  type="text"
+                  value={csrData.sia.publicReportUrl}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    sia: { ...csrData.sia, publicReportUrl: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. LEVEL CSR-7 — R&R */}
+      {activeTab === 'csr-7' && (
+        <div className="space-y-6">
+          <CommonLevel0Card
+            fields={csrData.rr.common}
+            accentColor="rose"
+            onChange={(upd) => setCsrData({
+              ...csrData,
+              rr: { ...csrData.rr, common: { ...csrData.rr.common, ...upd } }
+            })}
+          />
+
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl space-y-6">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Level CSR-7 — Rehabilitation & Resettlement (R&R)</h3>
+              <p className="text-xs text-slate-500">Enable only where applicable for project-affected families (PAFs)</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Project Reference</label>
+                <input
+                  type="text"
+                  value={csrData.rr.projectReference}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    rr: { ...csrData.rr, projectReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">PAFs Identified</label>
+                <input
+                  type="number"
+                  value={csrData.rr.pafsIdentified}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    rr: { ...csrData.rr, pafsIdentified: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">PAFs Covered by R&R</label>
+                <input
+                  type="number"
+                  value={csrData.rr.pafsCoveredByRandR}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    rr: { ...csrData.rr, pafsCoveredByRandR: Number(e.target.value) }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Disbursement Status</label>
+                <select
+                  value={csrData.rr.status}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    rr: { ...csrData.rr, status: e.target.value as any }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                >
+                  <option value="All Compensation Disbursed">All Compensation Disbursed</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Disputed / In Court">Disputed / In Court</option>
+                  <option value="Not Applicable">Not Applicable</option>
+                </select>
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Compensation Order Reference</label>
+                <input
+                  type="text"
+                  value={csrData.rr.compensationSupportReference}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    rr: { ...csrData.rr, compensationSupportReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+
+              <div className="lg:col-span-2">
+                <label className="font-semibold text-slate-700 block mb-1">Treasury Payment Ref</label>
+                <input
+                  type="text"
+                  value={csrData.rr.paymentEvidenceReference}
+                  onChange={(e) => setCsrData({
+                    ...csrData,
+                    rr: { ...csrData.rr, paymentEvidenceReference: e.target.value }
+                  })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. EVIDENCE TAB */}
+      {activeTab === 'evidence' && (
+        <CommonEvidenceManager roleKey="CSR_USER" accentColor="rose" />
+      )}
+
+      {/* 10. SUBMISSIONS TAB */}
+      {activeTab === 'submissions' && (
+        <div className="space-y-6">
+          <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl">
+            <h3 className="text-lg font-black text-slate-900 mb-1">My CSR Submissions History</h3>
+            <p className="text-xs text-slate-500 mb-4">Complete audit trail of verified CSR programmes and beneficiary records</p>
+            <div className="divide-y divide-slate-100 text-xs">
+              {assignments.map((asg) => (
+                <div key={asg.id} className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-800 text-sm">{asg.module}</span>
+                      <span className="text-[11px] font-semibold text-slate-500">({asg.reportingYear})</span>
+                    </div>
+                    <p className="text-slate-500 text-xs mt-0.5">{asg.description}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2.5 py-1 rounded-full font-bold text-[11px] ${
+                      asg.submissionStatus === 'Accepted' ? 'bg-emerald-100 text-emerald-800' :
+                      asg.submissionStatus === 'Submitted' ? 'bg-blue-100 text-blue-800' :
+                      asg.submissionStatus === 'Under Review' ? 'bg-purple-100 text-purple-800' :
+                      'bg-amber-100 text-amber-800'
+                    }`}>
+                      {asg.submissionStatus}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowValidationModal(true)}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      Audit Trail
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 11. ACTIVITY LOG TAB */}
+      {activeTab === 'activity' && (
+        <div className="rounded-[28px] border border-white/60 bg-white/75 p-6 shadow-xl shadow-sky-500/5 backdrop-blur-xl">
+          <div className="flex items-center gap-2 mb-4">
+            <History className="h-5 w-5 text-rose-600" />
+            <h3 className="text-base font-bold text-slate-900">CSR Contributor Activity Log</h3>
+          </div>
+          <div className="space-y-3">
+            {activities.map((act) => (
+              <div key={act.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 flex items-start justify-between gap-3 text-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">{act.user}</span>
+                    <span className="rounded-md bg-rose-100 text-rose-800 px-1.5 py-0.5 text-[10px] font-bold">{act.action}</span>
+                    <span className="font-semibold text-slate-600">• {act.target}</span>
+                  </div>
+                  <p className="text-slate-500 mt-1">{act.details}</p>
+                </div>
+                <span className="text-[11px] text-slate-400 whitespace-nowrap">{act.timestamp}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Validation & Submit Modal */}
+      <CommonValidationModal
+        isOpen={showValidationModal}
+        onClose={() => setShowValidationModal(false)}
+        roleKey="CSR_USER"
+        levelName={activeTab.toUpperCase()}
+        onSubmitSuccess={() => {
+          setAssignments(contributorStore.getAssignments('CSR_USER'))
+          setActivities(contributorStore.getActivities('CSR_USER'))
+        }}
+      />
+    </div>
   )
 }
