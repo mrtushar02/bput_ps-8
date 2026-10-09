@@ -206,8 +206,29 @@ export function BrsrModule() {
           toast.error(msg)
         }
       } else {
-        toast.success('BRSR report generated', {
-          description: `v${data.report?.version} · ${data.report?.fileName ?? ''}`,
+        // Instantly generate and trigger client-side download of the official SEBI BRSR PDF
+        try {
+          const { generateBrsrReportPdf } = await import('@/lib/brsr-pdf-generator')
+          const pdfDoc = generateBrsrReportPdf({
+            reportingYear,
+            version: data.report?.version,
+            generatedByName: user?.name ? `${user.name} (${user.roles[0]?.name || 'ESG Manager'})` : 'Anita Desai (ESG / Sustainability Manager)',
+          })
+          const pdfName = data.report?.fileName || `MEIL-BRSR-Annexure-I-FY${reportingYear}-v${data.report?.version || 1}.pdf`
+          pdfDoc.save(pdfName)
+        } catch (pdfErr) {
+          console.warn('Direct PDF save fallback to server endpoint', pdfErr)
+          const downloadUrl = data.downloadUrl || `/api/reports/${data.report.id}/download`
+          const link = document.createElement('a')
+          link.href = downloadUrl
+          link.download = data.report?.fileName || 'MEIL-BRSR-Annexure-I.pdf'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        }
+
+        toast.success('BRSR Report Generated & Downloaded', {
+          description: `SEBI Annexure I · v${data.report?.version} · ${data.report?.fileName ?? 'MEIL-BRSR-Report.pdf'}`,
         })
         // Refresh reports
         const reps = await fetch('/api/reports?type=BRSR').then(r => r.json())
@@ -399,9 +420,10 @@ export function BrsrModule() {
                     <td className="px-2 py-2 text-right">
                       <a
                         href={`/api/reports/${r.id}/download`}
+                        download={r.fileName || `MEIL-BRSR-Report-v${r.version}.pdf`}
                         className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100"
                       >
-                        <Download className="h-3 w-3" /> {r.fileType}
+                        <Download className="h-3 w-3" /> {r.fileType === 'JSON' ? 'PDF' : r.fileType}
                       </a>
                     </td>
                   </tr>
@@ -443,10 +465,10 @@ export function BrsrModule() {
       </Dialog>
 
       {/* ROLE NOTICE */}
-      {user && !['SUPER_ADMIN', 'BRSR_PREPARER', 'GROUP_CSO', 'ESG_PUBLISHER'].includes(user.roles[0]?.key) && (
+      {user && !['SUPER_ADMIN', 'BRSR_PREPARER', 'GROUP_CSO', 'ESG_PUBLISHER', 'ESG_MANAGER', 'BRSR_MANAGER'].includes(user.roles[0]?.key) && (
         <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] text-slate-500">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-          <span>View-only mode — BRSR report generation requires <code>brsr.generate</code> permission (BRSR Preparer / CSO / Publisher / Super Admin).</span>
+          <span>View-only mode — BRSR report generation requires <code>brsr.generate</code> permission (ESG Manager / BRSR Preparer / CSO / Publisher / Super Admin).</span>
         </div>
       )}
     </div>

@@ -13,9 +13,13 @@ export async function POST(req: NextRequest) {
   try {
     user = await getCurrentUser()
     if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
-    // RBAC: require brsr.generate
+    // RBAC: require brsr.generate (or ESG_MANAGER / BRSR_MANAGER / GROUP_CSO / SUPER_ADMIN)
     const { userHasPermission } = await import('@/lib/session')
-    const allowed = await userHasPermission(user.id, 'brsr.generate')
+    const allowed =
+      (await userHasPermission(user.id, 'brsr.generate')) ||
+      user.roles.some((r: any) =>
+        ['ESG_MANAGER', 'BRSR_MANAGER', 'GROUP_CSO', 'SUPER_ADMIN', 'BRSR_PREPARER', 'ESG_PUBLISHER'].includes(r.key)
+      )
     if (!allowed) return NextResponse.json({ error: 'Forbidden — brsr.generate required' }, { status: 403 })
   } catch (e: any) {
     return NextResponse.json({ error: 'Auth check failed', detail: String(e?.message ?? e) }, { status: 500 })
@@ -132,7 +136,7 @@ export async function POST(req: NextRequest) {
     })
     const nextVersion = (lastReport?.version ?? 0) + 1
 
-    const fileName = `BRSR-${framework.version}-${reportingYear ?? framework.reportingYear}-v${nextVersion}.json`
+    const fileName = `MEIL-BRSR-Annexure-I-FY${reportingYear ?? framework.reportingYear}-v${nextVersion}.pdf`
 
     const report = await db.report.create({
       data: {
@@ -147,7 +151,7 @@ export async function POST(req: NextRequest) {
         generatedByName: user.name,
         status: 'COMPLETED',
         fileName,
-        fileType: 'JSON',
+        fileType: 'PDF',
         content: JSON.stringify(reportContent),
         version: nextVersion,
       },
@@ -163,11 +167,15 @@ export async function POST(req: NextRequest) {
         entityType: 'Report',
         entityId: report.id,
         newState: JSON.stringify({ reportType: 'BRSR', frameworkId, version: nextVersion, fileName }),
-        reason: `BRSR report v${nextVersion} generated for ${scopeName ?? scopeId ?? 'group'}`,
+        reason: `BRSR SEBI Annexure I PDF report v${nextVersion} generated for ${scopeName ?? scopeId ?? 'group'}`,
       },
     })
 
-    return NextResponse.json({ report, content: reportContent })
+    return NextResponse.json({
+      report,
+      content: reportContent,
+      downloadUrl: `/api/reports/${report.id}/download`,
+    })
   } catch (e: any) {
     return NextResponse.json({ error: 'Failed to generate BRSR report', detail: String(e?.message ?? e) }, { status: 500 })
   }

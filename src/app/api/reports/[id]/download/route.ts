@@ -28,18 +28,35 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     let contentType: string
 
     if (report.reportType === 'BRSR') {
-      body = renderBrsrText(report.content)
-      contentType = 'text/plain; charset=utf-8'
-    } else {
-      let parsed: any
-      try {
-        parsed = JSON.parse(report.content)
-      } catch {
-        parsed = { content: report.content }
-      }
-      body = jsonToCsv(parsed)
-      contentType = 'text/csv; charset=utf-8'
+      const { generateBrsrReportPdf } = await import('@/lib/brsr-pdf-generator')
+      const pdfDoc = generateBrsrReportPdf({
+        reportingYear: report.reportingYear ?? 2026,
+        scopeName: report.scopeName ?? 'MEIL Group (All)',
+        scopeType: report.scopeType ?? 'GROUP',
+        generatedByName: report.generatedByName ?? 'Anita Desai (ESG / Sustainability Manager)',
+        version: report.version,
+      })
+      const pdfBuffer = Buffer.from(pdfDoc.output('arraybuffer'))
+      const pdfFileName = report.fileName?.endsWith('.pdf')
+        ? report.fileName
+        : `MEIL-BRSR-Annexure-I-FY${report.reportingYear ?? 2026}-v${report.version}.pdf`
+
+      const headers = new Headers()
+      headers.set('Content-Type', 'application/pdf')
+      headers.set('Content-Disposition', `attachment; filename="${pdfFileName}"`)
+      headers.set('Cache-Control', 'no-store')
+
+      return new NextResponse(pdfBuffer, { status: 200, headers })
     }
+
+    let parsed: any
+    try {
+      parsed = JSON.parse(report.content)
+    } catch {
+      parsed = { content: report.content }
+    }
+    body = jsonToCsv(parsed)
+    contentType = 'text/csv; charset=utf-8'
 
     const headers = new Headers()
     headers.set('Content-Type', contentType)
