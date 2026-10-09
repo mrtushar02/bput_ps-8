@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 //     / ESG_SUMMARY / AUDIT_PACKAGE) → CSV.
 //   - For BRSR → a structured plain-text rendition.
 // Sets Content-Disposition: attachment; filename="..."
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
 
@@ -41,9 +41,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         ? report.fileName
         : `MEIL-BRSR-Annexure-I-FY${report.reportingYear ?? 2026}-v${report.version}.pdf`
 
+      const isInline = req.nextUrl.searchParams.get('inline') === 'true'
+      const disposition = isInline
+        ? `inline; filename="${pdfFileName}"`
+        : `attachment; filename="${pdfFileName}"; filename*=UTF-8''${encodeURIComponent(pdfFileName)}`
+
       const headers = new Headers()
       headers.set('Content-Type', 'application/pdf')
-      headers.set('Content-Disposition', `attachment; filename="${pdfFileName}"`)
+      headers.set('Content-Disposition', disposition)
+      headers.set('Content-Length', String(pdfBuffer.byteLength))
       headers.set('Cache-Control', 'no-store')
 
       return new NextResponse(pdfBuffer, { status: 200, headers })

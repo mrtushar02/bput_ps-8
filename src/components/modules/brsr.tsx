@@ -206,29 +206,27 @@ export function BrsrModule() {
           toast.error(msg)
         }
       } else {
-        // Instantly generate and trigger client-side download of the official SEBI BRSR PDF
+        const downloadUrl = `/api/reports/${data.report.id}/download`
+        const viewUrl = `/api/reports/${data.report.id}/download?inline=true`
+        const pdfFileName = data.report?.fileName || `MEIL-BRSR-Annexure-I-FY${reportingYear}-v${data.report?.version || 1}.pdf`
+
+        // 1. Trigger browser file download with exact .pdf extension
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.setAttribute('download', pdfFileName)
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+
+        // 2. Open PDF in a new tab so user can immediately view, inspect and print all pages
         try {
-          const { generateBrsrReportPdf } = await import('@/lib/brsr-pdf-generator')
-          const pdfDoc = generateBrsrReportPdf({
-            reportingYear,
-            version: data.report?.version,
-            generatedByName: user?.name ? `${user.name} (${user.roles[0]?.name || 'ESG Manager'})` : 'Anita Desai (ESG / Sustainability Manager)',
-          })
-          const pdfName = data.report?.fileName || `MEIL-BRSR-Annexure-I-FY${reportingYear}-v${data.report?.version || 1}.pdf`
-          pdfDoc.save(pdfName)
-        } catch (pdfErr) {
-          console.warn('Direct PDF save fallback to server endpoint', pdfErr)
-          const downloadUrl = data.downloadUrl || `/api/reports/${data.report.id}/download`
-          const link = document.createElement('a')
-          link.href = downloadUrl
-          link.download = data.report?.fileName || 'MEIL-BRSR-Annexure-I.pdf'
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
+          window.open(viewUrl, '_blank')
+        } catch (wErr) {
+          console.warn('Popup blocked for preview tab', wErr)
         }
 
         toast.success('BRSR Report Generated & Downloaded', {
-          description: `SEBI Annexure I · v${data.report?.version} · ${data.report?.fileName ?? 'MEIL-BRSR-Report.pdf'}`,
+          description: `SEBI Annexure I · v${data.report?.version} · ${pdfFileName}`,
         })
         // Refresh reports
         const reps = await fetch('/api/reports?type=BRSR').then(r => r.json())
@@ -418,13 +416,25 @@ export function BrsrModule() {
                     </td>
                     <td className="px-2 py-2 text-slate-500 tabular-nums">{new Date(r.createdAt).toLocaleDateString()}</td>
                     <td className="px-2 py-2 text-right">
-                      <a
-                        href={`/api/reports/${r.id}/download`}
-                        download={r.fileName || `MEIL-BRSR-Report-v${r.version}.pdf`}
-                        className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100"
-                      >
-                        <Download className="h-3 w-3" /> {r.fileType === 'JSON' ? 'PDF' : r.fileType}
-                      </a>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <a
+                          href={`/api/reports/${r.id}/download?inline=true`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-200"
+                          title="Open PDF directly in browser"
+                        >
+                          <Eye className="h-3 w-3" /> View
+                        </a>
+                        <a
+                          href={`/api/reports/${r.id}/download`}
+                          download={r.fileName || `MEIL-BRSR-Annexure-I-FY${r.reportingYear ?? 2026}-v${r.version}.pdf`}
+                          className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100"
+                          title="Download PDF to computer"
+                        >
+                          <Download className="h-3 w-3" /> PDF
+                        </a>
+                      </div>
                     </td>
                   </tr>
                 ))}
