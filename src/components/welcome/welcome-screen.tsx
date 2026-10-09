@@ -49,7 +49,7 @@ const ROLES: RoleCardDef[] = [
   { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS / Safety User', phase: 1, category: 'operations', icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Environment, Health & Safety incident reports' },
   { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement User', phase: 1, category: 'operations', icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Supply chain sustainability & vendor ESG scores' },
   { key: 'CSR_USER', name: 'Imran Sheikh', email: 'imran@meil-esg.in', role: 'CSR / Community User', phase: 1, category: 'operations', icon: Heart, tint: 'from-rose-500 to-pink-600', blurb: 'Community outreach & CSR initiatives' },
-  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance User', phase: 1, category: 'governance', icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Regulatory reporting & framework compliance' },
+  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance User', phase: 1, category: 'operations', icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Regulatory reporting & framework compliance' },
   // Page 2 & subsequent roles
   { key: 'SUPER_ADMIN', name: 'Arjun Mehta', email: 'admin@meil-esg.in', role: 'Super Admin', phase: 3, category: 'leadership', icon: Settings2, tint: 'from-slate-500 to-slate-700', blurb: 'Full enterprise data & user administration' },
   { key: 'BU_REVIEWER', name: 'Rakesh Verma', email: 'rakesh@meil-esg.in', role: 'Business Unit Reviewer', phase: 2, category: 'approvals', icon: FileCheck, tint: 'from-blue-500 to-indigo-600', blurb: 'BU-level technical validation & review approval' },
@@ -978,34 +978,59 @@ function RolePickerScreen({
   onBack: () => void
 }) {
   const [selectedCategory, setSelectedCategory] = useState<RoleCategory>('all')
-  const [currentPage, setCurrentPage] = useState(0)
-  const pageSize = 6
+  const [currentPage, setCurrentPage] = useState(0) // 0: Phase 1 (7), 1: Phase 2 (3), 2: Phase 3 (5)
   const wheelLockRef = useRef<boolean>(false)
 
-  // Filter roles based on selected category tab
-  const filteredRoles = useMemo(() => {
-    if (selectedCategory === 'all') return roles
-    return roles.filter(r => r.category === selectedCategory)
-  }, [roles, selectedCategory])
+  // Explicit Phase Definitions matching the BRSR platform lifecycle
+  const PHASES = useMemo(() => [
+    {
+      phase: 1 as const,
+      label: 'Phase 1 — Site & Operational Data Entry',
+      shortLabel: 'Phase 1 · Site Data Entry',
+      badge: '7 Roles',
+      roles: roles.filter(r => r.phase === 1),
+    },
+    {
+      phase: 2 as const,
+      label: 'Phase 2 — Multi-Level Review & Approvals',
+      shortLabel: 'Phase 2 · Review & Approvals',
+      badge: '3 Roles',
+      roles: roles.filter(r => r.phase === 2),
+    },
+    {
+      phase: 3 as const,
+      label: 'Phase 3 — BRSR Core, Assurance & Analytics',
+      shortLabel: 'Phase 3 · Governance & Leadership',
+      badge: '5 Roles',
+      roles: roles.filter(r => r.phase === 3),
+    },
+  ], [roles])
 
-  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / pageSize))
+  const totalPages = PHASES.length
+  const currentPhase = PHASES[currentPage] || PHASES[0]
 
-  // Ensure current page is valid when category changes
-  useEffect(() => {
-    if (currentPage >= totalPages) {
-      setCurrentPage(0)
-    }
-  }, [totalPages, currentPage])
-
+  // Filter roles based on selected category tab or phase slide
   const displayedRoles = useMemo(() => {
-    const start = currentPage * pageSize
-    return filteredRoles.slice(start, start + pageSize)
-  }, [filteredRoles, currentPage, pageSize])
+    if (selectedCategory === 'all') {
+      return currentPhase.roles
+    }
+    const catFiltered = roles.filter(r => r.category === selectedCategory)
+    return catFiltered.length > 0 ? catFiltered : currentPhase.roles
+  }, [roles, selectedCategory, currentPhase])
 
-  const nextPage = () => setCurrentPage(prev => (prev + 1) % totalPages)
-  const prevPage = () => setCurrentPage(prev => (prev - 1 + totalPages) % totalPages)
+  const nextPage = () => {
+    setCurrentPage(prev => (prev + 1) % totalPages)
+    setSelectedCategory('all')
+    setHovered(null)
+  }
 
-  // Mouse wheel scroll handler: enables natural horizontal paging on wheel
+  const prevPage = () => {
+    setCurrentPage(prev => (prev - 1 + totalPages) % totalPages)
+    setSelectedCategory('all')
+    setHovered(null)
+  }
+
+  // Mouse wheel scroll handler: enables natural horizontal paging between phases
   const handleWheel = (e: React.WheelEvent) => {
     const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
     if (Math.abs(delta) < 18) return
@@ -1014,7 +1039,7 @@ function RolePickerScreen({
     wheelLockRef.current = true
     setTimeout(() => {
       wheelLockRef.current = false
-    }, 280)
+    }, 320)
 
     if (delta > 0) {
       nextPage()
@@ -1029,23 +1054,33 @@ function RolePickerScreen({
       const idx = displayedRoles.findIndex(r => r.key === hovered)
       if (idx !== -1) return idx
     }
-    // Default to CSR_USER if on page 0 of 'all' or 'operations', else first card
-    const csrIdx = displayedRoles.findIndex(r => r.key === 'CSR_USER')
-    if (csrIdx !== -1) return csrIdx
-    return 0
-  }, [hovered, displayedRoles])
+    // Highlight CSR_USER by default if on Phase 1
+    if (currentPage === 0) {
+      const csrIdx = displayedRoles.findIndex(r => r.key === 'CSR_USER')
+      if (csrIdx !== -1) return csrIdx
+    }
+    // Otherwise center card
+    return Math.floor(displayedRoles.length / 2)
+  }, [hovered, displayedRoles, currentPage])
 
   const ROLE_CATEGORIES: { id: RoleCategory; label: string; count: number; icon: typeof Globe }[] = [
     { id: 'all', label: 'All Roles', count: roles.length, icon: Globe },
-    { id: 'operations', label: 'Site Operations', count: roles.filter(r => r.category === 'operations').length, icon: Building2 },
-    { id: 'approvals', label: 'Review & Approvals', count: roles.filter(r => r.category === 'approvals').length, icon: FileCheck },
-    { id: 'governance', label: 'BRSR & Governance', count: roles.filter(r => r.category === 'governance').length, icon: Scale },
-    { id: 'leadership', label: 'Leadership & Board', count: roles.filter(r => r.category === 'leadership').length, icon: Crown },
+    { id: 'operations', label: 'Site Operations', count: roles.filter(r => r.phase === 1).length, icon: Building2 },
+    { id: 'approvals', label: 'Review & Approvals', count: roles.filter(r => r.phase === 2).length, icon: FileCheck },
+    { id: 'governance', label: 'BRSR & Governance', count: roles.filter(r => r.phase === 3 && r.category === 'governance').length, icon: Scale },
+    { id: 'leadership', label: 'Leadership & Board', count: roles.filter(r => r.phase === 3 && r.category === 'leadership').length, icon: Crown },
   ]
+
+  // Responsive dynamic card width class so all 7 cards fit on screen for Phase 1
+  const cardWidthClass = displayedRoles.length >= 7
+    ? 'w-[138px] sm:w-[148px] md:w-[156px] lg:w-[164px] xl:w-[172px] shrink-0'
+    : displayedRoles.length <= 3
+      ? 'w-[185px] sm:w-[200px] lg:w-[218px] shrink-0'
+      : 'w-[160px] sm:w-[172px] lg:w-[185px] shrink-0'
 
   return (
     <div className="relative flex w-full flex-col items-center justify-between py-2 sm:py-3">
-      {/* Top Header Pill Indicator from Screenshot */}
+      {/* Top Header Pill Indicator */}
       <div className="flex items-center justify-center mb-1">
         <span className="rounded-full bg-white/80 px-4 py-1 text-[11px] font-bold tracking-[0.25em] text-slate-400 uppercase border border-slate-200/60 shadow-xs backdrop-blur-md">
           STEP 1 OF 2
@@ -1075,9 +1110,16 @@ function RolePickerScreen({
               key={cat.id}
               onClick={() => {
                 setSelectedCategory(cat.id)
-                setCurrentPage(0)
+                setHovered(null)
+                if (cat.id === 'operations') {
+                  setCurrentPage(0)
+                } else if (cat.id === 'approvals') {
+                  setCurrentPage(1)
+                } else if (cat.id === 'governance' || cat.id === 'leadership') {
+                  setCurrentPage(2)
+                }
               }}
-              className={`group flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 ${
+              className={`group flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 cursor-pointer ${
                 isSelected
                   ? 'bg-gradient-to-r from-blue-600 via-sky-500 to-blue-700 text-white shadow-md shadow-blue-500/25 scale-[1.03]'
                   : 'bg-white/70 backdrop-blur-md border border-white/80 text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-xs'
@@ -1095,24 +1137,33 @@ function RolePickerScreen({
         })}
       </div>
 
+      {/* Current Phase Sub-heading Badge */}
+      <div className="flex items-center justify-center gap-2 my-1">
+        <span className="rounded-full bg-white/85 border border-sky-200/70 shadow-xs px-3.5 py-1 text-xs font-bold text-sky-800 backdrop-blur-md flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+          <span>{currentPhase.label}</span>
+          <span className="rounded-full bg-blue-600/10 px-2 py-0.5 text-[10px] font-black text-blue-700">
+            {displayedRoles.length} Containers
+          </span>
+        </span>
+      </div>
+
       {/* Horizontal Carousel Track with Mouse Scroll + Touch Drag + Chevrons */}
       <div 
         onWheel={handleWheel}
-        className="relative w-full flex items-center justify-center gap-2 sm:gap-4 lg:gap-5 my-4 sm:my-6 px-2 select-none"
+        className="relative w-full flex items-center justify-center gap-2 sm:gap-3 lg:gap-4 my-3 sm:my-5 px-1 select-none"
       >
         {/* Left Circular Arrow Button */}
         <button
           onClick={prevPage}
-          disabled={totalPages <= 1}
-          aria-label="Previous roles"
-          className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all ${
-            totalPages <= 1 ? 'opacity-40 cursor-not-allowed' : ''
-          }`}
+          aria-label="Previous phase slide"
+          title="Previous Phase"
+          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/85 border border-white/95 shadow-sm backdrop-blur-md text-slate-500 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all cursor-pointer z-10"
         >
-          <ChevronLeft className="h-5 w-5 stroke-[2]" />
+          <ChevronLeft className="h-5 w-5 stroke-[2.2]" />
         </button>
 
-        {/* 6 Role Cards in Row with Motion Animations & Drag / Wheel Scroll */}
+        {/* Phase Role Cards Row with Spring Animations & Drag / Wheel Scroll */}
         <motion.div 
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
@@ -1120,7 +1171,7 @@ function RolePickerScreen({
             if (info.offset.x < -50) nextPage()
             else if (info.offset.x > 50) prevPage()
           }}
-          className="flex items-center justify-center gap-3 sm:gap-4 lg:gap-5 flex-wrap sm:flex-nowrap cursor-grab active:cursor-grabbing"
+          className="flex items-center justify-center gap-2 sm:gap-2.5 lg:gap-3 xl:gap-3.5 flex-nowrap cursor-grab active:cursor-grabbing max-w-full overflow-x-auto scrollbar-none py-3 px-1"
         >
           <AnimatePresence mode="popLayout">
             {displayedRoles.map((r, idx) => {
@@ -1133,56 +1184,56 @@ function RolePickerScreen({
                   onMouseEnter={() => setHovered(r.key)}
                   onMouseLeave={() => setHovered(null)}
                   onClick={() => onPick(r)}
-                  initial={{ opacity: 0, y: 24, scale: 0.94 }}
+                  initial={{ opacity: 0, y: 22, scale: 0.93 }}
                   animate={{ 
                     opacity: 1, 
                     y: isHighlighted ? -16 : 0, 
                     scale: isHighlighted ? 1.02 : 1 
                   }}
-                  exit={{ opacity: 0, y: -20, scale: 0.92 }}
+                  exit={{ opacity: 0, y: -20, scale: 0.90 }}
                   transition={{ 
                     type: 'spring', 
-                    stiffness: 300, 
+                    stiffness: 320, 
                     damping: 24, 
-                    delay: idx * 0.03 
+                    delay: idx * 0.025 
                   }}
                   whileHover={{ 
                     y: isHighlighted ? -22 : -10, 
                     scale: isHighlighted ? 1.04 : 1.025 
                   }}
                   whileTap={{ scale: 0.96 }}
-                  className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-[28px] p-5 text-center transition-all duration-300 ${
+                  className={`group relative flex cursor-pointer flex-col items-center justify-between rounded-[28px] p-4 text-center transition-all duration-300 ${cardWidthClass} h-[270px] sm:h-[280px] lg:h-[286px] ${
                     isHighlighted
-                      ? 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/95 border-2 border-[#60A5FA] z-10 shadow-[0_36px_85px_-8px_rgba(37,99,235,0.44),0_16px_36px_-4px_rgba(37,99,235,0.28),inset_0_2px_4px_rgba(255,255,255,1)] ring-4 ring-blue-400/20'
-                      : 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/80 border border-white/90 shadow-[0_16px_36px_-8px_rgba(2,132,199,0.18),0_4px_14px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.95)] hover:bg-white/95 hover:border-sky-300 hover:shadow-[0_28px_65px_-8px_rgba(2,132,199,0.34),0_12px_24px_-4px_rgba(14,165,233,0.22),inset_0_2px_4px_rgba(255,255,255,1)]'
+                      ? 'bg-white/95 border-2 border-[#60A5FA] z-10 shadow-[0_36px_85px_-8px_rgba(37,99,235,0.44),0_16px_36px_-4px_rgba(37,99,235,0.28),inset_0_2px_4px_rgba(255,255,255,1)] ring-4 ring-blue-400/20'
+                      : 'bg-white/80 border border-white/90 shadow-[0_16px_36px_-8px_rgba(2,132,199,0.18),0_4px_14px_rgba(0,0,0,0.04),inset_0_1px_2px_rgba(255,255,255,0.95)] hover:bg-white/95 hover:border-sky-300 hover:shadow-[0_28px_65px_-8px_rgba(2,132,199,0.34),0_12px_24px_-4px_rgba(14,165,233,0.22),inset_0_2px_4px_rgba(255,255,255,1)]'
                   }`}
                 >
                   {/* Top Squircle Icon with Motion Pulse */}
                   <motion.div 
                     whileHover={{ scale: 1.15, rotate: [0, -4, 4, 0] }}
                     transition={{ duration: 0.3 }}
-                    className={`mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] transition-colors duration-200 ${
+                    className={`mb-3 flex h-12 w-12 sm:h-13 sm:w-13 items-center justify-center rounded-[18px] transition-colors duration-200 ${
                       isHighlighted 
                         ? 'bg-[#E0EFFE] text-[#2563EB] shadow-md shadow-blue-500/20' 
                         : 'bg-[#EBF4FE] text-[#2563EB] group-hover:bg-[#E0EFFE]'
                     }`}
                   >
-                    <Icon className="h-7 w-7 stroke-[1.8] text-[#2563EB]" />
+                    <Icon className="h-6 w-6 stroke-[1.8] text-[#2563EB]" />
                   </motion.div>
 
                   {/* Role Title */}
-                  <h3 className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] leading-tight mb-2 group-hover:text-blue-700 transition-colors">
+                  <h3 className="text-xs sm:text-[13px] lg:text-[13.5px] font-extrabold text-[#0F172A] leading-tight mb-1.5 group-hover:text-blue-700 transition-colors">
                     {r.role}
                   </h3>
 
                   {/* Description */}
-                  <p className="text-[11px] leading-relaxed text-slate-500 font-normal px-1 line-clamp-2">
+                  <p className="text-[10px] sm:text-[10.5px] leading-relaxed text-slate-500 font-normal px-0.5 line-clamp-2">
                     {r.blurb}
                   </p>
 
                   {/* Subtle Phase Pill */}
-                  <div className="mt-3">
-                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
+                  <div className="mt-auto pt-2.5">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${
                       isHighlighted ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600'
                     }`}>
                       Phase {r.phase}
@@ -1197,40 +1248,50 @@ function RolePickerScreen({
         {/* Right Circular Arrow Button */}
         <button
           onClick={nextPage}
-          disabled={totalPages <= 1}
-          aria-label="Next roles"
-          className={`flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all ${
-            totalPages <= 1 ? 'opacity-40 cursor-not-allowed' : ''
-          }`}
+          aria-label="Next phase slide"
+          title="Next Phase"
+          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/85 border border-white/95 shadow-sm backdrop-blur-md text-slate-500 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all cursor-pointer z-10"
         >
-          <ChevronRight className="h-5 w-5 stroke-[2]" />
+          <ChevronRight className="h-5 w-5 stroke-[2.2]" />
         </button>
       </div>
 
-      {/* Pagination Dots with Smooth Indicator */}
-      <div className="my-3 flex items-center justify-center gap-2">
-        {displayedRoles.map((r, i) => {
-          const isDotActive = i === activeIndex
+      {/* Phase Navigation Tabs / Dots */}
+      <div className="my-2.5 flex items-center justify-center gap-2">
+        {PHASES.map((p, i) => {
+          const isPhaseActive = i === currentPage
           return (
             <button
-              key={r.key}
-              onClick={() => setHovered(r.key)}
-              aria-label={`Highlight ${r.role}`}
-              className={`transition-all duration-300 ${
-                isDotActive
-                  ? 'h-1.5 w-5 rounded-full bg-[#2563EB] shadow-xs shadow-blue-500/40'
-                  : 'h-1.5 w-1.5 rounded-full bg-slate-300 hover:bg-slate-400'
+              key={p.phase}
+              onClick={() => {
+                setCurrentPage(i)
+                setSelectedCategory('all')
+                setHovered(null)
+              }}
+              aria-label={`Switch to ${p.label}`}
+              className={`group flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition-all duration-200 cursor-pointer ${
+                isPhaseActive
+                  ? 'bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-md shadow-blue-500/25 scale-[1.03]'
+                  : 'bg-white/70 backdrop-blur-md border border-white/80 text-slate-600 hover:bg-white hover:text-slate-900'
               }`}
-            />
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${isPhaseActive ? 'bg-white' : 'bg-slate-400'}`} />
+              <span>Phase {p.phase}</span>
+              <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-extrabold ${
+                isPhaseActive ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'
+              }`}>
+                {p.roles.length}
+              </span>
+            </button>
           )
         })}
       </div>
 
       {/* Mouse Scroll / Drag Hint */}
       <div className="flex items-center justify-center gap-1.5 text-[10px] font-semibold text-slate-400 mb-1">
-        <span>Scroll mouse wheel or drag horizontally to browse roles</span>
+        <span>Click side arrows or scroll mouse wheel to browse phases</span>
         <span>•</span>
-        <span>Page {currentPage + 1} of {totalPages}</span>
+        <span>Phase {currentPage + 1} of {totalPages} ({displayedRoles.length} containers)</span>
       </div>
 
       {/* Bottom Slogan Matching Screenshot */}
