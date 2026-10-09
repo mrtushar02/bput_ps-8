@@ -13,7 +13,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, ArrowLeft, Building2, Leaf, Users, ShieldCheck,
-  ChevronDown, Check, Sparkles, MapPin, Search, Route, Flame,
+  ChevronDown, ChevronLeft, ChevronRight, Heart, Check, Sparkles, MapPin, Search, Route, Flame,
   SunMedium, Zap, Droplets, Waves, Globe, CheckCircle2,
   Settings2, Package, HeartHandshake, Scale, FileCheck, Briefcase,
   BarChart3, Gavel, Eye, Crown, Compass, Activity, ShieldAlert
@@ -41,20 +41,21 @@ interface RoleCardDef {
 }
 
 const ROLES: RoleCardDef[] = [
+  { key: 'PROJECT_USER', name: 'Rohit Kumar', email: 'rohit@meil-esg.in', role: 'Project / Site User', phase: 1, icon: Building2, tint: 'from-sky-500 to-blue-600', blurb: 'Site operations & daily ESG metrics' },
+  { key: 'HR_USER', name: 'Sunita Rao', email: 'sunita@meil-esg.in', role: 'HR User', phase: 1, icon: Users, tint: 'from-cyan-500 to-teal-600', blurb: 'Human resources & workforce welfare metrics' },
+  { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS / Safety User', phase: 1, icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Environment, Health & Safety incident reports' },
+  { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement User', phase: 1, icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Supply chain sustainability & vendor ESG scores' },
+  { key: 'CSR_USER', name: 'Imran Sheikh', email: 'imran@meil-esg.in', role: 'CSR / Community User', phase: 1, icon: Heart, tint: 'from-rose-500 to-pink-600', blurb: 'Community outreach & CSR initiatives' },
+  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance User', phase: 1, icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Regulatory reporting & framework compliance' },
+  // Page 2 & subsequent roles
   { key: 'SUPER_ADMIN', name: 'Arjun Mehta', email: 'admin@meil-esg.in', role: 'Super Admin', phase: 3, icon: Settings2, tint: 'from-slate-500 to-slate-700', blurb: 'Full enterprise data & user administration' },
-  { key: 'PROJECT_USER', name: 'Rohit Kumar', email: 'rohit@meil-esg.in', role: 'Project / Site Engineer', phase: 1, icon: Building2, tint: 'from-sky-500 to-blue-600', blurb: 'Direct site-level source data & evidence entry' },
-  { key: 'HR_USER', name: 'Sunita Rao', email: 'sunita@meil-esg.in', role: 'HR & Workforce Lead', phase: 1, icon: Users, tint: 'from-cyan-500 to-teal-600', blurb: 'Workforce diversity, human rights & trainings' },
-  { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS & Safety Officer', phase: 1, icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Safety operations, zero harm & environmental compliance' },
-  { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement Specialist', phase: 1, icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Sustainable sourcing & Scope 3 supply chain' },
-  { key: 'CSR_USER', name: 'Imran Sheikh', email: 'imran@meil-esg.in', role: 'CSR & Community Lead', phase: 1, icon: HeartHandshake, tint: 'from-rose-500 to-pink-600', blurb: 'Community welfare, local sourcing & impact tracking' },
-  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance & Ethics Lead', phase: 1, icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Statutory compliance & BRSR governance' },
   { key: 'BU_REVIEWER', name: 'Rakesh Verma', email: 'rakesh@meil-esg.in', role: 'Business Unit Reviewer', phase: 2, icon: FileCheck, tint: 'from-blue-500 to-indigo-600', blurb: 'BU-level technical validation & review approval' },
   { key: 'SUBSIDIARY_REVIEWER', name: 'Nisha Pillai', email: 'nisha@meil-esg.in', role: 'Subsidiary Reviewer', phase: 2, icon: Briefcase, tint: 'from-indigo-500 to-blue-700', blurb: 'Subsidiary consolidation & sign-off review' },
   { key: 'GROUP_REVIEWER', name: 'Vikram Shah', email: 'vikram@meil-esg.in', role: 'Group / HQ Reviewer', phase: 2, icon: Gavel, tint: 'from-blue-600 to-cyan-700', blurb: 'Conglomerate-level sign-off & audit lock' },
   { key: 'ESG_MANAGER', name: 'Anita Desai', email: 'anita@meil-esg.in', role: 'ESG Manager', phase: 3, icon: BarChart3, tint: 'from-teal-500 to-emerald-600', blurb: 'Data completeness, emission factors & GHG calculation' },
   { key: 'BRSR_MANAGER', name: 'Meena Iyer', email: 'meena@meil-esg.in', role: 'BRSR Lead Manager', phase: 3, icon: FileCheck, tint: 'from-emerald-600 to-teal-700', blurb: 'SEBI BRSR Core disclosures & report generation' },
   { key: 'AUDITOR', name: 'Karthik S.', email: 'karthik@meil-esg.in', role: 'Assurance Auditor', phase: 3, icon: Eye, tint: 'from-slate-600 to-gray-700', blurb: 'Read-only assurance testing & audit trail' },
-  { key: 'EXECUTIVE', name: 'Rajesh Khanna', email: 'rajesh@meil-esg.in', role: 'Executive Board Member', phase: 3, icon: Crown, tint: 'from-amber-600 to-yellow-700', blurb: 'Strategic ESG metrics, risks & executive dashboards' },
+  { key: 'EXECUTIVE', name: 'Rajesh Khanna', email: 'rajesh@meil-esg.in', role: 'Executive Board', phase: 3, icon: Crown, tint: 'from-amber-600 to-yellow-700', blurb: 'Strategic ESG metrics, risks & executive dashboards' },
 ]
 
 const PHASE_LABELS = {
@@ -79,7 +80,13 @@ function getBuIcon(iconName: string) {
 
 export function WelcomeScreen() {
   const { login, selectedBuId, setSelectedBuId, selectedProjectId, setSelectedProjectId } = useApp()
-  const [stage, setStage] = useState<Stage>('welcome')
+  const [stage, setStage] = useState<Stage>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search).get('stage')
+      if (p === 'welcome' || p === 'project' || p === 'role' || p === 'login') return p as Stage
+    }
+    return 'role' // Default to role to show exact replica
+  })
 
   // Organization & Business Unit selection state
   const [selectedOrgId, setSelectedOrgId] = useState<string>('MEIL-GROUP')
@@ -145,144 +152,161 @@ export function WelcomeScreen() {
       <div className="relative z-10 flex min-h-screen flex-col justify-between px-3 py-4 md:px-8 md:py-6">
         
         {/* Top Header inside viewport */}
-        <header className="mx-auto flex w-full max-w-[1240px] items-center justify-between pb-3 pt-1">
-          {/* Left: Official MEIL Logo representation */}
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-md shadow-red-500/25">
-              <span className="text-xl font-black tracking-tighter">M</span>
+        <header className="mx-auto flex w-full max-w-[1380px] items-center justify-between pb-2 pt-1">
+          {/* Left: Official MEIL Logo from Screenshot */}
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#DC2626] text-white shadow-md shadow-red-500/25 font-black text-xl">
+              M
             </div>
-            <div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-black tracking-tight text-slate-900">meil</span>
-              </div>
-              <div className="text-[9px] font-semibold tracking-wider text-slate-500 uppercase">
-                Megha Engineering & Infrastructures Ltd.
-              </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black tracking-tight text-slate-900">meil</span>
             </div>
           </div>
 
-          {/* Right: Engineering A Sustainable Tomorrow */}
-          <div className="text-right">
-            <div className="text-xs font-semibold text-slate-700">Engineering</div>
-            <div className="text-[11px] font-medium text-slate-500">A Sustainable Tomorrow</div>
+          {/* Right: Project Site context + Motto */}
+          <div className="flex items-center gap-3 sm:gap-4">
+            {stage === 'role' && (
+              <button
+                onClick={() => setStage('project')}
+                className="hidden sm:flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold text-slate-600 glass-subtle hover:bg-white hover:text-sky-600 transition shadow-xs"
+                title="Change Selected Project Site"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>{currentProject.name}</span>
+              </button>
+            )}
+            {stage === 'project' && (
+              <button
+                onClick={() => setStage('welcome')}
+                className="hidden sm:flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold text-slate-600 glass-subtle hover:bg-white hover:text-sky-600 transition shadow-xs"
+                title="Back to Welcome Screen"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Organization & BU</span>
+              </button>
+            )}
+            <div className="text-right">
+              <div className="text-[10px] font-bold tracking-[0.2em] text-slate-400 uppercase">
+                Engineering
+              </div>
+              <div className="text-xs font-semibold text-slate-700">
+                A Sustainable Tomorrow
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* Central Liquid Glass Container */}
-        <main className="mx-auto my-auto flex w-full max-w-[1240px] items-center justify-center">
-          <div className="glass-ios-liquid w-full rounded-[36px] p-6 shadow-2xl transition-all md:p-10 lg:p-12">
-            <AnimatePresence mode="wait">
-              {stage === 'welcome' && (
-                <motion.div
-                  key="stage-welcome"
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
-                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                  className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12"
-                >
-                  {/* Left Column: 3D Orbit ESG Visual Diagram (5 Cols) */}
-                  <div className="relative hidden lg:col-span-5 lg:block">
-                    <LiquidGlassOrbitDiagram />
-                  </div>
+        {/* Dynamic Main Body: Role Screen has freestanding wide layout matching screenshot */}
+        {stage === 'role' ? (
+          <main className="mx-auto my-auto flex w-full max-w-[1380px] items-center justify-center py-2 sm:py-4">
+            <RolePickerScreen
+              project={currentProject}
+              bu={currentBu}
+              roles={ROLES}
+              hovered={hoveredRole}
+              setHovered={setHoveredRole}
+              onPick={handlePickRole}
+              onBack={() => setStage('project')}
+            />
+          </main>
+        ) : (
+          <main className="mx-auto my-auto flex w-full max-w-[1240px] items-center justify-center">
+            <div className="glass-ios-liquid w-full rounded-[36px] p-6 shadow-2xl transition-all md:p-10 lg:p-12">
+              <AnimatePresence mode="wait">
+                {stage === 'welcome' && (
+                  <motion.div
+                    key="stage-welcome"
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
+                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                    className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12"
+                  >
+                    {/* Left Column: 3D Orbit ESG Visual Diagram (5 Cols) */}
+                    <div className="relative hidden lg:col-span-5 lg:block">
+                      <LiquidGlassOrbitDiagram />
+                    </div>
 
-                  {/* Right Column: Welcome Headline, Org + BU Dropdowns, Continue, Pillars (7 Cols) */}
-                  <div className="lg:col-span-7">
-                    <WelcomePanel
-                      selectedOrgId={selectedOrgId}
-                      setSelectedOrgId={setSelectedOrgId}
-                      activeBuId={activeBuId}
+                    {/* Right Column: Welcome Headline, Org + BU Dropdowns, Continue, Pillars (7 Cols) */}
+                    <div className="lg:col-span-7">
+                      <WelcomePanel
+                        selectedOrgId={selectedOrgId}
+                        setSelectedOrgId={setSelectedOrgId}
+                        activeBuId={activeBuId}
+                        onSelectBu={handleSelectBu}
+                        onContinue={() => setStage('project')}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+
+                {stage === 'project' && (
+                  <motion.div
+                    key="stage-project"
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -30, transition: { duration: 0.2 } }}
+                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <ProjectSelectionScreen
+                      currentBu={currentBu}
+                      selectedProjectId={activeProjectId}
                       onSelectBu={handleSelectBu}
-                      onContinue={() => setStage('project')}
+                      onSelectProject={handleSelectProject}
+                      onBack={() => setStage('welcome')}
+                      onProceed={() => setStage('role')}
                     />
-                  </div>
-                </motion.div>
-              )}
+                  </motion.div>
+                )}
 
-              {stage === 'project' && (
-                <motion.div
-                  key="stage-project"
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30, transition: { duration: 0.2 } }}
-                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <ProjectSelectionScreen
-                    currentBu={currentBu}
-                    selectedProjectId={activeProjectId}
-                    onSelectBu={handleSelectBu}
-                    onSelectProject={handleSelectProject}
-                    onBack={() => setStage('welcome')}
-                    onProceed={() => setStage('role')}
-                  />
-                </motion.div>
-              )}
+                {stage === 'login' && selectedRole && (
+                  <motion.div
+                    key="stage-login"
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  >
+                    <LoginScreen
+                      project={currentProject}
+                      bu={currentBu}
+                      role={selectedRole}
+                      email={email}
+                      setEmail={setEmail}
+                      password={password}
+                      setPassword={setPassword}
+                      remember={remember}
+                      setRemember={setRemember}
+                      error={error}
+                      busy={busy}
+                      onSubmit={handleSubmitLogin}
+                      onBack={() => {
+                        setStage('role')
+                        setSelectedRole(null)
+                      }}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </main>
+        )}
 
-              {stage === 'role' && (
-                <motion.div
-                  key="stage-role"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
-                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <RolePickerScreen
-                    project={currentProject}
-                    bu={currentBu}
-                    roles={ROLES}
-                    hovered={hoveredRole}
-                    setHovered={setHoveredRole}
-                    onPick={handlePickRole}
-                    onBack={() => setStage('project')}
-                  />
-                </motion.div>
-              )}
-
-              {stage === 'login' && selectedRole && (
-                <motion.div
-                  key="stage-login"
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
-                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <LoginScreen
-                    project={currentProject}
-                    bu={currentBu}
-                    role={selectedRole}
-                    email={email}
-                    setEmail={setEmail}
-                    password={password}
-                    setPassword={setPassword}
-                    remember={remember}
-                    setRemember={setRemember}
-                    error={error}
-                    busy={busy}
-                    onSubmit={handleSubmitLogin}
-                    onBack={() => {
-                      setStage('role')
-                      setSelectedRole(null)
-                    }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </main>
-
-        {/* Compact Footer */}
-        <footer className="mx-auto flex w-full max-w-[1240px] items-center justify-between pt-3 text-[11px] text-slate-500">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-700">MEIL ESG & BRSR Reporting Platform</span>
-            <span>·</span>
-            <span>SEBI Compliant</span>
-            <span>·</span>
-            <span>GHG Protocol</span>
-          </div>
-          <div className="text-[10px] text-slate-400">
-            © {new Date().getFullYear()} Megha Engineering & Infrastructures Ltd.
-          </div>
-        </footer>
+        {/* Compact Footer (Hidden on role stage to match replica screenshot) */}
+        {stage !== 'role' && (
+          <footer className="mx-auto flex w-full max-w-[1240px] items-center justify-between pt-3 text-[11px] text-slate-500">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700">MEIL ESG & BRSR Reporting Platform</span>
+              <span>·</span>
+              <span>SEBI Compliant</span>
+              <span>·</span>
+              <span>GHG Protocol</span>
+            </div>
+            <div className="text-[10px] text-slate-400">
+              © {new Date().getFullYear()} Megha Engineering & Infrastructures Ltd.
+            </div>
+          </footer>
+        )}
 
       </div>
     </div>
@@ -295,6 +319,18 @@ export function WelcomeScreen() {
 function BackgroundAtmosphere() {
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      {/* Prominent Top-Left Frosted 3D Glass Lens / Bubble from Reference Screenshot */}
+      <div
+        className="pointer-events-none absolute -top-16 -left-16 sm:-top-20 sm:-left-20 w-[420px] h-[420px] sm:w-[500px] sm:h-[500px] rounded-full"
+        style={{
+          background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,0.85) 0%, rgba(224,242,254,0.48) 50%, rgba(186,230,253,0.2) 80%, transparent 100%)',
+          boxShadow: '0 25px 60px rgba(186,230,253,0.4), inset 0 2px 4px rgba(255,255,255,0.95)',
+          border: '1.5px solid rgba(255,255,255,0.7)',
+          backdropFilter: 'blur(35px)',
+          WebkitBackdropFilter: 'blur(35px)',
+        }}
+      />
+
       {/* Soft Sky Blue Radial Orbs */}
       <div className="orb animate-orb" style={{ width: 500, height: 500, top: -140, right: -100, background: 'radial-gradient(circle, rgba(125,211,252,0.65), transparent 70%)' }} />
       <div className="orb animate-orb" style={{ width: 440, height: 440, bottom: -120, left: -80, background: 'radial-gradient(circle, rgba(186,230,253,0.7), transparent 70%)', animationDelay: '3s' }} />
@@ -950,151 +986,122 @@ function RolePickerScreen({
   const nextPage = () => setCurrentPage(prev => (prev + 1) % totalPages)
   const prevPage = () => setCurrentPage(prev => (prev - 1 + totalPages) % totalPages)
 
+  // Active highlighted card index for carousel dots & elevation
+  // Defaults to 4th index (CSR / Community User) on page 0 if not hovering another card
+  const activeIndex = useMemo(() => {
+    if (hovered) {
+      const idx = displayedRoles.findIndex(r => r.key === hovered)
+      if (idx !== -1) return idx
+    }
+    return currentPage === 0 ? 4 : 0
+  }, [hovered, displayedRoles, currentPage])
+
   return (
-    <div className="relative flex flex-col items-center justify-between py-2 sm:py-4">
-      {/* Top Navigation Row: Back to Site + Step Indicator */}
-      <div className="relative w-full flex items-center justify-between mb-2">
-        <button
-          onClick={onBack}
-          className="glass-subtle flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-white hover:text-sky-600 shadow-xs"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Change Project</span>
-        </button>
-
-        {/* Top Step Pill Badge */}
-        <div className="flex items-center justify-center">
-          <span className="rounded-full bg-white/90 px-3.5 py-1 text-[10px] font-extrabold tracking-[0.2em] text-sky-600 uppercase border border-sky-100 shadow-xs backdrop-blur-md">
-            STEP 3 OF 3 • {project.name}
-          </span>
-        </div>
-
-        <div className="hidden sm:block text-[11px] font-semibold text-slate-400">
-          {bu.shortName}
-        </div>
+    <div className="relative flex w-full flex-col items-center justify-between py-2 sm:py-3">
+      {/* Top Header Pill Indicator from Screenshot */}
+      <div className="flex items-center justify-center mb-1">
+        <span className="rounded-full bg-white/80 px-4 py-1 text-[11px] font-bold tracking-[0.25em] text-slate-400 uppercase border border-slate-200/60 shadow-xs backdrop-blur-md">
+          STEP 1 OF 2
+        </span>
       </div>
 
       {/* Main Headline & Subtitle */}
-      <div className="text-center my-3 sm:my-5">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900">
+      <div className="text-center my-2 sm:my-3">
+        <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-[#0F172A]">
           Choose Your{' '}
-          <span className="bg-gradient-to-r from-blue-600 via-sky-500 to-blue-700 bg-clip-text text-transparent">
+          <span className="text-[#2563EB]">
             Role
           </span>
-        </h2>
-        <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500 max-w-lg mx-auto leading-relaxed">
+        </h1>
+        <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500">
           Select your role to continue to the MEIL ESG platform
         </p>
       </div>
 
-      {/* Horizontal Carousel Track with Left & Right Chevrons */}
-      <div className="relative w-full flex items-center justify-center gap-2 sm:gap-4 my-2 sm:my-4">
-        {/* Left Arrow Button */}
+      {/* Horizontal Carousel Track with Circular Chevrons */}
+      <div className="relative w-full flex items-center justify-center gap-2 sm:gap-4 lg:gap-5 my-6 sm:my-8 px-2">
+        {/* Left Circular Arrow Button */}
         <button
           onClick={prevPage}
           aria-label="Previous roles"
-          className="glass-ios-liquid z-20 flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full text-sky-600 hover:text-sky-700 hover:scale-105 active:scale-95 transition shadow-lg shadow-sky-500/15"
+          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all"
         >
-          <ChevronDown className="h-5 w-5 rotate-90" />
+          <ChevronLeft className="h-5 w-5 stroke-[2]" />
         </button>
 
-        {/* Cards Row */}
-        <div className="w-full overflow-hidden px-1 py-4">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPage}
-              initial={{ opacity: 0, x: 25 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -25 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-center justify-center gap-3 sm:gap-4 lg:gap-5 flex-wrap md:flex-nowrap"
-            >
-              {displayedRoles.map((r, idx) => {
-                const Icon = r.icon
-                const isHover = hovered === r.key
-                // Highlight CSR user by default on page 0 if nothing hovered, matching screenshot
-                const isDefaultActive = !hovered && currentPage === 0 && r.key === 'CSR_USER'
-                const isHighlighted = isHover || isDefaultActive
+        {/* 6 Role Cards in Row */}
+        <div className="flex items-center justify-center gap-3 sm:gap-4 lg:gap-5 flex-wrap sm:flex-nowrap">
+          {displayedRoles.map((r, idx) => {
+            const Icon = r.icon
+            const isHighlighted = idx === activeIndex
 
-                return (
-                  <motion.div
-                    key={r.key}
-                    onMouseEnter={() => setHovered(r.key)}
-                    onMouseLeave={() => setHovered(null)}
-                    onClick={() => onPick(r)}
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: idx * 0.04 }}
-                    whileHover={{ y: -8, scale: 1.03 }}
-                    className={`group relative flex cursor-pointer flex-col items-center justify-between rounded-[28px] p-5 text-center transition-all ${
-                      isHighlighted
-                        ? 'w-44 sm:w-48 lg:w-52 h-72 sm:h-80 bg-white/95 border-2 border-sky-400 shadow-role-active -translate-y-2 scale-[1.02] z-10'
-                        : 'w-44 sm:w-48 lg:w-52 h-72 sm:h-80 bg-white/80 border-1.5 border-white/90 shadow-role-card hover:bg-white hover:border-sky-300'
-                    }`}
-                  >
-                    {/* Top Squircle Icon */}
-                    <div className="flex flex-col items-center mt-2">
-                      <div className="mb-4 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-[22px] bg-gradient-to-tr from-sky-50 via-blue-50 to-indigo-50/80 text-blue-600 border border-white shadow-inner shadow-blue-500/10">
-                        <Icon className="h-7 w-7 text-blue-600 group-hover:scale-110 transition-transform duration-200" />
-                      </div>
+            return (
+              <motion.div
+                key={r.key}
+                onMouseEnter={() => setHovered(r.key)}
+                onMouseLeave={() => setHovered(null)}
+                onClick={() => onPick(r)}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: idx * 0.03 }}
+                className={`group relative flex cursor-pointer flex-col items-center justify-center rounded-[28px] p-5 text-center transition-all duration-300 ${
+                  isHighlighted
+                    ? 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/95 border-2 border-[#60A5FA] -translate-y-4 z-10 shadow-[0_28px_60px_-10px_rgba(37,99,235,0.38),0_12px_24px_-6px_rgba(37,99,235,0.22)]'
+                    : 'w-[168px] sm:w-[178px] lg:w-[188px] h-[275px] sm:h-[285px] bg-white/75 border border-white/90 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.03),0_2px_6px_-1px_rgba(0,0,0,0.02)] hover:-translate-y-2 hover:bg-white/90 hover:border-sky-300 hover:shadow-[0_20px_45px_-8px_rgba(37,99,235,0.22)]'
+                }`}
+              >
+                {/* Top Squircle Icon */}
+                <div className={`mb-4 flex h-14 w-14 items-center justify-center rounded-[20px] transition-transform duration-200 group-hover:scale-105 ${
+                  isHighlighted ? 'bg-[#E0EFFE]' : 'bg-[#EBF4FE]'
+                }`}>
+                  <Icon className="h-7 w-7 stroke-[1.8] text-[#2563EB]" />
+                </div>
 
-                      {/* Role Title */}
-                      <h3 className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-sky-700 transition-colors leading-tight">
-                        {r.role}
-                      </h3>
+                {/* Role Title */}
+                <h3 className="text-sm sm:text-[15px] font-extrabold text-[#0F172A] leading-tight mb-2">
+                  {r.role}
+                </h3>
 
-                      {/* Description */}
-                      <p className="mt-2 text-[11px] sm:text-xs leading-relaxed text-slate-500 font-normal px-1 line-clamp-3">
-                        {r.blurb}
-                      </p>
-                    </div>
-
-                    {/* Bottom Access Indicator */}
-                    <div className="mt-auto w-full pt-2">
-                      <div className={`mx-auto flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold transition ${
-                        isHighlighted
-                          ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-500 group-hover:bg-sky-50 group-hover:text-sky-700'
-                      }`}>
-                        <span>Select Role</span>
-                        <ArrowRight className="h-3 w-3" />
-                      </div>
-                    </div>
-                  </motion.div>
-                )
-              })}
-            </motion.div>
-          </AnimatePresence>
+                {/* Description */}
+                <p className="text-[11px] leading-relaxed text-slate-500 font-normal px-1 line-clamp-2">
+                  {r.blurb}
+                </p>
+              </motion.div>
+            )
+          })}
         </div>
 
-        {/* Right Arrow Button */}
+        {/* Right Circular Arrow Button */}
         <button
           onClick={nextPage}
           aria-label="Next roles"
-          className="glass-ios-liquid z-20 flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full text-sky-600 hover:text-sky-700 hover:scale-105 active:scale-95 transition shadow-lg shadow-sky-500/15"
+          className="flex h-11 w-11 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full bg-white/75 border border-white/90 shadow-sm backdrop-blur-md text-slate-400 hover:text-blue-600 hover:bg-white hover:scale-105 active:scale-95 transition-all"
         >
-          <ChevronDown className="h-5 w-5 -rotate-90" />
+          <ChevronRight className="h-5 w-5 stroke-[2]" />
         </button>
       </div>
 
-      {/* Pagination Dots */}
-      <div className="my-3 flex items-center justify-center gap-2">
-        {Array.from({ length: totalPages }).map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setCurrentPage(i)}
-            aria-label={`Go to page ${i + 1}`}
-            className={`transition-all ${
-              i === currentPage
-                ? 'h-1.5 w-6 rounded-full bg-blue-600 shadow-sm shadow-blue-500/30'
-                : 'h-1.5 w-1.5 rounded-full bg-sky-200 hover:bg-sky-400'
-            }`}
-          />
-        ))}
+      {/* Pagination Dots Matching Screenshot */}
+      <div className="my-4 flex items-center justify-center gap-2">
+        {displayedRoles.map((r, i) => {
+          const isDotActive = i === activeIndex
+          return (
+            <button
+              key={r.key}
+              onClick={() => setHovered(r.key)}
+              aria-label={`Highlight ${r.role}`}
+              className={`transition-all duration-300 ${
+                isDotActive
+                  ? 'h-1.5 w-5 rounded-full bg-[#2563EB] shadow-xs shadow-blue-500/40'
+                  : 'h-1.5 w-1.5 rounded-full bg-slate-300 hover:bg-slate-400'
+              }`}
+            />
+          )
+        })}
       </div>
 
-      {/* Bottom Slogan matching the reference design */}
-      <div className="mt-1 text-center text-[11px] sm:text-xs font-medium tracking-wide text-slate-400">
+      {/* Bottom Slogan Matching Screenshot */}
+      <div className="mt-2 text-center text-xs font-medium tracking-wide text-slate-400">
         Together for a Cleaner, Safer and More Responsible Tomorrow
       </div>
     </div>
