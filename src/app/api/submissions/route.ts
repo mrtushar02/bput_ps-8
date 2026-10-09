@@ -149,6 +149,20 @@ export async function POST(req: NextRequest) {
       'PEOPLE',
       'SAFETY',
       'TRAVEL',
+      'EMISSIONS',
+      'TRAINING',
+      'COMPLIANCE',
+      'INCIDENTS',
+      'INITIATIVES',
+      'LEVEL_1_ENERGY',
+      'LEVEL_2_WATER',
+      'LEVEL_3_GHG',
+      'LEVEL_4_WASTE',
+      'LEVEL_5_SAFETY',
+      'LEVEL_6_TRAINING',
+      'LEVEL_7_PERMITS',
+      'LEVEL_8_INCIDENTS',
+      'LEVEL_9_INITIATIVES',
     ]
     if (!allowedModules.includes(moduleKey)) {
       return NextResponse.json(

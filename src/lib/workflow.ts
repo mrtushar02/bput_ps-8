@@ -267,8 +267,28 @@ export async function fetchSourceRecords(
       })
       return rows as unknown as SourceRecordSummary[]
     }
-    default:
-      return []
+    default: {
+      // Check level-records store for any extended level records
+      const { getLevelRecordById } = await import('@/lib/level-records')
+      const customRows = recordIds
+        .map((id) => getLevelRecordById(id))
+        .filter((r): r is NonNullable<typeof r> => Boolean(r))
+        .map((r) => ({
+          id: r.id,
+          projectId: r.projectId,
+          reportingPeriodId: r.reportingPeriodId,
+          module: r.module,
+          evidenceId: r.evidenceId ?? null,
+          validationStatus: r.validationStatus,
+          calculationStatus: r.calculationStatus,
+          revisionNumber: r.revisionNumber,
+          status: r.status,
+          enteredBy: r.enteredBy,
+          enteredAt: new Date(r.enteredAt),
+          updatedAt: r.updatedAt ? new Date(r.updatedAt) : null,
+        }))
+      return customRows as unknown as SourceRecordSummary[]
+    }
   }
 }
 

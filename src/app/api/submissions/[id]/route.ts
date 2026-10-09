@@ -112,6 +112,14 @@ export async function GET(
             include: { calculationResults: true, validationResults: true },
           })
           break
+        default:
+          break
+      }
+      if (sourceRecords.length === 0) {
+        const { getLevelRecordById } = await import('@/lib/level-records')
+        sourceRecords = recordIds
+          .map((id) => getLevelRecordById(id))
+          .filter(Boolean) as unknown as Record<string, unknown>[]
       }
     }
 

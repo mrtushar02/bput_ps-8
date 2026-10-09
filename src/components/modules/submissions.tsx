@@ -138,11 +138,16 @@ interface OrgTreeResp {
 // ---------- Constants ----------
 
 const MODULE_OPTIONS = [
-  { value: 'ENERGY', label: 'Energy' },
-  { value: 'WATER', label: 'Water' },
-  { value: 'WASTE', label: 'Waste' },
-  { value: 'PEOPLE', label: 'People' },
-  { value: 'SAFETY', label: 'Safety' },
+  { value: 'ENERGY', label: 'L1 · Energy' },
+  { value: 'WATER', label: 'L2 · Water' },
+  { value: 'EMISSIONS', label: 'L3 · GHG & Air' },
+  { value: 'WASTE', label: 'L4 · Waste' },
+  { value: 'SAFETY', label: 'L5 · Safety' },
+  { value: 'PEOPLE', label: 'L6 · Workforce' },
+  { value: 'TRAINING', label: 'L6 · Training' },
+  { value: 'COMPLIANCE', label: 'L7 · Compliance' },
+  { value: 'INCIDENTS', label: 'L8 · Incidents & Grievances' },
+  { value: 'INITIATIVES', label: 'L9 · Initiatives' },
   { value: 'TRAVEL', label: 'Travel' },
 ] as const
 
