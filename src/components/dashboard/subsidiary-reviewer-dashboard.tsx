@@ -383,7 +383,7 @@ export function SubsidiaryReviewerDashboard() {
       {/* ============================
           2-COLUMN GRID (55/45)
          ============================ */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.22fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 xl:grid-cols-[1.22fr_1fr]">
         {/* ---- LEFT 55% ---- */}
         <div className="space-y-5">
           {/* KPI cards */}
@@ -743,7 +743,7 @@ function SubsidiarySkeleton() {
     <div className="space-y-5">
       <div className="h-12 animate-pulse rounded-2xl bg-blue-100/60" />
       <div className="h-24 animate-pulse rounded-2xl bg-blue-100/40" />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.22fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 xl:grid-cols-[1.22fr_1fr]">
         <div className="space-y-5">
           <div className="grid grid-cols-3 gap-4">
             {[0, 1, 2].map(i => <div key={i} className="h-28 animate-pulse rounded-2xl bg-blue-100/40" style={{ animationDelay: `${i * 0.08}s` }} />)}

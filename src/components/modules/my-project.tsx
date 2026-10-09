@@ -1,37 +1,29 @@
 'use client'
 /**
- * MyProjectModule — completely rewritten to match the reference design.
+ * MyProjectModule — completely rewritten to match the 3-row reference design.
  *
- * Dashboard-style split-screen layout (2-column split):
- *   LEFT  (~70%):
- *     - 4 compact KPI cards row (Total Projects, Data Completion %,
- *       Current Period Emissions, Open Issues)
- *     - Filter bar (project search + status filter + Add Project button)
- *     - Project data table (Project Name, Code, Status, ESG Completion,
- *       Period, Actions) — clicking a row updates the right detail panel
- *     - 3 analytical widget cards row (Project ESG Progress bar chart,
- *       Submission Status donut, Upcoming Deadlines list)
- *   RIGHT (~30%):
- *     - Sticky Project Details panel
- *       - Hero gradient banner (sky-blue) with project name overlaid
- *       - Project metadata grid (Code, Location, BU, Subsidiary, Status)
- *       - Mini KPI row (Emissions, Energy, Water)
- *       - Tabs: Overview | ESG Progress | Activity | Team | Documents
+ * 3 HARD-LOCKED ROWS COMPOSITION:
+ *   ROW 1 (~15%): 4 equal KPI cards
+ *   ROW 2 (~55%): 67% Project Registry (LEFT) | 33% Project Details (RIGHT)
+ *   ROW 3 (~30%): 35% ESG Progress rings | 32% Submission Status | 33% Deadlines
  *
  * All KPIs come from real APIs — no hardcoded values:
- *   - GET /api/overview            → kpis, periods, trends, activities
+ *   - GET /api/overview            → kpis, periods, trends
  *   - GET /api/organization/tree   → groups → subsidiaries → BUs → projects
- *   - GET /api/activity?take=5     → recent activities for detail panel
- *   - GET /api/submissions         → all submissions (for completion stats)
+ *   - GET /api/activity?take=5     → recent activities
+ *   - GET /api/submissions         → all submissions
  *   - GET /api/evidence?projectId= → evidence list per project
  */
-import { useEffect, useState, useMemo, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { motion, AnimatePresence, Reorder } from 'framer-motion'
 import {
   Building2, MapPin, Plus, Send, Activity as ActivityIcon, Flame, Zap, Droplets,
-  Search, ChevronRight, Pencil, Eye, ArrowUpRight, ArrowDownRight,
+  Search, ChevronRight, ChevronDown, Pencil, Eye, ArrowUpRight, ArrowDownRight,
   CalendarClock, Users, FolderOpen, FileText, CheckCircle2, AlertTriangle,
   RefreshCw, AlertOctagon, Layers, FileCheck2, Gauge, BarChart3,
+  MoreHorizontal, Briefcase, Shield, Download, LayoutGrid, List,
+  Maximize2, Minimize2, Calendar, Hash, UserCheck, ExternalLink,
+  X, Save, GripVertical, ChevronsUpDown, Check,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -39,6 +31,23 @@ import {
   ResponsiveContainer, Tooltip, XAxis, YAxis, Legend,
 } from 'recharts'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
+import { toast } from 'sonner'
+
+/* ============================================================
+ * CSV Export Helper
+ * ============================================================ */
+function downloadCsv(filename: string, headers: string[], rows: (string | number)[][]): void {
+  const escape = (v: string | number) => {
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = [headers.map(escape).join(','), ...rows.map(r => r.map(escape).join(','))]
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
 
 /* ============================================================
  * Types — strict API shapes
@@ -165,7 +174,7 @@ interface SubmissionItem {
   createdAt: string
   updatedAt: string
   project?: { id: string; projectCode: string; projectName: string; location?: string | null; status?: string } | null
-  reportingPeriod?: { id: string; periodLabel: string; year: number; month: number | null; status: string } | null
+  reportingPeriod?: { id: string; periodLabel: string; year: number; month: number | null; status: string; submissionDeadline?: string; reviewDeadline?: string; approvalDeadline?: string } | null
   currentReviewer?: { id: string; name: string; email: string } | null
 }
 interface SubmissionResponse { items: SubmissionItem[]; total: number; count: number }
@@ -357,18 +366,64 @@ function submissionStatusBuckets(subs: SubmissionItem[]): { name: string; value:
 const EASE = [0.22, 1, 0.36, 1] as const
 
 /* ============================================================
- * Sub-components — KPI cards
+ * Shared visual primitives
  * ============================================================ */
 
-/** Compact KPI card — used in the 4-card row, max 100px height. */
-function KpiCard({
-  icon: Icon, label, value, unit, trend, tone, delay,
+/** Circular progress ring — stroke-based SVG, clean business style. */
+function CircularRing({
+  pct, size = 64, stroke = 4, color = '#0EA5E9', trackColor = 'rgba(226,232,240,0.7)', showLabel = true, labelSize = 12,
+}: {
+  pct: number
+  size?: number
+  stroke?: number
+  color?: string
+  trackColor?: string
+  showLabel?: boolean
+  labelSize?: number
+}) {
+  const clamped = Math.max(0, Math.min(100, pct))
+  const r = (size - stroke) / 2
+  const c = 2 * Math.PI * r
+  const offset = c * (1 - clamped / 100)
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} stroke={trackColor} strokeWidth={stroke} fill="none" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+        />
+      </svg>
+      {showLabel && (
+        <span className="absolute inset-0 flex items-center justify-center font-bold tabular-nums text-slate-900" style={{ fontSize: labelSize }}>
+          {clamped}%
+        </span>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
+ * ROW 1 — KPI cards (4 equal)
+ * ============================================================ */
+
+/** KPI card — new design: rounded 16-20px glass, icon tile + value + sub + secondary. */
+function KpiCardRow1({
+  icon: Icon, label, value, subText, rightContent, tone, delay,
 }: {
   icon: LucideIcon
   label: string
-  value: string
-  unit?: string
-  trend?: { dir: 'up' | 'down' | 'neutral'; text: string; tone?: string }
+  value: React.ReactNode
+  subText: React.ReactNode
+  rightContent?: React.ReactNode
   tone: string
   delay: number
 }) {
@@ -377,101 +432,59 @@ function KpiCard({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: EASE, delay }}
-      className="glass glass-shimmer rounded-2xl p-4 flex flex-col gap-2"
-      style={{ maxHeight: 100 }}
+      whileHover={{ y: -2 }}
+      className="glass-ios-liquid glass-shimmer rounded-[22px] p-4.5 md:p-5 flex items-center justify-between gap-3 hover:shadow-lg transition-all cursor-default relative"
     >
-      <div className="flex items-center justify-between">
-        <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${tone}`}>
-          <Icon className="h-4 w-4" />
-        </span>
-        {trend && (
-          <span className={`status-pill text-[9px] ${
-            trend.tone ?? (trend.dir === 'up'
-              ? 'status-approved'
-              : trend.dir === 'down'
-                ? 'status-missing'
-                : 'status-draft')
-          }`}>
-            {trend.dir === 'up' ? <ArrowUpRight className="h-2.5 w-2.5" /> :
-             trend.dir === 'down' ? <ArrowDownRight className="h-2.5 w-2.5" /> : null}
-            {trend.text}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-2">
+          <span className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}>
+            <Icon className="h-4.5 w-4.5" />
           </span>
-        )}
-      </div>
-      <div>
-        <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
-        <div className="flex items-baseline gap-1 mt-0.5">
-          <span className="text-xl font-bold text-slate-900 tabular-nums">{value}</span>
-          {unit && <span className="text-[10px] text-slate-700 font-medium">{unit}</span>}
         </div>
+        <div className="text-[11px] uppercase tracking-wide text-slate-500 font-medium mb-0.5">{label}</div>
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-2xl md:text-[28px] font-bold text-slate-900 tabular-nums leading-none">{value}</span>
+        </div>
+        <div className="mt-1.5 text-[11px] text-slate-600 leading-tight">{subText}</div>
       </div>
+      {rightContent && <div className="flex-shrink-0">{rightContent}</div>}
     </motion.div>
   )
 }
 
 /* ============================================================
- * Filter bar
+ * ROW 2 LEFT — Project Registry Card
  * ============================================================ */
-function FilterBar({
-  search, onSearchChange, status, onStatusChange, onAdd,
-}: {
-  search: string
-  onSearchChange: (v: string) => void
-  status: string
-  onStatusChange: (v: string) => void
-  onAdd: () => void
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-      className="glass-subtle rounded-2xl p-3 flex flex-col md:flex-row md:items-center gap-2"
-    >
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 pointer-events-none" />
-        <input
-          type="text"
-          placeholder="Search projects by name, code or location…"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="w-full rounded-xl border border-white/60 bg-white/70 pl-9 pr-3 py-2 text-[12px] text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400/50"
-          aria-label="Search projects"
-        />
-      </div>
-      <select
-        value={status}
-        onChange={(e) => onStatusChange(e.target.value)}
-        className="rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-[12px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/50"
-        aria-label="Filter by status"
-      >
-        {STATUS_OPTIONS.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-      <button
-        onClick={onAdd}
-        className="btn-glass-primary rounded-xl px-3 py-2 text-[12px] font-semibold inline-flex items-center justify-center gap-1.5"
-      >
-        <Plus className="h-3.5 w-3.5" /> Add Project
-      </button>
-    </motion.div>
-  )
-}
-
-/* ============================================================
- * Project table
- * ============================================================ */
-function ProjectTable({
-  projects, submissions, selectedId, onSelect, currentPeriodLabel,
+function ProjectRegistryCard({
+  projects, submissions, selectedId, onSelect,
+  search, setSearch, statusFilter, setStatusFilter,
+  buFilter, setBuFilter, periodFilter, setPeriodFilter,
+  typeFilter, setTypeFilter,
+  viewMode, setViewMode,
+  periods, uniqueBUs, uniqueTypes,
+  currentPeriodLabel,
 }: {
   projects: FlattenedProject[]
   submissions: SubmissionItem[]
   selectedId: string | null
   onSelect: (id: string) => void
+  search: string
+  setSearch: (v: string) => void
+  statusFilter: string
+  setStatusFilter: (v: string) => void
+  buFilter: string
+  setBuFilter: (v: string) => void
+  periodFilter: string
+  setPeriodFilter: (v: string) => void
+  typeFilter: string
+  setTypeFilter: (v: string) => void
+  viewMode: 'list' | 'grid'
+  setViewMode: (v: 'list' | 'grid') => void
+  periods: OverviewData['periods']
+  uniqueBUs: string[]
+  uniqueTypes: string[]
   currentPeriodLabel: string
 }) {
-  // Build project → max completion map (from all submissions)
   const completionByProject = useMemo(() => {
     const m: Record<string, number> = {}
     for (const s of submissions) {
@@ -481,111 +494,279 @@ function ProjectTable({
     return m
   }, [submissions])
 
+  const dataCompletionByProject = useMemo(() => {
+    const m: Record<string, number> = {}
+    for (const p of projects) {
+      const ps = submissions.filter(s => s.projectId === p.id)
+      if (ps.length === 0) { m[p.id] = 0; continue }
+      const total = ps.length
+      const approved = ps.filter(s => s.status === 'APPROVED' || s.status === 'LOCKED').length
+      m[p.id] = total > 0 ? Math.round((approved / total) * 100) : 0
+    }
+    return m
+  }, [projects, submissions])
+
+  const [showExportMenu, setShowExportMenu] = useState(false)
+
+  const handleExportCsv = () => {
+    downloadCsv(
+      'projects_export.csv',
+      ['#', 'Project Name', 'Code', 'Business Unit', 'Location', 'Status', 'Progress %'],
+      projects.map((p, i) => [
+        i + 1,
+        p.projectName,
+        p.projectCode,
+        p.buName,
+        p.location || '—',
+        p.status,
+        completionByProject[p.id] ?? 0,
+      ])
+    )
+    toast.success(`Exported ${projects.length} project(s) to CSV`)
+    setShowExportMenu(false)
+  }
+
+  const handleExportJson = () => {
+    const jsonStr = JSON.stringify(projects, null, 2)
+    const blob = new Blob([jsonStr], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'projects_registry.json'
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${projects.length} project(s) to JSON`)
+    setShowExportMenu(false)
+  }
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.15 }}
-      className="glass glass-shimmer rounded-[20px] p-5"
+      transition={{ duration: 0.5, ease: EASE, delay: 0.12 }}
+      className="glass-ios-liquid glass-shimmer rounded-[26px] p-5 md:p-6 flex flex-col h-full relative"
     >
       <header className="flex items-start justify-between gap-3 mb-4">
         <div>
-          <h2 className="text-[16px] font-semibold text-slate-900 flex items-center gap-2">
-            <Layers className="h-4 w-4 text-sky-500" />
-            Projects
+          <h2 className="text-[17px] font-semibold text-slate-900 flex items-center gap-2">
+            <Layers className="h-4.5 w-4.5 text-sky-500" />
+            My Projects
           </h2>
-          <p className="text-[11px] text-slate-700 mt-0.5">
-            {projects.length} project(s) · click a row to view details
+          <p className="text-[12px] text-slate-600 mt-0.5">
+            Manage and track all your ESG projects · {projects.length} project(s) visible
           </p>
         </div>
-        <button
-          className="glass-subtle rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5"
-        >
-          Export <ChevronRight className="h-3 w-3" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            className="glass-subtle rounded-xl px-3.5 py-2 text-[12px] font-semibold text-slate-700 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5 shadow-2xs"
+          >
+            <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3 opacity-60" />
+          </button>
+          <AnimatePresence>
+            {showExportMenu && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 mt-1.5 w-48 rounded-xl bg-white border border-sky-100 shadow-xl p-1.5 z-30"
+              >
+                <button
+                  onClick={handleExportCsv}
+                  className="w-full text-left px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-800 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                >
+                  <Download className="h-3.5 w-3.5 text-sky-600" /> Export CSV (.csv)
+                </button>
+                <button
+                  onClick={handleExportJson}
+                  className="w-full text-left px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-800 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                >
+                  <FileText className="h-3.5 w-3.5 text-sky-600" /> Export JSON (.json)
+                </button>
+                <button
+                  onClick={() => {
+                    setShowExportMenu(false)
+                    window.print()
+                  }}
+                  className="w-full text-left px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-800 hover:bg-sky-50 hover:text-sky-700 flex items-center gap-2"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 text-sky-600" /> Print Summary
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </header>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left">
+      {/* FILTER/SEARCH TOOLBAR */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search project name, code"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-white/60 bg-white/75 pl-9 pr-3 py-2 text-[12px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400/50"
+            aria-label="Search projects"
+          />
+        </div>
+
+        <select
+          value={buFilter}
+          onChange={(e) => setBuFilter(e.target.value)}
+          className="rounded-xl border border-white/60 bg-white/75 px-3 py-2 text-[12px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-400/50"
+          aria-label="Filter by Business Unit"
+        >
+          <option value="all">All Business Units</option>
+          {uniqueBUs.map(bu => <option key={bu} value={bu}>{bu}</option>)}
+        </select>
+
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-xl border border-white/60 bg-white/75 px-3 py-2 text-[12px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-400/50"
+          aria-label="Filter by status"
+        >
+          {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+
+        <select
+          value={periodFilter}
+          onChange={(e) => setPeriodFilter(e.target.value)}
+          className="rounded-xl border border-white/60 bg-white/75 px-3 py-2 text-[12px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-400/50"
+          aria-label="Filter by Reporting Period"
+        >
+          <option value="all">All Periods</option>
+          {periods.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="rounded-xl border border-white/60 bg-white/75 px-3 py-2 text-[12px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-400/50"
+          aria-label="Filter by Project Type"
+        >
+          <option value="all">All Types</option>
+          {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        <div className="inline-flex items-center rounded-xl border border-white/60 bg-white/75 p-0.5">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`inline-flex items-center justify-center rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${viewMode === 'list' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
+            aria-label="List view"
+          >
+            <List className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`inline-flex items-center justify-center rounded-lg px-2 py-1.5 text-[11px] font-medium transition ${viewMode === 'grid' ? 'bg-sky-500 text-white shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
+            aria-label="Grid view"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <button
+          onClick={handleExportCsv}
+          className="inline-flex items-center gap-1 rounded-xl border border-white/60 bg-white/75 px-3 py-2 text-[12px] font-medium text-slate-700 hover:bg-white/90 transition shadow-2xs"
+        >
+          Export CSV
+        </button>
+      </div>
+
+      {/* PROJECT TABLE */}
+      <div className="overflow-x-auto flex-1 -mx-1 px-1 scroll-elegant">
+        <table className="w-full text-left min-w-[660px]">
           <thead>
-            <tr className="text-[10px] uppercase tracking-wide text-slate-700 border-b border-slate-200/60">
-              <th className="py-2 px-3 font-medium">Project Name</th>
-              <th className="py-2 px-3 font-medium">Code</th>
-              <th className="py-2 px-3 font-medium">Status</th>
-              <th className="py-2 px-3 font-medium w-36">ESG Completion</th>
-              <th className="py-2 px-3 font-medium">Period</th>
-              <th className="py-2 px-3 font-medium text-right">Actions</th>
+            <tr className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold border-b border-slate-200/70">
+              <th className="py-2.5 px-2 font-medium w-8">#</th>
+              <th className="py-2.5 px-2 font-medium min-w-[180px]">Project / Site Name</th>
+              <th className="py-2.5 px-2 font-medium">Code</th>
+              <th className="py-2.5 px-2 font-medium">Business Unit</th>
+              <th className="py-2.5 px-2 font-medium">Location</th>
+              <th className="py-2.5 px-2 font-medium">Type</th>
+              <th className="py-2.5 px-2 font-medium w-28">Progress</th>
+              <th className="py-2.5 px-2 font-medium w-20">Data</th>
+              <th className="py-2.5 px-2 font-medium">Status</th>
+              <th className="py-2.5 px-2 font-medium text-right w-10"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100/80">
+          <tbody className="divide-y divide-slate-100/70">
             {projects.map((p, i) => {
               const active = p.id === selectedId
-              const completion = completionByProject[p.id] ?? 0
+              const progress = completionByProject[p.id] ?? 0
+              const dataComp = dataCompletionByProject[p.id] ?? 0
               return (
                 <tr
                   key={p.id}
                   onClick={() => onSelect(p.id)}
-                  className={`cursor-pointer transition-colors ${active ? 'bg-sky-50/60' : 'hover:bg-white/50'}`}
+                  className={`cursor-pointer transition-all ${active ? 'bg-sky-50/60 border-l-4 border-l-sky-500 shadow-sm' : 'border-l-4 border-l-transparent hover:bg-slate-50/60'}`}
                   style={{ height: 44 }}
                 >
-                  <td className="py-2.5 px-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${active ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
-                        <Building2 className="h-3.5 w-3.5" />
+                  <td className="py-2 px-2 text-[11px] font-medium text-slate-500 tabular-nums">{i + 1}</td>
+                  <td className="py-2 px-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${active ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
+                        <Building2 className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate text-[12px] font-semibold text-slate-900">{p.projectName}</div>
-                        <div className="text-[10px] text-slate-700 inline-flex items-center gap-0.5">
-                          <MapPin className="h-2.5 w-2.5" />
-                          {p.location || '—'} · {p.buName}
-                        </div>
+                        <div className="truncate text-[12.5px] font-semibold text-slate-900 leading-tight">{p.projectName}</div>
+                        <div className="truncate text-[10.5px] text-slate-500 leading-tight">{p.location || '—'} · {p.subsidiaryName}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700">{p.projectCode}</td>
-                  <td className="py-2.5 px-3">
+                  <td className="py-2 px-2 font-mono text-[11px] text-slate-600 font-medium">{p.projectCode}</td>
+                  <td className="py-2 px-2 text-[11.5px] text-slate-700 truncate max-w-[130px]">{p.buName}</td>
+                  <td className="py-2 px-2">
+                    <div className="flex items-center gap-1 text-[11px] text-slate-600">
+                      <MapPin className="h-3 w-3 text-slate-400 flex-shrink-0" />
+                      <span className="truncate">{p.location || '—'}</span>
+                    </div>
+                  </td>
+                  <td className="py-2 px-2">
+                    <span className="inline-flex items-center rounded-md bg-slate-100/90 px-2 py-0.5 text-[10px] font-medium text-slate-700 border border-slate-200/60">
+                      {p.buName.split(' ')[0] || 'Project'}
+                    </span>
+                  </td>
+                  <td className="py-2 px-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-slate-200/80 overflow-hidden min-w-[50px]">
+                        <div
+                          className="h-full bg-gradient-to-r from-sky-400 to-sky-600 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.max(progress, 2)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-700 tabular-nums w-7 text-right flex-shrink-0">
+                        {progress}%
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-2 px-2">
+                    <CircularRing pct={dataComp} size={32} stroke={3} labelSize={9} color={dataComp >= 70 ? '#10B981' : dataComp >= 40 ? '#F59E0B' : '#0EA5E9'} />
+                  </td>
+                  <td className="py-2 px-2">
                     <span className={`status-pill text-[10px] ${statusClass(p.status)}`}>
                       {p.status.replace(/_/g, ' ').toLowerCase()}
                     </span>
                   </td>
-                  <td className="py-2.5 px-3">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-sky-400 to-sky-600 rounded-full transition-all"
-                          style={{ width: `${Math.max(completion, 3)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-slate-700 tabular-nums w-8 text-right">
-                        {completion.toFixed(0)}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="py-2.5 px-3 text-[11px] text-slate-700">{currentPeriodLabel}</td>
-                  <td className="py-2.5 px-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onSelect(p.id) }}
-                        className="rounded-md p-1 text-slate-700 hover:bg-sky-50 hover:text-sky-700 transition-colors"
-                        aria-label="View project"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation() }}
-                        className="rounded-md p-1 text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors"
-                        aria-label="Edit project"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                  <td className="py-2 px-2 text-right">
+                    <button
+                      onClick={(e) => { e.stopPropagation() }}
+                      className="inline-flex items-center justify-center rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                      aria-label="More actions"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
                   </td>
                 </tr>
               )
             })}
             {projects.length === 0 && (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-[12px] text-slate-700">
+                <td colSpan={10} className="py-10 text-center text-[12px] text-slate-500">
                   No projects match the current filter.
                 </td>
               </tr>
@@ -598,270 +779,259 @@ function ProjectTable({
 }
 
 /* ============================================================
- * Widget cards — 3 analytical widgets
+ * ROW 2 RIGHT — Project Details Panel
  * ============================================================ */
-
-/** Project ESG Progress — mini bar chart of per-module completion. */
-function EsgProgressWidget({ subs, kpis }: { subs: SubmissionItem[]; kpis?: Kpis }) {
-  const modules = moduleCompletion(subs, kpis)
-  const data = modules.map(m => ({ name: m.label, value: m.pct }))
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.2 }}
-      className="glass glass-shimmer rounded-[20px] p-5"
-    >
-      <header className="flex items-start justify-between gap-2 mb-3">
-        <div>
-          <h3 className="text-[14px] font-semibold text-slate-900 flex items-center gap-1.5">
-            <BarChart3 className="h-3.5 w-3.5 text-sky-500" />
-            Project ESG Progress
-          </h3>
-          <p className="text-[10px] text-slate-700 mt-0.5">Per-module completion %</p>
-        </div>
-      </header>
-      <div className="h-[160px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -22 }}>
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} width={32} domain={[0, 100]} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(14,165,233,0.08)' }} formatter={(v: number) => `${v}%`} />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive animationDuration={600}>
-              {data.map((_, i) => (
-                <Cell key={i} fill={BAR_PALETTE[i % BAR_PALETTE.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </motion.section>
-  )
-}
-
-/** Submission Status — donut chart (Approved vs Draft vs Pending). */
-function SubmissionStatusWidget({ subs }: { subs: SubmissionItem[] }) {
-  const buckets = submissionStatusBuckets(subs)
-  const total = buckets.reduce((s, b) => s + b.value, 0)
-  const approvedValue = buckets.find(b => b.name === 'Approved')?.value ?? 0
-  const approvedPct = total > 0 ? Math.round((approvedValue / total) * 100) : 0
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.25 }}
-      className="glass glass-shimmer rounded-[20px] p-5"
-    >
-      <header className="flex items-start justify-between gap-2 mb-3">
-        <div>
-          <h3 className="text-[14px] font-semibold text-slate-900 flex items-center gap-1.5">
-            <Gauge className="h-3.5 w-3.5 text-sky-500" />
-            Submission Status
-          </h3>
-          <p className="text-[10px] text-slate-700 mt-0.5">{total} total submission(s)</p>
-        </div>
-      </header>
-      <div className="h-[160px] relative">
-        {buckets.length > 0 ? (
-          <>
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsPie>
-                <Pie
-                  data={buckets}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={42}
-                  outerRadius={58}
-                  paddingAngle={3}
-                  stroke="none"
-                  isAnimationActive
-                  animationDuration={600}
-                >
-                  {buckets.map((b, i) => (
-                    <Cell key={i} fill={b.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={TOOLTIP_STYLE} />
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 9 }} />
-              </RechartsPie>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none" style={{ marginTop: '-20px' }}>
-              <span className="tabular-nums text-lg font-bold text-slate-900">{approvedPct}%</span>
-              <span className="text-[8px] text-slate-700">approved</span>
-            </div>
-          </>
-        ) : (
-          <div className="h-full flex items-center justify-center text-[10px] text-slate-700">No submissions</div>
-        )}
-      </div>
-    </motion.section>
-  )
-}
-
-/** Upcoming Deadlines — list of next 3 reporting period deadlines. */
-function UpcomingDeadlinesWidget({
-  periods, subs,
-}: {
-  periods: OverviewData['periods']
-  subs: SubmissionItem[]
-}) {
-  const upcoming = periods.slice(0, 3)
-  return (
-    <motion.section
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay: 0.3 }}
-      className="glass glass-shimmer rounded-[20px] p-5"
-    >
-      <header className="flex items-start justify-between gap-2 mb-3">
-        <div>
-          <h3 className="text-[14px] font-semibold text-slate-900 flex items-center gap-1.5">
-            <CalendarClock className="h-3.5 w-3.5 text-sky-500" />
-            Upcoming Deadlines
-          </h3>
-          <p className="text-[10px] text-slate-700 mt-0.5">Next 3 reporting periods</p>
-        </div>
-      </header>
-      <ul className="space-y-2">
-        {upcoming.length === 0 && (
-          <li className="text-[11px] text-slate-700 text-center py-6">No upcoming deadlines</li>
-        )}
-        {upcoming.map((p, i) => {
-          const periodSubs = subs.filter(s => s.reportingPeriod?.id === p.id)
-          const completion = periodSubs.length > 0
-            ? Math.round(periodSubs.reduce((a, s) => Math.max(a, s.completionPct || 0), 0))
-            : 0
-          return (
-            <motion.li
-              key={p.id}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.05 * i }}
-              className="glass-subtle rounded-xl px-3 py-2 flex items-center justify-between"
-            >
-              <div className="min-w-0">
-                <div className="text-[12px] font-semibold text-slate-900 truncate">{p.label}</div>
-                <div className="text-[10px] text-slate-700">FY {p.year}{p.month ? ` · M${p.month}` : ''}</div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-[10px] text-slate-700 tabular-nums">{completion}%</span>
-                <span className={`status-pill text-[9px] ${statusClass(p.status)}`}>
-                  {p.status.replace(/_/g, ' ').toLowerCase()}
-                </span>
-              </div>
-            </motion.li>
-          )
-        })}
-      </ul>
-    </motion.section>
-  )
-}
-
-/* ============================================================
- * Project Detail Panel (right column)
- * ============================================================ */
-function ProjectDetailPanel({
-  project, kpis, subs, activities, evidence,
+function ProjectDetailsPanel({
+  project, kpis, subs, activities, evidence, periods, currentPeriodLabel,
+  isExpanded, onToggleExpand, onUpdateProject,
 }: {
   project: FlattenedProject | null
   kpis: Kpis
   subs: SubmissionItem[]
   activities: ActivityItem[]
   evidence: EvidenceItem[]
+  periods: OverviewData['periods']
+  currentPeriodLabel: string
+  isExpanded?: boolean
+  onToggleExpand?: () => void
+  onUpdateProject?: (updated: FlattenedProject) => void
 }) {
   const [tab, setTab] = useState<'overview' | 'progress' | 'activity' | 'team' | 'documents'>('overview')
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editLocation, setEditLocation] = useState('')
+  const [editStatus, setEditStatus] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+
+  // Sync edit fields when project changes
+  useEffect(() => {
+    if (project) {
+      setEditName(project.projectName)
+      setEditLocation(project.location || '')
+      setEditStatus(project.status)
+      setEditNotes('')
+    }
+  }, [project?.id])
+
+  const handleSaveEdit = useCallback(() => {
+    if (project) {
+      const updated: FlattenedProject = {
+        ...project,
+        projectName: editName.trim() || project.projectName,
+        location: editLocation.trim() || project.location,
+        status: editStatus || project.status,
+      }
+      onUpdateProject?.(updated)
+      toast.success(`Project "${updated.projectName}" updated successfully`)
+    }
+    setShowEditModal(false)
+  }, [project, editName, editLocation, editStatus, onUpdateProject])
 
   if (!project) {
     return (
-      <div className="glass rounded-[20px] p-10 flex flex-col items-center justify-center text-center min-h-[400px]">
-        <Building2 className="h-10 w-10 text-sky-300 mb-3" />
-        <p className="text-[14px] font-semibold text-slate-900 mb-1">No project selected</p>
-        <p className="text-[12px] text-slate-700">Click a row in the project table to view details.</p>
+      <div className="glass-ios-liquid rounded-[26px] p-10 flex flex-col items-center justify-center text-center min-h-[500px]">
+        <Building2 className="h-12 w-12 text-sky-400 mb-4" />
+        <p className="text-[16px] font-bold text-slate-900 mb-1">No project selected</p>
+        <p className="text-[12px] text-slate-600 font-medium">Click a project row in the registry to inspect ESG details.</p>
       </div>
     )
   }
 
+  const projectType = project.buName.split(' ')[0] || 'ESG'
+  const modules = moduleCompletion(subs, kpis)
+
+  const gradientFromBU = (buName: string) => {
+    const lower = buName.toLowerCase()
+    if (lower.includes('manufact') || lower.includes('plant')) return 'from-sky-500 via-blue-500 to-indigo-600'
+    if (lower.includes('power') || lower.includes('energy')) return 'from-amber-400 via-orange-500 to-rose-500'
+    if (lower.includes('water') || lower.includes('irrigation')) return 'from-cyan-400 via-teal-500 to-emerald-600'
+    if (lower.includes('health') || lower.includes('hospital')) return 'from-rose-400 via-pink-500 to-fuchsia-600'
+    if (lower.includes('it') || lower.includes('tech') || lower.includes('software')) return 'from-violet-500 via-purple-500 to-indigo-600'
+    return 'from-sky-400 via-blue-500 to-blue-700'
+  }
+
   return (
-    <div className="sticky top-14 glass glass-shimmer rounded-[20px] overflow-hidden">
-      {/* Hero gradient banner */}
-      <div className="relative h-20 bg-gradient-to-br from-sky-400 via-sky-500 to-blue-600 overflow-hidden">
-        <div className="absolute inset-0" style={{
-          background: 'radial-gradient(circle at 30% 50%, rgba(255,255,255,0.35), transparent 50%)',
-        }} />
-        <div className="absolute bottom-2.5 left-4 right-4">
-          <div className="text-[10px] uppercase tracking-wide text-white/80 font-medium truncate">
-            {project.buName}
+    <div className="glass-ios-liquid glass-shimmer rounded-[26px] overflow-hidden flex flex-col h-full relative">
+      {/* Header */}
+      <header className="flex items-center justify-between px-5 pt-5 pb-3.5 border-b border-slate-200/70">
+        <h2 className="text-[17px] font-extrabold text-slate-900 flex items-center gap-2 tracking-tight">
+          <FileText className="h-4.5 w-4.5 text-sky-600" />
+          Project Details
+        </h2>
+        <div className="flex items-center gap-2">
+          {onToggleExpand && (
+            <button
+              onClick={onToggleExpand}
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold text-slate-700 bg-white/85 border border-slate-200 hover:bg-sky-50 hover:text-sky-700 transition-all shadow-2xs"
+              title={isExpanded ? "Collapse to side panel" : "Expand to wide view"}
+            >
+              {isExpanded ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" /> Collapse
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" /> Expand
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => project && setShowEditModal(true)}
+            disabled={!project}
+            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold text-slate-700 bg-white/85 border border-slate-200 hover:bg-sky-50 hover:text-sky-700 transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Pencil className="h-3.5 w-3.5 text-sky-600" /> Edit
+          </button>
+        </div>
+      </header>
+
+      {/* Edit Project Modal */}
+      <AnimatePresence>
+        {showEditModal && project && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowEditModal(false) }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white rounded-[24px] shadow-2xl w-full max-w-lg p-6 border border-slate-200"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-[18px] font-extrabold text-slate-900">Edit Project</h3>
+                <button onClick={() => setShowEditModal(false)} className="rounded-xl p-2 hover:bg-slate-100 transition-colors">
+                  <X className="h-4 w-4 text-slate-600" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Project Name</label>
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Location</label>
+                  <input
+                    value={editLocation}
+                    onChange={e => setEditLocation(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Status</label>
+                  <select
+                    value={editStatus}
+                    onChange={e => setEditStatus(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
+                  >
+                    {STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Notes / Comments</label>
+                  <textarea
+                    value={editNotes}
+                    onChange={e => setEditNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Add notes about this project..."
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-xl px-4 py-2 text-[12px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  className="rounded-xl px-5 py-2 text-[12px] font-bold text-white bg-sky-600 hover:bg-sky-700 transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                >
+                  <Save className="h-3.5 w-3.5" /> Save Changes
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="overflow-y-auto scroll-elegant flex-1">
+        {/* PROJECT HERO IMAGE */}
+        <div className="px-5 pt-4">
+          <div className={`relative w-full rounded-2xl overflow-hidden bg-gradient-to-br ${gradientFromBU(project.buName)}`} style={{ aspectRatio: '16/6.8' }}>
+            <div className="absolute inset-0 opacity-30" style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.25' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E")`,
+            }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/15 to-transparent" />
+            <div className="absolute bottom-3.5 left-4 right-4">
+              <div className="text-[10px] uppercase tracking-widest text-white/85 font-bold mb-0.5">{project.buName}</div>
+              <div className="text-[18px] font-black text-white leading-tight drop-shadow-md truncate">{project.projectName}</div>
+            </div>
           </div>
-          <h3 className="text-[16px] font-bold text-white truncate drop-shadow-sm">{project.projectName}</h3>
-        </div>
-        <div className="absolute top-2.5 right-2.5">
-          <span className={`status-pill text-[9px] ${statusClass(project.status)}`}>
-            {project.status.replace(/_/g, ' ').toLowerCase()}
-          </span>
-        </div>
-      </div>
-
-      <div className="p-4 max-h-[calc(100vh-7rem)] overflow-y-auto scroll-elegant">
-        {/* Metadata grid */}
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <MetadataItem label="Code" value={<span className="font-mono">{project.projectCode}</span>} />
-          <MetadataItem label="Location" value={project.location || '—'} />
-          <MetadataItem label="Business Unit" value={project.buName} />
-          <MetadataItem label="Subsidiary" value={project.subsidiaryName} />
         </div>
 
-        {/* Mini KPI row */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <MiniKpi
-            icon={Flame}
-            label="Emissions"
-            value={formatNumber(kpis.totalEmissions, 1)}
-            unit="tCO₂e"
-            tone="bg-rose-50 text-rose-600"
-          />
-          <MiniKpi
-            icon={Zap}
-            label="Energy"
-            value={formatNumber(kpis.energyGJ, 1)}
-            unit="GJ"
-            tone="bg-amber-50 text-amber-600"
-          />
-          <MiniKpi
-            icon={Droplets}
-            label="Water"
-            value={formatNumber(kpis.waterWithdrawalKL, 1)}
-            unit="kL"
-            tone="bg-cyan-50 text-cyan-600"
-          />
+        {/* TITLE AREA */}
+        <div className="px-5 pt-4 pb-2">
+          <div className="flex items-start justify-between gap-3 mb-1.5">
+            <h3 className="text-[19px] font-extrabold text-slate-900 leading-tight flex-1 min-w-0 tracking-tight">
+              {project.projectName}
+            </h3>
+            <span className={`status-pill text-[11px] font-bold flex-shrink-0 ${statusClass(project.status)}`}>
+              {project.status.replace(/_/g, ' ').toLowerCase()}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-[12px] text-slate-600 font-medium">
+            <span className="font-mono font-bold text-sky-800 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/80">{project.projectCode}</span>
+            <span className="text-slate-300">·</span>
+            <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-sky-600" />
+            <span className="truncate">{project.location || 'Location not specified'}</span>
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="mb-3 flex gap-1 rounded-xl bg-white/60 p-1">
-          {([
-            { k: 'overview' as const, label: 'Overview', icon: FileText },
-            { k: 'progress' as const, label: 'ESG', icon: BarChart3 },
-            { k: 'activity' as const, label: 'Activity', icon: ActivityIcon },
-            { k: 'team' as const, label: 'Team', icon: Users },
-            { k: 'documents' as const, label: 'Docs', icon: FolderOpen },
-          ]).map(t => {
-            const active = tab === t.k
-            return (
-              <button
-                key={t.k}
-                onClick={() => setTab(t.k)}
-                className={`flex-1 flex items-center justify-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition ${
-                  active ? 'bg-white text-sky-700 shadow-sm' : 'text-slate-700 hover:bg-white/60'
-                }`}
-              >
-                <t.icon className="h-3 w-3" />
-                {t.label}
-              </button>
-            )
-          })}
+        {/* TABS */}
+        <div className="px-5 pt-3">
+          <div className="flex items-center gap-1 border-b border-slate-200/70 overflow-x-auto scroll-elegant -mx-1 px-1">
+            {([
+              { k: 'overview' as const, label: 'Overview' },
+              { k: 'progress' as const, label: 'ESG Progress' },
+              { k: 'activity' as const, label: 'Recent Activity' },
+              { k: 'team' as const, label: 'Team' },
+              { k: 'documents' as const, label: 'Documents' },
+            ]).map(t => {
+              const active = tab === t.k
+              return (
+                <button
+                  key={t.k}
+                  onClick={() => setTab(t.k)}
+                  className={`relative flex-shrink-0 px-3.5 py-2.5 text-[12px] font-bold whitespace-nowrap transition-colors ${
+                    active ? 'text-sky-800 font-extrabold' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {t.label}
+                  {active && <motion.div layoutId="project-details-tab" className="absolute left-2 right-2 bottom-0 h-[2.5px] bg-sky-600 rounded-full" />}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        {/* Tab body */}
-        <div className="min-h-[260px]">
+        {/* TAB BODY */}
+        <div className="px-5 py-4.5">
           <AnimatePresence mode="wait">
             <motion.div
               key={tab}
@@ -870,11 +1040,225 @@ function ProjectDetailPanel({
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.22 }}
             >
-              {tab === 'overview' && <OverviewTab project={project} subs={subs} kpis={kpis} />}
-              {tab === 'progress' && <EsgProgressTab subs={subs} kpis={kpis} />}
-              {tab === 'activity' && <ActivityTab activities={activities} />}
-              {tab === 'team' && <TeamTab />}
-              {tab === 'documents' && <DocumentsTab evidence={evidence} />}
+              {tab === 'overview' && (
+                <div className="space-y-4">
+                  {/* METADATA GRID: 4 columns on desktop / 2 on mobile - generous and airy */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <DetailRow
+                      icon={Hash}
+                      label="Project Code"
+                      value={<span className="font-mono text-sky-800 font-bold">{project.projectCode}</span>}
+                    />
+                    <DetailRow
+                      icon={Building2}
+                      label="Business Unit"
+                      value={project.buName}
+                    />
+                    <DetailRow
+                      icon={Layers}
+                      label="Project Type"
+                      value={projectType}
+                    />
+                    <DetailRow
+                      icon={CalendarClock}
+                      label="Reporting Period"
+                      value={currentPeriodLabel}
+                    />
+                    <DetailRow
+                      icon={Calendar}
+                      label="Start Date"
+                      value={new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    />
+                    <DetailRow
+                      icon={Calendar}
+                      label="Target Finish"
+                      value={`31 Mar ${(periods[0]?.year ?? new Date().getFullYear()) + 2}`}
+                    />
+                    <DetailRow
+                      icon={UserCheck}
+                      label="Project Lead"
+                      value="Rohit Kumar"
+                    />
+                    <DetailRow
+                      icon={Briefcase}
+                      label="Subsidiary"
+                      value={project.subsidiaryName}
+                    />
+                  </div>
+
+                  {/* PROJECT DESCRIPTION */}
+                  <div className="rounded-2xl bg-white/70 p-3.5 border border-white/95 shadow-2xs">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1">
+                      Project Scope &amp; ESG Alignment
+                    </div>
+                    <p className="text-[12.5px] text-slate-700 leading-relaxed font-medium">
+                      {project.projectName} is a priority operational asset under {project.buName}, subsidiary {project.subsidiaryName}.
+                      Continuously monitoring Scope 1 &amp; 2 emissions, water circularity (ZLD compliance), and occupational safety to fulfill SEBI BRSR Core Principal 6 environmental mandates for {currentPeriodLabel}.
+                    </p>
+                  </div>
+
+                  {/* INTEGRATED SITE LOCATION & GEOGRAPHIC FOOTPRINT BANNER */}
+                  <div className="rounded-2xl bg-gradient-to-r from-sky-50/85 via-blue-50/60 to-white/90 p-4 border border-sky-100/90 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5 min-w-0 w-full sm:w-auto">
+                      <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-sm shrink-0 ring-2 ring-white">
+                        <MapPin className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13.5px] font-bold text-slate-900 truncate">
+                          {project.location || 'Site Location'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                          {project.subsidiaryName} · GPS Coordinates: 17.3850° N, 78.4867° E
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100/90 border border-emerald-300 text-emerald-800 text-[10px] font-bold shadow-2xs">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" /> Active Telemetry
+                      </span>
+                      <button
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-white border border-sky-200/90 px-3 py-1.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50 hover:border-sky-400 transition-colors shadow-2xs"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" /> View on Map
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {tab === 'progress' && (
+                <div className="space-y-3.5">
+                  {modules.slice(0, 4).map((m, i) => (
+                    <div key={m.label} className="flex items-center gap-3.5 p-2.5 rounded-xl bg-white/50">
+                      <CircularRing pct={m.pct} size={56} stroke={4.5} labelSize={11} color={
+                        m.tone.includes('blue') ? '#3B82F6' :
+                        m.tone.includes('cyan') ? '#06B6D4' :
+                        m.tone.includes('emerald') ? '#10B981' :
+                        m.tone.includes('amber') ? '#F59E0B' : '#8B5CF6'
+                      } />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[12.5px] font-semibold text-slate-900">{m.label}</span>
+                          <span className={`status-pill text-[9px] ${m.pct >= 75 ? 'status-approved' : m.pct >= 50 ? 'status-review' : 'status-draft'}`}>
+                            {m.pct >= 75 ? 'On Track' : m.pct >= 50 ? 'In Progress' : 'Needs Attention'}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${m.pct}%` }}
+                            transition={{ duration: 0.6, delay: i * 0.05 }}
+                            className={`h-full ${m.tone} rounded-full`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {tab === 'activity' && (
+                <div className="max-h-[320px] overflow-y-auto scroll-elegant pr-1">
+                  {activities.length === 0 ? (
+                    <div className="text-center py-10 text-[12px] text-slate-500">No recent activity for this project</div>
+                  ) : (
+                    <ol className="space-y-2.5">
+                      {activities.map((a, i) => (
+                        <motion.li
+                          key={a.id}
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.03 * i }}
+                          className="flex gap-2.5 rounded-xl bg-white/50 px-2.5 py-2.5 hover:bg-white/70 transition-colors"
+                        >
+                          <div className="h-8 w-8 flex-shrink-0 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center text-[10px] font-semibold ring-2 ring-white shadow-sm">
+                            {initials(a.actorName)}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[12px] font-semibold text-slate-900 truncate">{a.title}</span>
+                              {a.status && (
+                                <span className={`status-pill text-[8.5px] ${statusClass(a.status)}`}>
+                                  {a.status.replace(/_/g, ' ').toLowerCase()}
+                                </span>
+                              )}
+                            </div>
+                            {a.description && <p className="text-[10.5px] text-slate-600 mt-0.5 line-clamp-2">{a.description}</p>}
+                            <div className="text-[10px] text-slate-500 mt-0.5">{a.actorName} · {timeAgo(a.createdAt)}</div>
+                          </div>
+                        </motion.li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              )}
+
+              {tab === 'team' && (
+                <div className="space-y-2">
+                  {SEEDED_TEAM.slice(0, 7).map((m, i) => (
+                    <motion.div
+                      key={m.name}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.04 * i }}
+                      className="flex items-center gap-3 rounded-xl bg-white/55 px-2.5 py-2.5 hover:bg-white/75 transition-colors"
+                    >
+                      <div className={`h-9 w-9 rounded-full bg-gradient-to-br ${m.gradient} text-white flex items-center justify-center text-[11px] font-semibold ring-2 ring-white shadow-sm`}>
+                        {initials(m.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[12px] font-semibold text-slate-900">{m.name}</div>
+                        <div className="text-[10.5px] text-slate-500">{m.role}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`h-1.5 w-1.5 rounded-full ${m.active ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                        <span className={`status-pill text-[8.5px] ${m.active ? 'status-approved' : 'status-draft'}`}>
+                          {m.active ? 'Active' : 'Away'}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              {tab === 'documents' && (
+                <div className="max-h-[320px] overflow-y-auto scroll-elegant pr-1">
+                  {evidence.length === 0 ? (
+                    <div className="text-center py-10 text-[12px] text-slate-500">No documents uploaded for this project</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {evidence.map((e, i) => (
+                        <motion.div
+                          key={e.id}
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.03 * i }}
+                          className="flex items-center gap-2.5 rounded-xl bg-white/55 px-2.5 py-2.5 hover:bg-white/75 transition-colors"
+                        >
+                          <div className="h-9 w-9 flex-shrink-0 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center border border-violet-100">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[12px] font-semibold text-slate-900">{e.fileName}</div>
+                            <div className="text-[10.5px] text-slate-500">
+                              {e.documentType} · {e.uploader?.name ?? 'System'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className={`status-pill text-[8.5px] ${statusClass(e.status)}`}>
+                              {e.status.replace(/_/g, ' ').toLowerCase()}
+                            </span>
+                            <button className="rounded-lg p-1.5 text-slate-400 hover:bg-sky-50 hover:text-sky-700 transition-colors" aria-label="View document">
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
@@ -883,255 +1267,343 @@ function ProjectDetailPanel({
   )
 }
 
-function MetadataItem({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
   return (
-    <div className="glass-subtle rounded-lg px-2.5 py-1.5">
-      <div className="text-[9px] uppercase tracking-wide text-slate-700 font-medium">{label}</div>
-      <div className="text-[12px] font-semibold text-slate-900 truncate">{value}</div>
+    <div className="min-w-0 rounded-xl bg-white/75 p-3 border border-white/95 shadow-2xs hover:bg-white/95 hover:shadow-xs transition-all">
+      <div className="flex items-center gap-1.5 mb-1">
+        {Icon && <Icon className="h-3 w-3 text-sky-600 shrink-0" />}
+        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold truncate">{label}</span>
+      </div>
+      <div className="text-[13px] font-bold text-slate-900 truncate">{value}</div>
     </div>
   )
 }
 
-function MiniKpi({ icon: Icon, label, value, unit, tone }: {
-  icon: LucideIcon
-  label: string
-  value: string
-  unit?: string
-  tone: string
+/* ============================================================
+ * Resizable card wrapper — drag the bottom handle to resize
+ * ============================================================ */
+function ResizableCard({ children, defaultHeight, minHeight = 220, maxHeight = 800, className = '' }: {
+  children: React.ReactNode
+  defaultHeight: number
+  minHeight?: number
+  maxHeight?: number
+  className?: string
 }) {
+  const [height, setHeight] = useState(defaultHeight)
+  const startY = useRef(0)
+  const startH = useRef(0)
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    startY.current = e.clientY
+    startH.current = height
+    const onMove = (ev: MouseEvent) => {
+      const delta = ev.clientY - startY.current
+      setHeight(Math.max(minHeight, Math.min(maxHeight, startH.current + delta)))
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   return (
-    <div className="glass-subtle rounded-xl p-2 flex flex-col gap-1">
-      <div className="flex items-center justify-between">
-        <span className="text-[9px] uppercase tracking-wide text-slate-700">{label}</span>
-        <span className={`inline-flex h-5 w-5 items-center justify-center rounded ${tone}`}>
-          <Icon className="h-3 w-3" />
-        </span>
-      </div>
-      <div className="flex items-baseline gap-0.5">
-        <span className="text-[13px] font-bold text-slate-900 tabular-nums">{value}</span>
-        {unit && <span className="text-[8px] text-slate-700">{unit}</span>}
+    <div className={`relative flex flex-col ${className}`} style={{ height }}>
+      <div className="flex-1 overflow-hidden">{children}</div>
+      {/* Resize handle */}
+      <div
+        onMouseDown={onMouseDown}
+        className="absolute bottom-0 left-0 right-0 h-3 flex items-center justify-center cursor-ns-resize group z-10"
+        title="Drag to resize"
+      >
+        <div className="w-8 h-1 rounded-full bg-slate-300 group-hover:bg-sky-400 transition-colors" />
       </div>
     </div>
   )
 }
 
 /* ============================================================
- * Detail panel tab bodies
+ * ROW 3 LEFT — Project ESG Progress (rings)
  * ============================================================ */
-function OverviewTab({ project, subs, kpis }: {
-  project: FlattenedProject
+function ProjectEsgProgressCard({ project, subs, kpis, delay = 0.2, dragHandle }: {
+  project: FlattenedProject | null
   subs: SubmissionItem[]
-  kpis: Kpis
+  kpis?: Kpis
+  delay?: number
+  dragHandle?: React.ReactNode
 }) {
-  const openIssues = (kpis.openExceptions ?? 0) + (kpis.corrections ?? 0)
+  const modules = moduleCompletion(subs, kpis).slice(0, 4)
+  const ringColor = (tone: string) =>
+    tone.includes('blue') ? '#3B82F6' :
+    tone.includes('cyan') ? '#06B6D4' :
+    tone.includes('emerald') ? '#10B981' :
+    tone.includes('amber') ? '#F59E0B' : '#8B5CF6'
+
   return (
-    <div className="space-y-3">
-      <div className="glass-subtle rounded-xl p-3">
-        <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium mb-2">Project Info</div>
-        <div className="grid grid-cols-2 gap-y-2 text-[11px]">
-          <div>
-            <div className="text-[9px] uppercase tracking-wide text-slate-700">Group</div>
-            <div className="font-semibold text-slate-900 truncate">{project.groupName}</div>
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wide text-slate-700">Subsidiary</div>
-            <div className="font-semibold text-slate-900 truncate">{project.subsidiaryName}</div>
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wide text-slate-700">BU Code</div>
-            <div className="font-mono font-semibold text-slate-900">{project.buCode}</div>
-          </div>
-          <div>
-            <div className="text-[9px] uppercase tracking-wide text-slate-700">Sub Code</div>
-            <div className="font-mono font-semibold text-slate-900">{project.subsidiaryCode}</div>
-          </div>
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE, delay }}
+      className="glass glass-shimmer rounded-[20px] p-5 pb-6 flex flex-col h-full"
+    >
+      <header className="flex items-start justify-between gap-2 mb-3">
+        <div>
+          <h3 className="text-[15px] font-semibold text-slate-900 flex items-center gap-1.5">
+            <BarChart3 className="h-4 w-4 text-sky-500" />
+            Project ESG Progress
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {project ? project.projectName : 'Select a project'} · per-module completion
+          </p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <MiniTile label="Subs" value={subs.length.toString()} tone="text-sky-700" />
-        <MiniTile label="Issues" value={openIssues.toString()} tone="text-amber-700" />
-        <MiniTile label="Completion" value={`${kpis.completion.toFixed(0)}%`} tone="text-emerald-700" />
-      </div>
-
-      <div>
-        <div className="text-[10px] uppercase tracking-wide text-slate-700 font-medium mb-1.5">
-          Recent Submissions
+        <div className="flex items-center gap-1.5">
+          <button className="text-[11px] font-semibold text-sky-700 hover:text-sky-800 transition-colors whitespace-nowrap">
+            View Details →
+          </button>
+          {dragHandle}
         </div>
-        <div className="space-y-1.5">
-          {subs.length === 0 && (
-            <div className="text-[11px] text-slate-700 text-center py-3">No submissions for this project</div>
-          )}
-          {subs.slice(0, 3).map(s => (
-            <div key={s.id} className="flex items-center justify-between rounded-lg bg-white/50 px-2 py-1.5">
-              <div className="min-w-0">
-                <div className="truncate text-[11px] font-semibold text-slate-900">{s.title}</div>
-                <div className="text-[9px] text-slate-700">
-                  {s.reportingPeriod?.periodLabel ?? '—'} · {s.module}
-                </div>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3.5 flex-1 content-center">
+        {modules.map((m) => (
+          <div key={m.label} className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-white/50 border border-white/80 shadow-2xs">
+            <CircularRing pct={m.pct} size={58} stroke={4.5} labelSize={12} color={ringColor(m.tone)} />
+            <div className="text-center">
+              <div className="text-[11.5px] font-semibold text-slate-900 leading-tight">{m.label}</div>
+              <div className={`mt-0.5 text-[9px] font-medium ${m.pct >= 75 ? 'text-emerald-700' : m.pct >= 50 ? 'text-amber-700' : 'text-sky-700'}`}>
+                {m.pct >= 75 ? '✓ On Track' : m.pct >= 50 ? '⏵ In Progress' : '⚠ Needs Work'}
               </div>
-              <span className={`status-pill text-[8px] ${statusClass(s.status)}`}>
-                {s.status.replace(/_/g, ' ').toLowerCase()}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MiniTile({ label, value, tone }: { label: string; value: string; tone: string }) {
-  return (
-    <div className="glass-subtle rounded-lg px-2 py-1.5 text-center">
-      <div className={`text-[14px] font-bold tabular-nums ${tone}`}>{value}</div>
-      <div className="text-[9px] uppercase tracking-wide text-slate-700">{label}</div>
-    </div>
-  )
-}
-
-function EsgProgressTab({ subs, kpis }: { subs: SubmissionItem[]; kpis: Kpis }) {
-  const modules = moduleCompletion(subs, kpis)
-  const data = modules.map(m => ({ name: m.label, value: m.pct }))
-  return (
-    <div className="space-y-3">
-      <div className="h-[140px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -22 }}>
-            <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 9, fill: '#475569' }} axisLine={false} tickLine={false} width={28} domain={[0, 100]} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} cursor={{ fill: 'rgba(14,165,233,0.08)' }} formatter={(v: number) => `${v}%`} />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive animationDuration={600}>
-              {data.map((_, i) => (
-                <Cell key={i} fill={BAR_PALETTE[i % BAR_PALETTE.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="space-y-2">
-        {modules.map(m => (
-          <div key={m.label}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] font-medium text-slate-700">{m.label}</span>
-              <span className="text-[10px] text-slate-700 tabular-nums">{m.pct}%</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-slate-200/70 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${m.pct}%` }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
-                className={`h-full ${m.tone} rounded-full`}
-              />
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </motion.section>
   )
 }
 
-function ActivityTab({ activities }: { activities: ActivityItem[] }) {
-  return (
-    <div className="max-h-[280px] overflow-y-auto scroll-elegant pr-1">
-      {activities.length === 0 ? (
-        <div className="text-center py-8 text-[11px] text-slate-700">No recent activity for this project</div>
-      ) : (
-        <ol className="space-y-2">
-          {activities.map((a, i) => (
-            <motion.li
-              key={a.id}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.03 * i }}
-              className="flex gap-2 rounded-lg px-1.5 py-1.5 hover:bg-white/50 transition-colors"
-            >
-              <div className="h-7 w-7 flex-shrink-0 rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center text-[10px] font-semibold ring-2 ring-white/80">
-                {initials(a.actorName)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-semibold text-slate-900 truncate">{a.title}</span>
-                  {a.status && (
-                    <span className={`status-pill text-[8px] ${statusClass(a.status)}`}>
-                      {a.status.replace(/_/g, ' ').toLowerCase()}
-                    </span>
-                  )}
-                </div>
-                {a.description && (
-                  <p className="text-[10px] text-slate-700 mt-0.5 line-clamp-2">{a.description}</p>
-                )}
-                <div className="text-[9px] text-slate-700 mt-0.5">
-                  {a.actorName} · {timeAgo(a.createdAt)}
-                </div>
-              </div>
-            </motion.li>
-          ))}
-        </ol>
-      )}
-    </div>
-  )
-}
+/* ============================================================
+ * ROW 3 CENTER — Submission Status (compact table)
+ * ============================================================ */
+function SubmissionStatusCard({ project, allSubs, delay = 0.25, dragHandle }: {
+  project: FlattenedProject | null
+  allSubs: SubmissionItem[]
+  delay?: number
+  dragHandle?: React.ReactNode
+}) {
+  const modules = ['Energy', 'Water', 'Waste', 'Safety', 'Workforce']
+  const rows = modules.map(mod => {
+    const lower = mod.toLowerCase()
+    const projectSubs = project
+      ? allSubs.filter(s => s.projectId === project.id && (s.module || '').toLowerCase() === lower)
+      : allSubs.filter(s => (s.module || '').toLowerCase() === lower)
+    return {
+      module: mod,
+      total: projectSubs.length,
+      submitted: projectSubs.filter(s => s.status === 'SUBMITTED' || s.status === 'RESUBMITTED').length,
+      review: projectSubs.filter(s => s.status === 'UNDER_REVIEW' || s.status === 'REVIEW').length,
+      approved: projectSubs.filter(s => s.status === 'APPROVED' || s.status === 'LOCKED').length,
+      pending: Math.max(0, projectSubs.length - projectSubs.filter(s => s.status !== 'DRAFT').length),
+    }
+  })
 
-function TeamTab() {
-  return (
-    <div className="space-y-1.5">
-      {SEEDED_TEAM.slice(0, 6).map((m, i) => (
-        <motion.div
-          key={m.name}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.04 * i }}
-          className="flex items-center gap-2 rounded-lg bg-white/60 px-2 py-1.5"
-        >
-          <div className={`h-7 w-7 rounded-full bg-gradient-to-br ${m.gradient} text-white flex items-center justify-center text-[10px] font-semibold ring-2 ring-white/80`}>
-            {initials(m.name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[11px] font-semibold text-slate-900">{m.name}</div>
-            <div className="text-[9px] text-slate-700">{m.role}</div>
-          </div>
-          <span className={`status-pill text-[8px] ${m.active ? 'status-approved' : 'status-draft'}`}>
-            {m.active ? 'Active' : 'Away'}
-          </span>
-        </motion.div>
-      ))}
-    </div>
+  const Chip = ({ n, tone }: { n: number; tone: string }) => (
+    <span className={`inline-flex min-w-[20px] items-center justify-center rounded-md px-1.5 py-0.5 text-[9.5px] font-bold tabular-nums ${tone}`}>
+      {n}
+    </span>
   )
-}
 
-function DocumentsTab({ evidence }: { evidence: EvidenceItem[] }) {
   return (
-    <div className="max-h-[280px] overflow-y-auto scroll-elegant pr-1">
-      {evidence.length === 0 ? (
-        <div className="text-center py-8 text-[11px] text-slate-700">No documents uploaded</div>
-      ) : (
-        <div className="space-y-1.5">
-          {evidence.slice(0, 8).map((e, i) => (
-            <motion.div
-              key={e.id}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.03 * i }}
-              className="flex items-center gap-2 rounded-lg bg-white/60 px-2 py-1.5"
-            >
-              <div className="h-7 w-7 flex-shrink-0 rounded-md bg-violet-50 text-violet-600 flex items-center justify-center">
-                <FileText className="h-3.5 w-3.5" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[11px] font-semibold text-slate-900">{e.fileName}</div>
-                <div className="text-[9px] text-slate-700">
-                  {e.documentType} · {e.uploader?.name ?? 'System'}
-                </div>
-              </div>
-              <span className={`status-pill text-[8px] ${statusClass(e.status)}`}>
-                {e.status.replace(/_/g, ' ').toLowerCase()}
-              </span>
-            </motion.div>
-          ))}
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE, delay }}
+      className="glass glass-shimmer rounded-[20px] p-5 pb-6 flex flex-col h-full"
+    >
+      <header className="flex items-start justify-between gap-2 mb-3">
+        <div>
+          <h3 className="text-[15px] font-semibold text-slate-900 flex items-center gap-1.5">
+            <Gauge className="h-4 w-4 text-sky-500" />
+            Submission Status
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {project ? project.projectCode : 'All projects'} · module breakdown
+          </p>
         </div>
-      )}
-    </div>
+        <div className="flex items-center gap-1.5">
+          <button className="text-[11px] font-semibold text-sky-700 hover:text-sky-800 transition-colors whitespace-nowrap">
+            View All →
+          </button>
+          {dragHandle}
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-x-auto -mx-1 px-1 scroll-elegant">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="text-[9.5px] uppercase tracking-wider text-slate-500 font-semibold border-b border-slate-200/60">
+              <th className="py-2 px-1 font-medium">Module</th>
+              <th className="py-2 px-1 font-medium text-center">Total</th>
+              <th className="py-2 px-1 font-medium text-center">Sub.</th>
+              <th className="py-2 px-1 font-medium text-center">Rev.</th>
+              <th className="py-2 px-1 font-medium text-center">App.</th>
+              <th className="py-2 px-1 font-medium text-center">Pen.</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100/60">
+            {rows.map(r => (
+              <tr key={r.module} className="hover:bg-white/40 transition-colors">
+                <td className="py-2 px-1 text-[11px] font-semibold text-slate-800">{r.module}</td>
+                <td className="py-2 px-1 text-center"><Chip n={r.total} tone="bg-slate-100 text-slate-700" /></td>
+                <td className="py-2 px-1 text-center"><Chip n={r.submitted} tone="bg-sky-100 text-sky-700" /></td>
+                <td className="py-2 px-1 text-center"><Chip n={r.review} tone="bg-amber-100 text-amber-700" /></td>
+                <td className="py-2 px-1 text-center"><Chip n={r.approved} tone="bg-emerald-100 text-emerald-700" /></td>
+                <td className="py-2 px-1 text-center"><Chip n={r.pending} tone="bg-rose-100 text-rose-700" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </motion.section>
+  )
+}
+
+/* ============================================================
+ * Upcoming Deadlines — fix overflow/z-index so tooltip stays inside
+ * ============================================================ */
+function UpcomingDeadlinesCard({ project, periods, allSubs, delay = 0.3, dragHandle }: {
+  project: FlattenedProject | null
+  periods: OverviewData['periods']
+  allSubs: SubmissionItem[]
+  delay?: number
+  dragHandle?: React.ReactNode
+}) {
+  const deadlineRows = useMemo(() => {
+    const rows: { task: string; project: string; due: string; dueTs: number; status: string }[] = []
+    for (const p of periods) {
+      const baseYear = p.year
+      const baseMonth = p.month ?? 3
+
+      const addRow = (task: string, offsetDays: number, statusBase: string) => {
+        const date = new Date(baseYear, baseMonth - 1, 15)
+        date.setDate(date.getDate() + offsetDays)
+        const dueTs = date.getTime()
+        const now = Date.now()
+        let status = statusBase
+        if (dueTs < now) status = 'Overdue'
+        else if (dueTs - now < 7 * 24 * 3600 * 1000 && statusBase !== 'Completed') status = 'At Risk'
+        rows.push({
+          task,
+          project: project ? project.projectCode : p.label,
+          due: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          dueTs,
+          status,
+        })
+      }
+
+      const projectFilter = project ? allSubs.filter(s => s.projectId === project.id) : allSubs
+      const subForPeriod = projectFilter.find(s => s.reportingPeriod?.id === p.id)
+      const isDone = subForPeriod?.status === 'APPROVED' || subForPeriod?.status === 'LOCKED'
+      const inProgress = subForPeriod?.status === 'SUBMITTED' || subForPeriod?.status === 'UNDER_REVIEW'
+
+      addRow(`Data Submission - ${p.label}`, 0, isDone ? 'Completed' : inProgress ? 'In Progress' : 'Pending')
+      addRow(`Review Cycle - ${p.label}`, 14, isDone ? 'Completed' : 'Pending')
+      addRow(`Approval Sign-off - ${p.label}`, 28, isDone ? 'Completed' : 'Pending')
+    }
+
+    const todayProjects = project
+      ? allSubs.filter(s => s.projectId === project.id && s.status !== 'APPROVED' && s.status !== 'LOCKED')
+      : allSubs.filter(s => s.status !== 'APPROVED' && s.status !== 'LOCKED')
+    for (const s of todayProjects.slice(0, 3)) {
+      const created = new Date(s.updatedAt || s.createdAt)
+      const due = new Date(created)
+      due.setDate(due.getDate() + 14)
+      const now = Date.now()
+      let status = 'Pending'
+      if (s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW') status = 'In Progress'
+      if (due.getTime() < now) status = 'Overdue'
+      else if (due.getTime() - now < 5 * 24 * 3600 * 1000) status = 'At Risk'
+      rows.push({
+        task: s.title.length > 30 ? s.title.slice(0, 30) + '…' : s.title,
+        project: s.project?.projectCode ?? project?.projectCode ?? '—',
+        due: due.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        dueTs: due.getTime(),
+        status,
+      })
+    }
+
+    return rows.sort((a, b) => a.dueTs - b.dueTs).slice(0, 5)
+  }, [periods, allSubs, project])
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE, delay }}
+      className="glass glass-shimmer rounded-[20px] p-5 pb-6 flex flex-col h-full overflow-hidden"
+    >
+      <header className="flex items-start justify-between gap-2 mb-3">
+        <div>
+          <h3 className="text-[15px] font-semibold text-slate-900 flex items-center gap-1.5">
+            <CalendarClock className="h-4 w-4 text-sky-500" />
+            Upcoming Deadlines
+          </h3>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {deadlineRows.length} task(s) · sorted by due date
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              downloadCsv(
+                'upcoming_deadlines.csv',
+                ['Task', 'Project', 'Due Date', 'Status'],
+                deadlineRows.map(r => [r.task, r.project, r.due, r.status])
+              )
+              toast.success('Deadlines exported to CSV')
+            }}
+            className="text-[11px] font-semibold text-sky-700 hover:text-sky-800 transition-colors whitespace-nowrap inline-flex items-center gap-1"
+          >
+            <Download className="h-3 w-3" /> Export
+          </button>
+          {dragHandle}
+        </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto -mx-1 px-1 scroll-elegant space-y-1.5 pb-2">
+        {deadlineRows.map((row, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white/40 hover:bg-white/70 border border-white/60 transition-colors"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="text-[11px] font-semibold text-slate-800 truncate">
+                {row.task}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5 text-[9.5px] text-slate-500 font-mono">
+                <span>{row.project}</span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-600 font-sans">{row.due}</span>
+              </div>
+            </div>
+            <span className={`status-pill text-[8.5px] px-2 py-0.5 shrink-0 whitespace-nowrap font-medium ${
+              row.status === 'Completed' ? 'status-approved' :
+              row.status === 'In Progress' ? 'status-review' :
+              row.status === 'Overdue' ? 'status-missing' :
+              row.status === 'At Risk' ? 'status-warning' : 'status-draft'
+            }`}>
+              {row.status}
+            </span>
+          </div>
+        ))}
+        {deadlineRows.length === 0 && (
+          <div className="py-8 text-center text-[11px] text-slate-500">
+            No upcoming deadlines
+          </div>
+        )}
+      </div>
+    </motion.section>
   )
 }
 
@@ -1142,22 +1614,25 @@ function MyProjectSkeleton() {
   return (
     <div className="space-y-5">
       <div className="h-8 w-64 animate-pulse rounded bg-slate-200/60" />
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="glass h-[100px] animate-pulse rounded-2xl" />
-            ))}
-          </div>
-          <div className="glass-subtle h-12 animate-pulse rounded-2xl" />
-          <div className="glass h-[320px] animate-pulse rounded-[20px]" />
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="glass h-[260px] animate-pulse rounded-[20px]" />
-            ))}
-          </div>
-        </div>
-        <div className="glass h-[640px] animate-pulse rounded-[20px]" />
+
+      {/* ROW 1: 4 KPI cards */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="glass h-[110px] animate-pulse rounded-2xl" />
+        ))}
+      </div>
+
+      {/* ROW 2: Registry + Details */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.95fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="glass h-[460px] animate-pulse rounded-[20px]" />
+        <div className="glass h-[620px] animate-pulse rounded-[20px]" />
+      </div>
+
+      {/* ROW 3: 3 asymmetric cards */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)_minmax(0,1fr)]">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="glass h-[260px] animate-pulse rounded-[20px]" />
+        ))}
       </div>
     </div>
   )
@@ -1190,7 +1665,7 @@ function EmptyState({ message }: { message: string }) {
 }
 
 /* ============================================================
- * Main component
+ * Main component — 3 hard-locked rows
  * ============================================================ */
 export function MyProjectModule() {
   const { setActiveModule } = useApp()
@@ -1200,7 +1675,6 @@ export function MyProjectModule() {
   const [globalActivity, setGlobalActivity] = useState<ActivityItem[]>([])
   const [allSubs, setAllSubs] = useState<SubmissionItem[]>([])
 
-  // Project-scoped data for detail panel
   const [projectActivity, setProjectActivity] = useState<ActivityItem[]>([])
   const [projectSubs, setProjectSubs] = useState<SubmissionItem[]>([])
   const [projectEvidence, setProjectEvidence] = useState<EvidenceItem[]>([])
@@ -1208,12 +1682,31 @@ export function MyProjectModule() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [buFilter, setBuFilter] = useState('all')
+  const [periodFilter, setPeriodFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Drag-and-drop card order for Row 3
+  const [row3Order, setRow3Order] = useState<('esg' | 'submissions' | 'deadlines')[]>(['esg', 'submissions', 'deadlines'])
+  // Card heights for Row 3 (resizable)
+  const [cardHeights, setCardHeights] = useState<Record<string, number>>({ esg: 340, submissions: 340, deadlines: 340 })
+
+  // Real-time project edits
+  const [editedProjects, setEditedProjects] = useState<Record<string, FlattenedProject>>({})
+  const handleUpdateProject = useCallback((updated: FlattenedProject) => {
+    setEditedProjects(prev => ({
+      ...prev,
+      [updated.id]: updated,
+    }))
+  }, [])
+
   const mountedRef = useRef(true)
 
-  /* ---- initial load: overview + org tree + global activity + all submissions ---- */
+  /* ---- initial load ---- */
   useEffect(() => {
     mountedRef.current = true
     Promise.all([
@@ -1234,7 +1727,6 @@ export function MyProjectModule() {
         setTree(tr)
         setGlobalActivity(act.items ?? [])
         setAllSubs(subs.items ?? [])
-        // Default to first project from org tree
         const projects = flattenProjects(tr)
         if (projects.length > 0) {
           setSelectedProjectId(projects[0].id)
@@ -1249,7 +1741,7 @@ export function MyProjectModule() {
     return () => { mountedRef.current = false }
   }, [])
 
-  /* ---- project-scoped fetch: activity + submissions + evidence ---- */
+  /* ---- project-scoped fetch ---- */
   useEffect(() => {
     if (!selectedProjectId) return
     let cancelled = false
@@ -1273,8 +1765,23 @@ export function MyProjectModule() {
     return () => { cancelled = true }
   }, [selectedProjectId])
 
-  /* ---- derived values ---- */
-  const allProjects = useMemo(() => flattenProjects(tree), [tree])
+  /* ---- derived ---- */
+  const allProjects = useMemo(() => {
+    const base = flattenProjects(tree)
+    return base.map(p => editedProjects[p.id] ? { ...p, ...editedProjects[p.id] } : p)
+  }, [tree, editedProjects])
+
+  const uniqueBUs = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of allProjects) set.add(p.buName)
+    return Array.from(set).sort()
+  }, [allProjects])
+
+  const uniqueTypes = useMemo(() => {
+    const set = new Set<string>()
+    for (const p of allProjects) set.add(p.buName.split(' ')[0] || 'Project')
+    return Array.from(set).sort()
+  }, [allProjects])
 
   const filteredProjects = useMemo(() => {
     let list = allProjects
@@ -1290,15 +1797,31 @@ export function MyProjectModule() {
       const s = statusFilter.toUpperCase()
       list = list.filter(p => p.status.toUpperCase() === s)
     }
+    if (buFilter !== 'all') {
+      list = list.filter(p => p.buName === buFilter)
+    }
+    if (typeFilter !== 'all') {
+      list = list.filter(p => (p.buName.split(' ')[0] || 'Project') === typeFilter)
+    }
     return list
-  }, [allProjects, search, statusFilter])
+  }, [allProjects, search, statusFilter, buFilter, typeFilter])
+
+  /* ---- selection sync: auto-select first on filtered change ---- */
+  useEffect(() => {
+    if (filteredProjects.length > 0) {
+      if (!selectedProjectId || !filteredProjects.find(p => p.id === selectedProjectId)) {
+        setSelectedProjectId(filteredProjects[0].id)
+      }
+    } else {
+      setSelectedProjectId(null)
+    }
+  }, [filteredProjects])
 
   const selectedProject = useMemo(
     () => allProjects.find(p => p.id === selectedProjectId) ?? null,
     [allProjects, selectedProjectId],
   )
 
-  /** Trend pill for emissions — derived from monthly trend data (last vs prev). */
   const emissionsTrend = useMemo<{ dir: 'up' | 'down' | 'neutral'; text: string }>(() => {
     if (!overview) return { dir: 'neutral', text: '—' }
     const arr = Object.entries(overview.trends).map(([label, v]) => ({ label, ...v }))
@@ -1322,6 +1845,13 @@ export function MyProjectModule() {
   const currentPeriod = overview.periods[0]
   const currentPeriodLabel = currentPeriod?.label ?? '—'
   const openIssues = (k.openExceptions ?? 0) + (k.corrections ?? 0)
+  const totalSubs = k.totalSubs ?? 0
+  const approvedSubs = k.approvedSubs ?? 0
+  const draftSubs = k.draftSubs ?? 0
+  const uniqueBUCount = uniqueBUs.length
+  const pendingSubs = Math.max(0, totalSubs - approvedSubs - draftSubs)
+
+  const trendTone = (approvedSubs / Math.max(1, totalSubs)) >= 0.5 ? 'status-approved' : 'status-missing'
 
   return (
     <div className="space-y-5">
@@ -1355,85 +1885,201 @@ export function MyProjectModule() {
         </div>
       </motion.div>
 
-      {/* Main 2-column split: LEFT 70% / RIGHT 30% */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_360px]">
-        {/* LEFT COLUMN */}
-        <div className="space-y-5">
-          {/* 4 KPI cards row */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <KpiCard
-              icon={Layers}
-              tone="bg-sky-50 text-sky-600 border border-sky-200"
-              label="Total Projects"
-              value={allProjects.length.toString()}
-              trend={{ dir: 'neutral', text: 'in scope' }}
-              delay={0.05}
-            />
-            <KpiCard
-              icon={FileCheck2}
-              tone="bg-emerald-50 text-emerald-600 border border-emerald-200"
-              label="Data Completion"
-              value={k.completion.toFixed(0)}
-              unit="%"
-              trend={{ dir: k.completion >= 50 ? 'up' : 'down', text: `${k.approvedSubs}/${k.totalSubs}` }}
-              delay={0.1}
-            />
-            <KpiCard
-              icon={Flame}
-              tone="bg-rose-50 text-rose-600 border border-rose-200"
-              label="Current Emissions"
-              value={formatNumber(k.totalEmissions, 1)}
-              unit="tCO₂e"
-              trend={emissionsTrend}
-              delay={0.15}
-            />
-            <KpiCard
-              icon={AlertTriangle}
-              tone="bg-amber-50 text-amber-600 border border-amber-200"
-              label="Open Issues"
-              value={openIssues.toString()}
-              trend={{ dir: openIssues > 0 ? 'down' : 'neutral', text: openIssues > 0 ? 'open' : 'clean' }}
-              delay={0.2}
-            />
-          </div>
+      {/* ====================================================== */}
+      {/* ROW 1: 4 EQUAL KPI CARDS                               */}
+      {/* ====================================================== */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
+        <KpiCardRow1
+          icon={Briefcase}
+          tone="bg-sky-50 text-sky-600 border border-sky-200/80"
+          label="Total Assigned Projects"
+          value={allProjects.length}
+          subText={`${uniqueBUCount} Business Unit${uniqueBUCount === 1 ? '' : 's'}`}
+          rightContent={<Layers className="h-4 w-4 text-sky-400" />}
+          delay={0.05}
+        />
 
-          {/* Filter bar */}
-          <FilterBar
-            search={search}
-            onSearchChange={setSearch}
-            status={statusFilter}
-            onStatusChange={setStatusFilter}
-            onAdd={() => setActiveModule('admin' as ModuleKey)}
-          />
+        <KpiCardRow1
+          icon={FileCheck2}
+          tone="bg-emerald-50 text-emerald-600 border border-emerald-200/80"
+          label="Data Completion"
+          value={<>{k.completion.toFixed(0)}<span className="text-[15px] font-bold ml-0.5">%</span></>}
+          subText="Portfolio reporting coverage"
+          rightContent={
+            <div className="flex flex-col items-end gap-1">
+              <CircularRing pct={k.completion} size={44} stroke={4} labelSize={10} color={k.completion >= 70 ? '#10B981' : k.completion >= 40 ? '#F59E0B' : '#0EA5E9'} />
+              <span className={`status-pill text-[8.5px] ${trendTone}`}>
+                {approvedSubs}/{totalSubs} subs
+              </span>
+            </div>
+          }
+          delay={0.1}
+        />
 
-          {/* Project table */}
-          <ProjectTable
+        <KpiCardRow1
+          icon={FileText}
+          tone="bg-amber-50 text-amber-600 border border-amber-200/80"
+          label="Pending Submissions"
+          value={pendingSubs}
+          subText={`Across ${filteredProjects.length || allProjects.length} Project${(filteredProjects.length || allProjects.length) === 1 ? '' : 's'}`}
+          rightContent={<RefreshCw className="h-4 w-4 text-amber-400" />}
+          delay={0.15}
+        />
+
+        <KpiCardRow1
+          icon={Shield}
+          tone="bg-emerald-50 text-emerald-600 border border-emerald-200/80"
+          label="Approved Submissions"
+          value={approvedSubs}
+          subText={currentPeriodLabel}
+          rightContent={<CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+          delay={0.2}
+        />
+      </div>
+
+      {/* ====================================================== */}
+      {/* ROW 2: Registry LEFT | Details RIGHT — registry wider    */}
+      {/* ====================================================== */}
+      <div className={`grid grid-cols-1 gap-6 transition-all duration-300 items-stretch ${
+        isDetailsExpanded
+          ? 'grid-cols-1'
+          : 'lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]'
+      }`}>
+        {!isDetailsExpanded && (
+          <ProjectRegistryCard
             projects={filteredProjects}
             submissions={allSubs}
             selectedId={selectedProjectId}
             onSelect={setSelectedProjectId}
+            search={search}
+            setSearch={setSearch}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            buFilter={buFilter}
+            setBuFilter={setBuFilter}
+            periodFilter={periodFilter}
+            setPeriodFilter={setPeriodFilter}
+            typeFilter={typeFilter}
+            setTypeFilter={setTypeFilter}
+            viewMode={viewMode}
+            setViewMode={setViewMode}
+            periods={overview.periods}
+            uniqueBUs={uniqueBUs}
+            uniqueTypes={uniqueTypes}
             currentPeriodLabel={currentPeriodLabel}
           />
+        )}
 
-          {/* 3 widget cards row */}
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-            <EsgProgressWidget subs={allSubs} kpis={k} />
-            <SubmissionStatusWidget subs={allSubs} />
-            <UpcomingDeadlinesWidget periods={overview.periods} subs={allSubs} />
-          </div>
-        </div>
+        <ProjectDetailsPanel
+          key={selectedProject?.id ?? 'none'}
+          project={selectedProject}
+          onUpdateProject={handleUpdateProject}
+          kpis={k}
+          subs={projectSubs}
+          activities={projectActivity.length > 0 ? projectActivity : globalActivity.filter(a => a.projectId === selectedProject?.id)}
+          evidence={projectEvidence}
+          periods={overview.periods}
+          currentPeriodLabel={currentPeriodLabel}
+          isExpanded={isDetailsExpanded}
+          onToggleExpand={() => setIsDetailsExpanded(!isDetailsExpanded)}
+        />
+      </div>
 
-        {/* RIGHT COLUMN — Project Detail Panel */}
-        <div>
-          <ProjectDetailPanel
-            key={selectedProject?.id ?? 'none'}
-            project={selectedProject}
-            kpis={k}
-            subs={projectSubs}
-            activities={projectActivity.length > 0 ? projectActivity : globalActivity}
-            evidence={projectEvidence}
-          />
+      {/* ====================================================== */}
+      {/* ROW 3: Drag-and-Drop + Resizable Cards                  */}
+      {/* ====================================================== */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+          <GripVertical className="h-3.5 w-3.5 text-sky-500" />
+          <span>Drag card headers to reorder · Drag bottom edge to adjust card height</span>
         </div>
+        <Reorder.Group
+          axis="x"
+          values={row3Order}
+          onReorder={setRow3Order}
+          className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3"
+          layoutScroll
+        >
+          {row3Order.map(cardId => {
+            const h = cardHeights[cardId] ?? 340
+            const setH = (newH: number) => setCardHeights(prev => ({ ...prev, [cardId]: newH }))
+            const cardDragHandle = (
+              <div
+                className="cursor-grab active:cursor-grabbing p-1 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                title="Drag card to reorder"
+              >
+                <GripVertical className="h-4 w-4" />
+              </div>
+            )
+
+            return (
+              <Reorder.Item
+                key={cardId}
+                value={cardId}
+                className="relative"
+                whileDrag={{ scale: 1.02, zIndex: 50, boxShadow: '0 20px 48px -8px rgba(2,132,199,0.25)' }}
+              >
+                {/* Resizable wrapper */}
+                <div className="relative" style={{ height: h }}>
+                  <div className="h-full overflow-hidden">
+                    {cardId === 'esg' && (
+                      <ProjectEsgProgressCard
+                        project={selectedProject}
+                        subs={selectedProject ? projectSubs : allSubs}
+                        kpis={k}
+                        delay={0.2}
+                        dragHandle={cardDragHandle}
+                      />
+                    )}
+                    {cardId === 'submissions' && (
+                      <SubmissionStatusCard
+                        project={selectedProject}
+                        allSubs={selectedProject ? projectSubs : allSubs}
+                        delay={0.25}
+                        dragHandle={cardDragHandle}
+                      />
+                    )}
+                    {cardId === 'deadlines' && (
+                      <UpcomingDeadlinesCard
+                        project={selectedProject}
+                        periods={overview.periods}
+                        allSubs={selectedProject ? projectSubs : allSubs}
+                        delay={0.3}
+                        dragHandle={cardDragHandle}
+                      />
+                    )}
+                  </div>
+
+                  {/* Resize handle */}
+                  <div
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      const startY = e.clientY
+                      const startH = h
+                      const onMove = (ev: MouseEvent) => {
+                        setH(Math.max(260, Math.min(700, startH + ev.clientY - startY)))
+                      }
+                      const onUp = () => {
+                        window.removeEventListener('mousemove', onMove)
+                        window.removeEventListener('mouseup', onUp)
+                      }
+                      window.addEventListener('mousemove', onMove)
+                      window.addEventListener('mouseup', onUp)
+                    }}
+                    className="absolute bottom-0 left-0 right-0 h-4 flex items-end justify-center pb-1 cursor-ns-resize group z-20"
+                    title="Drag to resize card"
+                  >
+                    <div className="flex items-center gap-0.5">
+                      <div className="w-6 h-1 rounded-full bg-slate-300 group-hover:bg-sky-400 transition-colors" />
+                      <ChevronsUpDown className="h-3 w-3 text-slate-300 group-hover:text-sky-400 transition-colors" />
+                      <div className="w-6 h-1 rounded-full bg-slate-300 group-hover:bg-sky-400 transition-colors" />
+                    </div>
+                  </div>
+                </div>
+              </Reorder.Item>
+            )
+          })}
+        </Reorder.Group>
       </div>
     </div>
   )

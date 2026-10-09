@@ -313,7 +313,7 @@ export function GroupReviewerDashboard() {
       {/* ============================
           3-COLUMN GRID
          ============================ */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-3">
         {/* ---- LEFT: Subsidiary Overview ---- */}
         <SubsidiaryOverviewCard rows={subsidiaryRows} onOpen={() => setActiveModule('submissions')} />
 
@@ -682,7 +682,7 @@ function GroupSkeleton() {
     <div className="space-y-5">
       <div className="h-12 animate-pulse rounded-2xl" style={{ background: 'rgba(30,58,138,0.15)' }} />
       <div className="h-40 animate-pulse rounded-2xl" style={{ background: 'rgba(212,160,23,0.12)' }} />
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-3">
         {[0, 1, 2].map(i => (
           <div key={i} className="h-72 animate-pulse rounded-2xl" style={{ background: 'rgba(30,58,138,0.10)', animationDelay: `${i * 0.08}s` }} />
         ))}

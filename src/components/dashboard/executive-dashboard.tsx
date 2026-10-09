@@ -292,7 +292,7 @@ export function ExecutiveDashboard() {
       </div>
 
       {/* ===== BOTTOM SPLIT 50/50 ===== */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
         {/* LEFT — ESG dimension breakdown */}
         <motion.section
           initial={{ opacity: 0, y: 16 }}
@@ -586,7 +586,7 @@ function ExecutiveSkeleton() {
       </div>
 
       {/* bottom split skeleton */}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
         <div className="h-[280px] animate-pulse rounded-2xl border border-amber-200/60 bg-amber-100/50" />
         <div className="h-[280px] animate-pulse rounded-2xl border border-amber-200/60 bg-amber-100/50" />
       </div>

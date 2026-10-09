@@ -316,7 +316,7 @@ export function EsgManagerDashboard() {
       {/* ============================
           2-COLUMN GRID (60/40)
          ============================ */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
         {/* ---- LEFT 60% ---- */}
         <div className="space-y-5">
           {/* 4 KPI cards */}
@@ -660,7 +660,7 @@ function EsgManagerSkeleton() {
   return (
     <div className="space-y-5">
       <div className="h-12 animate-pulse rounded-2xl bg-teal-100/60" />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-5">
           <div className="grid grid-cols-4 gap-4">
             {[0, 1, 2, 3].map(i => <div key={i} className="h-24 animate-pulse rounded-2xl bg-teal-100/40" style={{ animationDelay: `${i * 0.08}s` }} />)}

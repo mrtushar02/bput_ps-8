@@ -667,7 +667,7 @@ export function ProcurementDashboard() {
       <div className="space-y-5">
         <div className="glass rounded-[20px] h-[100px] animate-pulse" />
         <div className="glass rounded-[20px] h-[320px] animate-pulse" />
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-2">
           <div className="glass rounded-[20px] h-[320px] animate-pulse" />
           <div className="glass rounded-[20px] h-[320px] animate-pulse" />
         </div>
@@ -785,7 +785,7 @@ export function ProcurementDashboard() {
       <SupplierDistributionCard kpis={kpis} />
 
       {/* ---------- 2-column: assessment table + sourcing donut ---------- */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
         <SupplierEsgAssessmentCard kpis={kpis} />
         <SourcingMixCard kpis={kpis} />
       </div>

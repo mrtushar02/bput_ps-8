@@ -695,7 +695,7 @@ export function CsrDashboard() {
     return (
       <div className="space-y-5">
         <div className="glass rounded-[20px] h-[80px] animate-pulse" />
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-3">
               {[0, 1, 2].map(i => <div key={i} className="glass rounded-2xl h-[110px] animate-pulse" />)}
@@ -786,7 +786,7 @@ export function CsrDashboard() {
       </motion.header>
 
       {/* ---------- 2-column 60/40 ---------- */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-[1.5fr_1fr]">
         {/* LEFT (60%) */}
         <div className="space-y-5">
           {/* 3 KPI cards */}

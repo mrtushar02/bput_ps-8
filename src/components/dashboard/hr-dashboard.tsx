@@ -796,7 +796,7 @@ export function HrDashboard() {
     return (
       <div className="space-y-5">
         <div className="glass rounded-[20px] h-16 animate-pulse" />
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,35%)]">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,38%)] xl:grid-cols-[1fr_400px]">
           <div className="space-y-5">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -903,7 +903,7 @@ export function HrDashboard() {
       </motion.header>
 
       {/* ---- 2-column grid (65 / 35) ---- */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,35%)]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-[1fr_minmax(320px,38%)] xl:grid-cols-[1fr_400px]">
         {/* LEFT 65% */}
         <div className="space-y-5">
           {/* 4 KPI tiles */}

@@ -474,7 +474,7 @@ export function AuditorDashboard() {
       </motion.div>
 
       {/* ---- 2-column equal split ---- */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ============================
             LEFT COLUMN — Audit Trail Timeline
            ============================ */}
@@ -952,7 +952,7 @@ function DashboardSkeleton() {
         ))}
       </div>
       {/* 2-col skeleton */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="h-96 animate-pulse rounded-2xl bg-slate-200/50" />
         <div className="space-y-4">
           <div className="h-44 animate-pulse rounded-2xl bg-slate-200/50" />

@@ -428,7 +428,7 @@ export function EsgAnalystDashboard() {
       {/* ============================
           BOTTOM: metric cards + activity feed
          ============================ */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
         {/* 3 metric cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {metricCards.map((c, i) => (

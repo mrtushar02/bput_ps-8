@@ -349,7 +349,7 @@ export function BrsrManagerDashboard() {
       {/* ============================
           2-COLUMN GRID (60/40)
          ============================ */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
         {/* ---- LEFT 60% ---- */}
         <div className="space-y-5">
           {/* Section A questions list */}
@@ -770,7 +770,7 @@ function BrsrSkeleton() {
     <div className="space-y-5">
       <div className="h-12 animate-pulse rounded-2xl bg-green-100/60" />
       <div className="h-32 animate-pulse rounded-2xl bg-green-100/40" />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-5">
           <div className="h-72 animate-pulse rounded-2xl bg-green-100/40" />
           <div className="h-56 animate-pulse rounded-2xl bg-green-100/40" />

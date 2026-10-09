@@ -355,7 +355,7 @@ export function ReviewerDashboard() {
       />
 
       {/* ---- 2-column grid ---- */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
         {/* ============================
             LEFT COLUMN (~60%)
            ============================ */}
@@ -1075,7 +1075,7 @@ function ReviewerSkeleton() {
       <div className="h-9 w-72 animate-pulse rounded-lg bg-slate-200/60" />
       {/* pipeline banner skeleton */}
       <div className="glass h-28 animate-pulse rounded-2xl" />
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-5 xl:grid-cols-[1.5fr_1fr]">
         {/* left */}
         <div className="space-y-5">
           <div className="glass h-72 animate-pulse rounded-2xl" />

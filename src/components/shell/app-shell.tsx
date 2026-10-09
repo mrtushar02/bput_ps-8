@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Bell, Search, HelpCircle, ChevronDown, LogOut, Settings, ShieldCheck,
-  Calendar, Database, Activity, X, Check, AlertTriangle, AlertOctagon,
+  Calendar, X, AlertTriangle, AlertOctagon,
   ChevronLeft, ChevronRight, Menu, Sparkles, Zap
 } from 'lucide-react'
 import { useApp, type ModuleKey } from '@/lib/auth-context'
@@ -72,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const tint = roleTint[roleKey] ?? 'from-blue-500 to-cyan-600'
 
   return (
-    <div className="relative flex min-h-screen flex-col">
+    <div className="relative flex min-h-screen flex-col overflow-hidden">
       {/* ambient background */}
       <div className="pointer-events-none fixed inset-0 z-0">
         <div className="orb animate-orb" style={{ width: 380, height: 380, top: -120, right: -60, background: 'radial-gradient(circle, rgba(125,181,255,0.35), transparent 70%)' }} />
@@ -320,7 +320,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </AnimatePresence>
 
         {/* MAIN CONTENT */}
-        <main className="relative z-10 min-w-0 flex-1 px-4 py-5 md:px-6 md:py-6">
+        <main className="relative z-10 min-w-0 flex-1 px-4 pb-16 pt-5 md:px-6 md:pb-20 md:pt-6">
           <AnimatePresence mode="wait">
             <motion.div key={activeModule} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
               {children}
@@ -328,24 +328,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </main>
       </div>
-
-      {/* STICKY FOOTER */}
-      <footer className="glass-nav relative z-10 mt-auto border-t border-white/40">
-        <div className="mx-auto flex max-w-[1600px] flex-col items-center justify-between gap-2 px-4 py-3 text-[11px] text-slate-500 md:flex-row md:px-6">
-          <div className="flex items-center gap-2">
-            <Activity className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="font-medium text-slate-600">MEIL ESG / BRSR Reporting Platform</span>
-            <span className="hidden md:inline">·</span>
-            <span className="hidden md:inline">Source → Evidence → Validate → Calculate → Approve → Consolidate → BRSR → Report → Audit</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1"><Database className="h-3 w-3" /> DB-backed</span>
-            <span className="flex items-center gap-1"><ShieldCheck className="h-3 w-3 text-blue-500" /> RBAC</span>
-            <span className="flex items-center gap-1"><Check className="h-3 w-3 text-emerald-500" /> Audit-traceable</span>
-            <span className="text-slate-400">v3.0 · Illustrative</span>
-          </div>
-        </div>
-      </footer>
 
       <CommandPalette initialQuery={search} openExternally={searchTriggered} onConsumed={() => setSearchTriggered(false)} />
     </div>

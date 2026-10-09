@@ -647,7 +647,7 @@ export function ComplianceDashboard() {
     return (
       <div className="space-y-5">
         <div className="glass rounded-[20px] h-[80px] animate-pulse" />
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_0.6fr_0.4fr]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:grid-cols-[1fr_0.6fr_0.4fr]">
           <div className="space-y-5">
             <div className="grid grid-cols-3 gap-3">
               {[0, 1, 2].map(i => <div key={i} className="glass rounded-2xl h-[110px] animate-pulse" />)}
@@ -737,7 +737,7 @@ export function ComplianceDashboard() {
       </motion.header>
 
       {/* ---------- 3-column asymmetric (50/30/20) ---------- */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_0.6fr_0.4fr]">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:grid-cols-[1fr_0.6fr_0.4fr]">
         {/* LEFT (50%) */}
         <div className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
