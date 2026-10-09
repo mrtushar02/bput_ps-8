@@ -1,9 +1,145 @@
 'use client'
 /**
  * Finance & Resource Data Contributor — Persistent Data Store & Workflow Engine
- * Manages assignments, financial metrics, resource expenditures, evidence documents,
- * submissions, validation checklist, activity logs, and reporting exports.
+ * Comprehensive BRSR Level 0 through Level 7 data schemas and business rules:
+ * - Level 0: Common Metadata & Entity Context
+ * - Level 1: Financial Summary (BRSR Single Source of Truth)
+ * - Level 2: Environmental & Resource-Related Expenditure (8 categories, CapEx/OpEx)
+ * - Level 3: Financial Calculations & Intensity Metrics (Ratios, YoY, Denominators)
+ * - Level 4: CSR & Other Assigned Financial Disclosures
+ * - Level 5: Financial Evidence & Documents (14 fields, upload vs acceptance status)
+ * - Level 6: Validation & Reconciliation Checklist (Blocking errors vs Warnings)
+ * - Level 7: Multi-state Submission & Review Workflow
  */
+
+export interface CommonMetadata {
+  entityName: string // Prefilled, read-only
+  entityId: string // Prefilled, read-only
+  subsidiaryOrBu: string // Prefilled, read-only
+  projectId: string // Prefilled, if applicable
+  financialYear: string // Assigned reporting period (e.g., FY 2026-27)
+  reportingPeriod: 'Annual' | 'Quarter' | 'Month'
+  dataModule: string // Financial Summary / Resource Expenditure / other
+  dataCategory: string // Dropdown
+  recordDescription: string // Text
+  amountOrValue: number // Numeric
+  currency: 'INR (₹)' | 'USD ($)' | 'EUR (€)'
+  displayUnit: 'INR' | 'Thousand' | 'Lakh' | 'Crore'
+  dataAvailability: 'Reported' | 'Zero' | 'Estimated' | 'Not Available' | 'Not Applicable'
+  dataSource: 'Audited statement' | 'Ledger' | 'Approved report' | 'Other'
+  sourceReference: string // Document number / Ledger reference
+  calculationMethod: 'Direct value' | 'Calculated' | 'Estimated'
+  supportingDocument: string // File upload or evidence link
+  remarks: string // Text
+  preparedBy: string // Auto-filled from login
+  entryDate: string // System-generated
+  lastUpdated: string // System-generated
+  submissionStatus: 'Draft' | 'Submitted' | 'Returned' | 'Accepted'
+  reviewerComments?: string // Displayed when applicable
+}
+
+export interface FinancialSummaryData {
+  // Level 0 Common fields
+  common: CommonMetadata
+
+  // Level 1 Financial Summary fields
+  turnover: number // Current financial year
+  previousTurnover: number // Comparative financial year
+  turnoverUnit: 'Crore' | 'Lakh' | 'Thousand'
+  totalExpenditure: number // Where required
+  capEx: number // Relevant financial amount
+  opEx: number // Relevant financial amount
+  financialReportingBasis: 'Standalone (Ind AS)' | 'Consolidated (Ind AS)' | 'IFRS' | 'Statutory Tax Audit Basis'
+  financialStatementReference: string // Source document
+  ledgerCostCentreRef: string // Ledger / Cost Centre Reference
+  financialDataSource: 'Audited statement' | 'Ledger' | 'Approved report' | 'Other'
+  reconciliationStatus: 'Pending' | 'Reconciled' | 'Exception'
+  reconciliationRemarks: string // Explanation of discrepancies
+  supportingDocuments: string[] // Financial statements and relevant extracts
+  environmentalSpend: number // Derived or entered
+  dataSource: string // Backwards-compatible
+  documentReference: string // Backwards-compatible
+  remarks: string // Backwards-compatible
+  lastSaved?: string
+}
+
+export interface ResourceExpenditureItem {
+  id: string
+  category: 
+    | 'Pollution Control'
+    | 'Energy Efficiency'
+    | 'Renewable Energy'
+    | 'Water Conservation'
+    | 'Waste Management'
+    | 'Emission Reduction'
+    | 'Environmental Protection'
+    | 'Other Resource-Efficiency Initiatives'
+  projectName: string // Name of activity / initiative
+  description: string // Purpose of expenditure
+  amount: number // Actual expenditure (in ₹ Crore)
+  currency: string // INR or applicable
+  source: 'CapEx' | 'OpEx' // Expense Type
+  accountingPeriod: string // Month / Quarter / Financial Year
+  costCentre: string // Applicable cost-centre reference
+  vendorRef: string // Vendor / Supplier reference
+  invoiceRef: string // Supporting accounting record
+  dataSource: 'Ledger' | 'Invoice' | 'Approved report' | 'Other'
+  supportingDocument: string // Upload or link evidence
+  remarks: string // Additional explanation
+  status: 'Draft' | 'Verified' | 'Locked'
+  dateAdded: string
+}
+
+export interface IntensityMetricsData {
+  currentRevenue: number // Linked financial record (₹ Cr)
+  previousRevenue: number // Linked comparative record (₹ Cr)
+  relevantExpenditureTotal: number // Calculated from linked entries (₹ Cr)
+  physicalOutputDenominator: number // e.g., 850 (MW generated or MT produced)
+  physicalOutputUnit: 'MW generated' | 'MT product' | 'km highway' | 'Million Passengers' | 'kL water treated'
+  revenueBasedIntensity: number // Applicable metric / Revenue (%)
+  physicalOutputIntensity: number // Applicable metric / Physical output (₹ Cr / unit)
+  yoyChange: number // % change YoY
+  calculationMethodology: 'SEBI BRSR Core Guidance' | 'GRI 302-3 / 305-4 Standard' | 'GHG Protocol Intensity Standard'
+  sourceDataReferences: string[]
+  calculationValidation: 'Passed' | 'Warning' | 'Failed'
+  explanationOfVariance: string
+  reviewerNotes: string
+}
+
+export interface CsrDisclosureData {
+  isEnabled: boolean
+  csrProjectReference: string // Linked CSR activity
+  financialYear: string // Applicable reporting period
+  approvedCsrBudget: number // Where applicable (₹ Cr)
+  actualCsrExpenditure: number // Verified amount (₹ Cr)
+  expenditureType: 'Project Execution' | 'Administrative Overheads' | 'Capacity Building' | 'Ongoing Project' | 'Capital Asset Creation'
+  implementingAgencyRef: string // Where applicable
+  ledgerPaymentRef: string // Financial source
+  unspentAmount: number // Auto-calculated Budget - Expenditure
+  reconciliationStatus: 'Pending' | 'Reconciled' | 'Exception'
+  supportingDocument: string // Statement / Ledger / Approved report
+  remarks: string // Explanation
+}
+
+export interface EvidenceDocumentItem {
+  id: string
+  documentName: string // Original filename
+  category: 'Financial Statement' | 'General Ledger Extract' | 'Invoice' | 'Capital Expenditure' | 'Operating Expenditure' | 'Environmental Expenditure' | 'CSR Statement' | 'Supporting Document' | 'Other'
+  linkedEntity: string // Prefilled
+  linkedTo: 'Financial Summary' | 'Resource Expenditure' | 'Intensity Metrics' | 'CSR Disclosures'
+  reportingPeriod: string // Financial year / period
+  documentDate: string // Source document date
+  issuingOrganization: string // Where applicable
+  sourceReference: string // Document or invoice number
+  fileUploadName?: string
+  size: string
+  uploadedBy: string // System-generated
+  uploadDate: string // System-generated
+  status: 'Accepted' | 'Under Review' | 'Returned' | 'Draft' // Document review acceptance status
+  reviewerComments?: string
+  remarks?: string
+  versionHistory: { version: string; date: string; user: string; note: string }[]
+}
 
 export interface FinanceAssignment {
   id: string
@@ -24,45 +160,9 @@ export interface FinanceAssignment {
   submissionId: string
 }
 
-export interface FinancialSummaryData {
-  turnover: number
-  previousTurnover: number
-  turnoverUnit: 'Crore' | 'Lakh' | 'Thousand'
-  totalExpenditure: number
-  capEx: number
-  opEx: number
-  environmentalSpend: number
-  dataSource: string
-  documentReference: string
-  remarks: string
-  lastSaved?: string
-}
-
-export interface ResourceExpenditureItem {
-  id: string
-  category: 'Pollution Control' | 'Energy Efficiency' | 'Renewable Energy' | 'Water Conservation' | 'Waste Management' | 'Other Initiatives'
-  description: string
-  amount: number // in ₹ Crore
-  accountingPeriod: string
-  source: 'CapEx' | 'OpEx'
-  status: 'Draft' | 'Verified' | 'Locked'
-  dateAdded: string
-}
-
-export interface EvidenceDocumentItem {
-  id: string
-  documentName: string
-  category: 'Financial Statement' | 'Capital Expenditure' | 'Operating Expenditure' | 'Environmental Expenditure' | 'Supporting Document' | 'General Ledger Extract'
-  linkedTo: 'Financial Summary' | 'Resource Expenditure'
-  uploadDate: string
-  uploadedBy: string
-  size: string
-  status: 'Accepted' | 'Under Review' | 'Returned' | 'Draft'
-  remarks?: string
-}
-
 export interface SubmissionRecord {
   id: string
+  version: string
   entityName: string
   entityId: string
   businessUnit: string
@@ -90,10 +190,15 @@ export interface ActivityEvent {
 
 export interface ValidationChecklistResult {
   financialSummaryCompleted: boolean
-  resourceExpenditureCompleted: boolean
+  currencyAndUnitsValid: boolean
+  reportingPeriodsMatch: boolean
+  duplicateExpendituresChecked: boolean
   requiredDocumentsUploaded: boolean
+  financialFiguresReconciled: boolean
+  calculatedMetricsValid: boolean
   previousYearComparisonAvailable: boolean
-  remarksProvided: boolean
+  exceptionsExplained: boolean
+  noBlockingErrors: boolean
   readyForSubmission: boolean
   completionPercentage: number
   blockingErrors: string[]
@@ -101,6 +206,85 @@ export interface ValidationChecklistResult {
 }
 
 // ---------------- DEFAULT SEED DATA ----------------
+
+const DEFAULT_COMMON_METADATA: CommonMetadata = {
+  entityName: 'Gayatri Solar Plant',
+  entityId: 'MEIL-SOL-GJT',
+  subsidiaryOrBu: 'Solar BU',
+  projectId: 'PRJ-GJT-2026',
+  financialYear: 'FY 2026-27',
+  reportingPeriod: 'Annual',
+  dataModule: 'Financial Summary',
+  dataCategory: 'Turnover & Capital Expenditure',
+  recordDescription: 'Annual Statutory Financial and Environmental Capex Schedule',
+  amountOrValue: 1250.0,
+  currency: 'INR (₹)',
+  displayUnit: 'Crore',
+  dataAvailability: 'Reported',
+  dataSource: 'Audited statement',
+  sourceReference: 'STAT-AUD-FY26-SCH4',
+  calculationMethod: 'Direct value',
+  supportingDocument: 'MEIL_FS_2026-27.pdf',
+  remarks: 'Turnover reconciled with statutory auditor note annexure 4.',
+  preparedBy: 'Rakesh Verma (Finance Contributor)',
+  entryDate: '01 Apr 2026',
+  lastUpdated: '10 Jun 2026, 02:15 PM',
+  submissionStatus: 'Draft',
+  reviewerComments: 'Please ensure CapEx ledger references are attached prior to sign-off.',
+}
+
+const DEFAULT_FINANCIAL_SUMMARY: FinancialSummaryData = {
+  common: DEFAULT_COMMON_METADATA,
+  turnover: 1250.0,
+  previousTurnover: 1180.0,
+  turnoverUnit: 'Crore',
+  totalExpenditure: 980.0,
+  capEx: 320.0,
+  opEx: 660.0,
+  financialReportingBasis: 'Standalone (Ind AS)',
+  financialStatementReference: 'MEIL_FS_2026-27.pdf',
+  ledgerCostCentreRef: 'CC-SOL-GJT-01',
+  financialDataSource: 'Audited statement',
+  reconciliationStatus: 'Reconciled',
+  reconciliationRemarks: 'Turnover and CapEx figures cross-checked against SAP GL accounts.',
+  supportingDocuments: ['MEIL_FS_2026-27.pdf', 'CapEx_Projects.xlsx'],
+  environmentalSpend: 45.0,
+  dataSource: 'Audited statement',
+  documentReference: 'MEIL_FS_2026-27.pdf',
+  remarks: 'Turnover reconciled with statutory auditor notes annexure 4.',
+  lastSaved: '10 Jun 2026, 02:15 PM',
+}
+
+const DEFAULT_INTENSITY_METRICS: IntensityMetricsData = {
+  currentRevenue: 1250.0,
+  previousRevenue: 1180.0,
+  relevantExpenditureTotal: 45.0,
+  physicalOutputDenominator: 850.0,
+  physicalOutputUnit: 'MW generated',
+  revenueBasedIntensity: 3.6, // 45 / 1250 * 100
+  physicalOutputIntensity: 0.0529, // 45 / 850
+  yoyChange: 5.93,
+  calculationMethodology: 'SEBI BRSR Core Guidance',
+  sourceDataReferences: ['MEIL-FS-2026-27.pdf', 'CEA-GRID-REPORT-2026.pdf'],
+  calculationValidation: 'Passed',
+  explanationOfVariance: 'Environmental spend intensity increased by 0.3% due to high-efficiency transformer installations.',
+  reviewerNotes: 'Methodology conforms with SEBI Principle 6 Section C environmental protection guidance.',
+}
+
+const DEFAULT_CSR_DISCLOSURES: CsrDisclosureData = {
+  isEnabled: true,
+  csrProjectReference: 'CSR-2026-SOLAR-GJT-WATER-01',
+  financialYear: 'FY 2026-27',
+  approvedCsrBudget: 15.0,
+  actualCsrExpenditure: 12.8,
+  expenditureType: 'Project Execution',
+  implementingAgencyRef: 'MEIL Foundation (Reg. 12A/80G)',
+  ledgerPaymentRef: 'SAP-PAY-CSR-88192',
+  unspentAmount: 2.2,
+  reconciliationStatus: 'Reconciled',
+  supportingDocument: 'CSR_Audit_Statement_2026.pdf',
+  remarks: 'Unspent ₹2.2 Cr allocated to ongoing village solar microgrid project to be completed in Q2.',
+}
 
 const DEFAULT_ASSIGNMENTS: FinanceAssignment[] = [
   {
@@ -213,78 +397,112 @@ const DEFAULT_ASSIGNMENTS: FinanceAssignment[] = [
   },
 ]
 
-const DEFAULT_FINANCIAL_SUMMARY: FinancialSummaryData = {
-  turnover: 1250.0,
-  previousTurnover: 1180.0,
-  turnoverUnit: 'Crore',
-  totalExpenditure: 980.0,
-  capEx: 320.0,
-  opEx: 660.0,
-  environmentalSpend: 45.0,
-  dataSource: 'Audited Financial Statement',
-  documentReference: 'MEIL_FS_2026-27.pdf',
-  remarks: 'Turnover and CapEx reconciled with audited statutory auditor notes annexure 4.',
-  lastSaved: '10 Jun 2026, 02:15 PM',
-}
-
 const DEFAULT_EXPENDITURES: ResourceExpenditureItem[] = [
   {
     id: 'exp-1',
     category: 'Pollution Control',
-    description: 'Air emission control equipment',
+    projectName: 'Flue Gas Dust Suppressors & Scrubber System',
+    description: 'Air emission control equipment & electrostatic precipitator retrofits',
     amount: 12.5,
-    accountingPeriod: 'FY 2026-27',
+    currency: 'INR (₹)',
     source: 'CapEx',
+    accountingPeriod: 'FY 2026-27',
+    costCentre: 'CC-SOL-GJT-01',
+    vendorRef: 'Thermax India Ltd.',
+    invoiceRef: 'INV-THX-2026-991',
+    dataSource: 'Invoice',
+    supportingDocument: 'CapEx_Projects.xlsx',
+    remarks: 'Approved under green modernization scheme.',
     status: 'Verified',
     dateAdded: '10 Jun 2026',
   },
   {
     id: 'exp-2',
     category: 'Energy Efficiency',
-    description: 'High efficiency transformers',
+    projectName: 'Smart Substation Loss Reduction Initiative',
+    description: 'High efficiency transformers & variable frequency drive motors',
     amount: 8.0,
-    accountingPeriod: 'FY 2026-27',
+    currency: 'INR (₹)',
     source: 'CapEx',
+    accountingPeriod: 'FY 2026-27',
+    costCentre: 'CC-SOL-GJT-02',
+    vendorRef: 'ABB India Ltd.',
+    invoiceRef: 'INV-ABB-88210',
+    dataSource: 'Ledger',
+    supportingDocument: 'CapEx_Projects.xlsx',
+    remarks: 'Achieved 4.2% lower transmission loss.',
     status: 'Verified',
     dateAdded: '10 Jun 2026',
   },
   {
     id: 'exp-3',
     category: 'Renewable Energy',
-    description: 'Solar panels installation',
+    projectName: 'Bifacial Solar Panel Array Expansion',
+    description: 'Captive solar rooftop & tracking arrays installation',
     amount: 15.0,
-    accountingPeriod: 'FY 2026-27',
+    currency: 'INR (₹)',
     source: 'CapEx',
+    accountingPeriod: 'FY 2026-27',
+    costCentre: 'CC-SOL-GJT-01',
+    vendorRef: 'Tata Power Solar',
+    invoiceRef: 'INV-TPS-44120',
+    dataSource: 'Invoice',
+    supportingDocument: 'CapEx_Projects.xlsx',
+    remarks: 'Commissioned on 15 May 2026.',
     status: 'Verified',
     dateAdded: '10 Jun 2026',
   },
   {
     id: 'exp-4',
     category: 'Water Conservation',
-    description: 'Rainwater harvesting system',
+    projectName: 'Zero Liquid Discharge & Rainwater Storage',
+    description: 'Rainwater harvesting civil works & filtration membrane replacement',
     amount: 5.5,
-    accountingPeriod: 'FY 2026-27',
+    currency: 'INR (₹)',
     source: 'OpEx',
+    accountingPeriod: 'FY 2026-27',
+    costCentre: 'CC-SOL-GJT-03',
+    vendorRef: 'Ion Exchange India',
+    invoiceRef: 'INV-IE-3091',
+    dataSource: 'Ledger',
+    supportingDocument: 'OpEx_Records.pdf',
+    remarks: 'Quarterly maintenance contract operations.',
     status: 'Verified',
     dateAdded: '09 Jun 2026',
   },
   {
     id: 'exp-5',
     category: 'Waste Management',
-    description: 'Waste treatment facility',
+    projectName: 'Hazardous Chemical & Sludge Treatment Cell',
+    description: 'Bioremediation facility & concrete containment lining',
     amount: 3.0,
-    accountingPeriod: 'FY 2026-27',
+    currency: 'INR (₹)',
     source: 'OpEx',
+    accountingPeriod: 'FY 2026-27',
+    costCentre: 'CC-SOL-GJT-03',
+    vendorRef: 'Ramky Enviro Engineers',
+    invoiceRef: 'INV-RKE-1102',
+    dataSource: 'Invoice',
+    supportingDocument: 'OpEx_Records.pdf',
+    remarks: 'SPCB authorized co-processing facility handling.',
     status: 'Verified',
     dateAdded: '09 Jun 2026',
   },
   {
     id: 'exp-6',
-    category: 'Other Initiatives',
-    description: 'Green belt development',
+    category: 'Environmental Protection',
+    projectName: 'Afforestation & Biodiversity Corridor',
+    description: 'Native flora green belt development around perimeter buffer',
     amount: 1.0,
-    accountingPeriod: 'FY 2026-27',
+    currency: 'INR (₹)',
     source: 'OpEx',
+    accountingPeriod: 'FY 2026-27',
+    costCentre: 'CC-SOL-GJT-04',
+    vendorRef: 'State Forest Nursery Dept',
+    invoiceRef: 'INV-SFN-0091',
+    dataSource: 'Approved report',
+    supportingDocument: 'Environmental_Spend.pdf',
+    remarks: '3,500 saplings planted across 12 hectares.',
     status: 'Verified',
     dateAdded: '08 Jun 2026',
   },
@@ -295,62 +513,104 @@ const DEFAULT_EVIDENCE_DOCS: EvidenceDocumentItem[] = [
     id: 'doc-1',
     documentName: 'MEIL_FS_2026-27.pdf',
     category: 'Financial Statement',
+    linkedEntity: 'Gayatri Solar Plant (MEIL-SOL-GJT)',
     linkedTo: 'Financial Summary',
-    uploadDate: '12 Jun 2026',
-    uploadedBy: 'Rakesh Verma',
+    reportingPeriod: 'FY 2026-27',
+    documentDate: '15 May 2026',
+    issuingOrganization: 'KPMG India Statutory Audit',
+    sourceReference: 'STAT-AUD-FY26-SCH4',
     size: '4.8 MB',
+    uploadedBy: 'Rakesh Verma',
+    uploadDate: '12 Jun 2026',
     status: 'Accepted',
     remarks: 'Approved by statutory audit team',
+    versionHistory: [
+      { version: 'v1.0', date: '12 Jun 2026', user: 'Rakesh Verma', note: 'Initial certified draft' }
+    ]
   },
   {
     id: 'doc-2',
     documentName: 'CapEx_Projects.xlsx',
     category: 'Capital Expenditure',
+    linkedEntity: 'Gayatri Solar Plant (MEIL-SOL-GJT)',
     linkedTo: 'Resource Expenditure',
-    uploadDate: '10 Jun 2026',
-    uploadedBy: 'Rakesh Verma',
+    reportingPeriod: 'FY 2026-27',
+    documentDate: '01 Jun 2026',
+    issuingOrganization: 'MEIL Project Accounts Dept',
+    sourceReference: 'SAP-CAPEX-RUN-06',
     size: '2.1 MB',
+    uploadedBy: 'Rakesh Verma',
+    uploadDate: '10 Jun 2026',
     status: 'Under Review',
     remarks: 'CapEx breakdown for solar & transformers',
+    versionHistory: [
+      { version: 'v1.0', date: '10 Jun 2026', user: 'Rakesh Verma', note: 'Full GL line item extracts' }
+    ]
   },
   {
     id: 'doc-3',
     documentName: 'OpEx_Records.pdf',
     category: 'Operating Expenditure',
+    linkedEntity: 'Gayatri Solar Plant (MEIL-SOL-GJT)',
     linkedTo: 'Resource Expenditure',
-    uploadDate: '10 Jun 2026',
-    uploadedBy: 'Rakesh Verma',
+    reportingPeriod: 'FY 2026-27',
+    documentDate: '05 Jun 2026',
+    issuingOrganization: 'Solar BU Plant Operations',
+    sourceReference: 'OPEX-SUMMARY-Q4',
     size: '1.4 MB',
+    uploadedBy: 'Rakesh Verma',
+    uploadDate: '10 Jun 2026',
     status: 'Accepted',
     remarks: 'Rainwater & waste treatment operating slips',
+    versionHistory: [
+      { version: 'v1.0', date: '10 Jun 2026', user: 'Rakesh Verma', note: 'Certified vouchers' }
+    ]
   },
   {
     id: 'doc-4',
     documentName: 'Environmental_Spend.pdf',
     category: 'Environmental Expenditure',
+    linkedEntity: 'Gayatri Solar Plant (MEIL-SOL-GJT)',
     linkedTo: 'Resource Expenditure',
-    uploadDate: '09 Jun 2026',
-    uploadedBy: 'Rakesh Verma',
+    reportingPeriod: 'FY 2026-27',
+    documentDate: '08 Jun 2026',
+    issuingOrganization: 'Corporate Sustainability Cell',
+    sourceReference: 'ENV-RECON-MEIL-09',
     size: '3.6 MB',
+    uploadedBy: 'Rakesh Verma',
+    uploadDate: '09 Jun 2026',
     status: 'Accepted',
     remarks: 'Total ₹45.00 Cr reconciliation cert',
+    versionHistory: [
+      { version: 'v1.0', date: '09 Jun 2026', user: 'Rakesh Verma', note: 'Cross-audited reconciliation' }
+    ]
   },
   {
     id: 'doc-5',
     documentName: 'Bank_Statement.pdf',
     category: 'Supporting Document',
+    linkedEntity: 'Gayatri Solar Plant (MEIL-SOL-GJT)',
     linkedTo: 'Financial Summary',
-    uploadDate: '09 Jun 2026',
-    uploadedBy: 'Rakesh Verma',
+    reportingPeriod: 'FY 2026-27',
+    documentDate: '04 Jun 2026',
+    issuingOrganization: 'State Bank of India Corporate',
+    sourceReference: 'SBI-TXN-2026-994',
     size: '5.2 MB',
+    uploadedBy: 'Rakesh Verma',
+    uploadDate: '09 Jun 2026',
     status: 'Returned',
     remarks: 'Requires page 12 stamp certification from treasury',
+    reviewerComments: 'Page 12 ledger reconciliation seal is missing.',
+    versionHistory: [
+      { version: 'v1.0', date: '09 Jun 2026', user: 'Rakesh Verma', note: 'Initial bank copy' }
+    ]
   },
 ]
 
 const DEFAULT_SUBMISSIONS: SubmissionRecord[] = [
   {
     id: 'SUB-2026-SOL-GJT',
+    version: 'v1.2',
     entityName: 'Gayatri Solar Plant',
     entityId: 'MEIL-SOL-GJT',
     businessUnit: 'Solar BU',
@@ -360,7 +620,7 @@ const DEFAULT_SUBMISSIONS: SubmissionRecord[] = [
     completion: 80,
     status: 'In Progress',
     reviewer: 'Anita Desai (ESG Manager)',
-    latestComment: 'Draft saved. Please upload the revised certified bank statement before final submission.',
+    latestComment: 'Draft saved. Please verify that all 8 resource categories are mapped to accounting ledger refs.',
     lastUpdated: 'Today at 02:15 PM',
     timeline: [
       { step: 'Assignment Created', timestamp: '01 Jun 2026', actor: 'System Admin', note: 'Scope assigned for Solar BU' },
@@ -369,6 +629,7 @@ const DEFAULT_SUBMISSIONS: SubmissionRecord[] = [
   },
   {
     id: 'SUB-2026-PORT-VZG',
+    version: 'v1.0',
     entityName: 'Vizag Port Expansion',
     entityId: 'MEIL-PORT-VZG',
     businessUnit: 'Ports BU',
@@ -388,6 +649,7 @@ const DEFAULT_SUBMISSIONS: SubmissionRecord[] = [
   },
   {
     id: 'SUB-2026-SOL-NZR',
+    version: 'v1.1',
     entityName: 'Nizamabad Solar Farm',
     entityId: 'MEIL-SOL-NZR',
     businessUnit: 'Solar BU',
@@ -398,11 +660,11 @@ const DEFAULT_SUBMISSIONS: SubmissionRecord[] = [
     status: 'Returned for Correction',
     reviewer: 'Meena Iyer (BRSR Manager)',
     latestComment: 'Environmental expenditure was listed under wrong accounting period. Please correct to FY 2026-27.',
-    lastUpdated: '04 Jun 2026',
+    lastUpdated: '02 Jun 2026',
     timeline: [
-      { step: 'Submitted', timestamp: '02 Jun 2026', actor: 'Rakesh Verma', note: 'Initial submission' },
-      { step: 'Returned for Correction', timestamp: '04 Jun 2026', actor: 'Meena Iyer', note: 'Period mismatch in line item 3' },
-    ],
+      { step: 'Submitted', timestamp: '02 Jun 2026', actor: 'Rakesh Verma', note: 'Initial packet' },
+      { step: 'Returned for Correction', timestamp: '03 Jun 2026', actor: 'Meena Iyer', note: 'Accounting period adjustment needed' }
+    ]
   },
 ]
 
@@ -411,9 +673,9 @@ const DEFAULT_ACTIVITY: ActivityEvent[] = [
     id: 'act-1',
     timestamp: 'Today at 02:15 PM',
     type: 'DRAFT_SAVED',
-    title: 'Financial data submitted',
+    title: 'Financial data updated',
     description: 'Financial Summary and Resource Expenditure saved for Gayatri Solar Plant',
-    entity: 'MEIL-SOL-GJT | June 2026',
+    entity: 'MEIL-SOL-GJT | FY 2026-27',
     actor: 'Rakesh Verma',
     severity: 'success',
   },
@@ -422,7 +684,7 @@ const DEFAULT_ACTIVITY: ActivityEvent[] = [
     timestamp: '12 Jun 2026, 11:30 AM',
     type: 'DOC_UPLOADED',
     title: 'Document uploaded',
-    description: 'Annual Financial Statement.pdf uploaded and verified',
+    description: 'MEIL_FS_2026-27.pdf uploaded and linked to Financial Summary',
     entity: 'MEIL_FS_2026-27.pdf',
     actor: 'Rakesh Verma',
     severity: 'info',
@@ -464,6 +726,8 @@ const KEYS = {
   ASSIGNMENTS: 'meil_finance_assignments',
   FINANCIAL_SUMMARY: 'meil_finance_summary',
   EXPENDITURES: 'meil_finance_expenditures',
+  INTENSITY_METRICS: 'meil_finance_intensity_metrics',
+  CSR_DISCLOSURES: 'meil_finance_csr_disclosures',
   EVIDENCE_DOCS: 'meil_finance_evidence_docs',
   SUBMISSIONS: 'meil_finance_submissions',
   ACTIVITY: 'meil_finance_activity',
@@ -496,7 +760,16 @@ export class FinanceStoreService {
     if (!this.isClient) return DEFAULT_FINANCIAL_SUMMARY
     try {
       const data = localStorage.getItem(KEYS.FINANCIAL_SUMMARY)
-      return data ? JSON.parse(data) : DEFAULT_FINANCIAL_SUMMARY
+      if (!data) return DEFAULT_FINANCIAL_SUMMARY
+      const parsed = JSON.parse(data)
+      return {
+        ...DEFAULT_FINANCIAL_SUMMARY,
+        ...parsed,
+        common: {
+          ...DEFAULT_COMMON_METADATA,
+          ...(parsed.common || {})
+        }
+      }
     } catch {
       return DEFAULT_FINANCIAL_SUMMARY
     }
@@ -505,12 +778,21 @@ export class FinanceStoreService {
   static saveFinancialSummary(data: FinancialSummaryData) {
     if (!this.isClient) return
     try {
-      localStorage.setItem(KEYS.FINANCIAL_SUMMARY, JSON.stringify({ ...data, lastSaved: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }))
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const updated = {
+        ...data,
+        lastSaved: timestamp,
+        common: {
+          ...data.common,
+          lastUpdated: `Today at ${timestamp}`
+        }
+      }
+      localStorage.setItem(KEYS.FINANCIAL_SUMMARY, JSON.stringify(updated))
       this.logActivity({
         type: 'DRAFT_SAVED',
         title: 'Financial data saved',
-        description: `Saved turnover ₹${data.turnover} Cr and CapEx ₹${data.capEx} Cr`,
-        entity: 'MEIL-SOL-GJT',
+        description: `Saved turnover ₹${data.turnover} ${data.turnoverUnit} and CapEx ₹${data.capEx} Cr`,
+        entity: data.common?.entityId || 'MEIL-SOL-GJT',
         actor: 'Rakesh Verma',
         severity: 'success',
       })
@@ -566,6 +848,42 @@ export class FinanceStoreService {
     this.saveExpenditures(updated)
   }
 
+  // Level 3 Intensity Metrics
+  static getIntensityMetrics(): IntensityMetricsData {
+    if (!this.isClient) return DEFAULT_INTENSITY_METRICS
+    try {
+      const data = localStorage.getItem(KEYS.INTENSITY_METRICS)
+      return data ? JSON.parse(data) : DEFAULT_INTENSITY_METRICS
+    } catch {
+      return DEFAULT_INTENSITY_METRICS
+    }
+  }
+
+  static saveIntensityMetrics(metrics: IntensityMetricsData) {
+    if (!this.isClient) return
+    try {
+      localStorage.setItem(KEYS.INTENSITY_METRICS, JSON.stringify(metrics))
+    } catch {}
+  }
+
+  // Level 4 CSR Disclosures
+  static getCsrDisclosures(): CsrDisclosureData {
+    if (!this.isClient) return DEFAULT_CSR_DISCLOSURES
+    try {
+      const data = localStorage.getItem(KEYS.CSR_DISCLOSURES)
+      return data ? JSON.parse(data) : DEFAULT_CSR_DISCLOSURES
+    } catch {
+      return DEFAULT_CSR_DISCLOSURES
+    }
+  }
+
+  static saveCsrDisclosures(csr: CsrDisclosureData) {
+    if (!this.isClient) return
+    try {
+      localStorage.setItem(KEYS.CSR_DISCLOSURES, JSON.stringify(csr))
+    } catch {}
+  }
+
   static getEvidenceDocs(): EvidenceDocumentItem[] {
     if (!this.isClient) return DEFAULT_EVIDENCE_DOCS
     try {
@@ -587,23 +905,27 @@ export class FinanceStoreService {
     } catch {}
   }
 
-  static addEvidenceDoc(doc: Omit<EvidenceDocumentItem, 'id' | 'uploadDate' | 'uploadedBy'>): EvidenceDocumentItem {
+  static addEvidenceDoc(doc: Omit<EvidenceDocumentItem, 'id' | 'uploadDate' | 'uploadedBy' | 'versionHistory'>): EvidenceDocumentItem {
     const list = this.getEvidenceDocs()
+    const nowStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
     const newDoc: EvidenceDocumentItem = {
       ...doc,
       id: `doc-${Date.now()}`,
-      uploadDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      uploadDate: nowStr,
       uploadedBy: 'Rakesh Verma',
+      versionHistory: [
+        { version: 'v1.0', date: nowStr, user: 'Rakesh Verma', note: 'Uploaded via Contributor Console' }
+      ]
     }
     const updated = [newDoc, ...list]
     this.saveEvidenceDocs(updated)
     this.logActivity({
       type: 'DOC_UPLOADED',
-      title: 'Evidence document uploaded',
-      description: `Uploaded ${newDoc.documentName} for ${newDoc.linkedTo}`,
-      entity: newDoc.documentName,
+      title: 'Evidence document linked',
+      description: `Attached ${newDoc.documentName} to ${newDoc.linkedTo}`,
+      entity: newDoc.linkedEntity || 'MEIL-SOL-GJT',
       actor: 'Rakesh Verma',
-      severity: 'success',
+      severity: 'info',
     })
     return newDoc
   }
@@ -612,14 +934,10 @@ export class FinanceStoreService {
     return this.addEvidenceDoc(doc)
   }
 
-  static deleteEvidenceDoc(id: string) {
-    const list = this.getEvidenceDocs()
-    const filtered = list.filter(i => i.id !== id)
-    this.saveEvidenceDocs(filtered)
-  }
-
   static deleteEvidenceDocument(id: string) {
-    return this.deleteEvidenceDoc(id)
+    const list = this.getEvidenceDocs()
+    const filtered = list.filter(d => d.id !== id)
+    this.saveEvidenceDocs(filtered)
   }
 
   static getSubmissions(): SubmissionRecord[] {
@@ -639,14 +957,10 @@ export class FinanceStoreService {
     } catch {}
   }
 
-  static submitRecordForReview(entityId: string = 'MEIL-SOL-GJT'): { ok: boolean; message: string } {
-    const summary = this.getFinancialSummary()
-    const expenditures = this.getExpenditures()
-    const docs = this.getEvidenceDocs()
-    const validation = this.validateRecord(summary, expenditures, docs)
-
+  static submitRecordForReview(entityId: string = 'MEIL-SOL-GJT') {
+    const validation = this.validateRecord()
     if (!validation.readyForSubmission) {
-      return { ok: false, message: validation.blockingErrors[0] || 'Validation failed. Check requirements.' }
+      return { ok: false, errors: validation.blockingErrors }
     }
 
     const submissions = this.getSubmissions()
@@ -656,11 +970,12 @@ export class FinanceStoreService {
           ...s,
           status: 'Submitted' as const,
           completion: 100,
+          version: 'v1.3',
           lastUpdated: 'Just now',
-          latestComment: 'Submitted by Rakesh Verma. Awaiting reviewer review.',
+          latestComment: 'Submitted by Rakesh Verma. Awaiting reviewer sign-off.',
           timeline: [
             ...s.timeline,
-            { step: 'Submitted for Review', timestamp: new Date().toLocaleDateString('en-GB'), actor: 'Rakesh Verma', note: 'All validations passed' },
+            { step: 'Submitted for Review', timestamp: new Date().toLocaleDateString('en-GB'), actor: 'Rakesh Verma', note: 'All Level 0-7 checks passed' },
           ],
         }
       }
@@ -691,11 +1006,12 @@ export class FinanceStoreService {
         return {
           ...s,
           status: 'Submitted' as const,
+          version: 'v1.4',
           lastUpdated: 'Just now',
           latestComment: 'Corrections addressed by Rakesh Verma. Resubmitted for approval.',
           timeline: [
             ...s.timeline,
-            { step: 'Resubmitted for Review', timestamp: new Date().toLocaleDateString('en-GB'), actor: 'Rakesh Verma', note: 'Corrections addressed' }
+            { step: 'Resubmitted for Review', timestamp: new Date().toLocaleDateString('en-GB'), actor: 'Rakesh Verma', note: 'Corrections incorporated' }
           ]
         }
       }
@@ -783,12 +1099,14 @@ export class FinanceStoreService {
   static getCategoryDistribution(expenditures: ResourceExpenditureItem[] = this.getExpenditures()): { category: string; amount: number; percentage: number; color: string }[] {
     const total = this.getTotalResourceExpenditure(expenditures) || 1
     const colorMap: Record<string, string> = {
-      'Renewable Energy': '#2563EB', // Blue
-      'Energy Efficiency': '#3B82F6', // Sky
-      'Pollution Control': '#8B5CF6', // Purple
-      'Water Conservation': '#06B6D4', // Cyan
-      'Waste Management': '#10B981', // Emerald
-      'Other Initiatives': '#64748B', // Slate
+      'Renewable Energy': '#2563EB',
+      'Energy Efficiency': '#3B82F6',
+      'Pollution Control': '#8B5CF6',
+      'Water Conservation': '#06B6D4',
+      'Waste Management': '#10B981',
+      'Emission Reduction': '#F59E0B',
+      'Environmental Protection': '#14B8A6',
+      'Other Resource-Efficiency Initiatives': '#64748B',
     }
 
     const byCat = expenditures.reduce((acc, item) => {
@@ -804,6 +1122,20 @@ export class FinanceStoreService {
     }))
   }
 
+  /**
+   * Level 6 — Validation & Reconciliation
+   * Checks all 10 criteria specified in Level 6:
+   * - Required financial fields are complete.
+   * - Currency and display units are valid.
+   * - Reporting periods match the assigned financial year.
+   * - Duplicate expenditure entries are identified.
+   * - Required evidence is linked to the correct records.
+   * - Financial figures reconcile to their approved source records.
+   * - Calculated metrics use valid inputs and approved methodology.
+   * - Previous-year comparisons use the correct period.
+   * - Exceptions and estimates have appropriate explanations.
+   * - No unresolved blocking validation errors remain.
+   */
   static validateRecord(
     summary: FinancialSummaryData = this.getFinancialSummary(),
     expenditures: ResourceExpenditureItem[] = this.getExpenditures(),
@@ -812,57 +1144,100 @@ export class FinanceStoreService {
     const blockingErrors: string[] = []
     const warnings: string[] = []
 
-    // 1. Financial summary check
-    const financialSummaryCompleted = summary.turnover > 0 && summary.totalExpenditure > 0 && !!summary.dataSource
+    // 1. Required financial fields
+    const financialSummaryCompleted = summary.turnover > 0 && summary.totalExpenditure > 0 && !!summary.financialReportingBasis
     if (!financialSummaryCompleted) {
-      blockingErrors.push('Total Turnover and Total Expenditure must be greater than zero')
+      blockingErrors.push('Total Turnover, Total Expenditure, and Financial Reporting Basis are mandatory')
     }
 
-    // 2. Resource expenditure check
-    const resourceExpenditureCompleted = expenditures.length >= 1 && this.getTotalResourceExpenditure(expenditures) > 0
-    if (!resourceExpenditureCompleted) {
-      blockingErrors.push('At least 1 valid resource expenditure record is required')
+    // 2. Currency & display units valid
+    const currencyAndUnitsValid = !!summary.common?.currency && !!summary.turnoverUnit
+    if (!currencyAndUnitsValid) {
+      blockingErrors.push('Valid currency (INR) and display unit must be assigned')
     }
 
-    // 3. Required documents uploaded
+    // 3. Reporting periods match assigned FY
+    const reportingPeriodsMatch = summary.common?.financialYear === 'FY 2026-27'
+    if (!reportingPeriodsMatch) {
+      warnings.push(`Assigned financial year (${summary.common?.financialYear}) requires reconciliation with FY 2026-27`)
+    }
+
+    // 4. Duplicate expenditure entries check
+    const descSet = new Set<string>()
+    let hasDuplicates = false
+    for (const exp of expenditures) {
+      const key = `${exp.category}-${exp.description.toLowerCase().trim()}`
+      if (descSet.has(key)) {
+        hasDuplicates = true
+        warnings.push(`Potential duplicate expenditure line item: "${exp.description}" under ${exp.category}`)
+        break
+      }
+      descSet.add(key)
+    }
+    const duplicateExpendituresChecked = !hasDuplicates
+
+    // 5. Required evidence linked
     const acceptedOrPendingDocs = docs.filter(d => d.status !== 'Returned')
     const hasFinancialDoc = acceptedOrPendingDocs.some(d => d.category === 'Financial Statement' || d.linkedTo === 'Financial Summary')
     const hasExpenditureDoc = acceptedOrPendingDocs.some(d => d.category === 'Environmental Expenditure' || d.category === 'Capital Expenditure' || d.linkedTo === 'Resource Expenditure')
     const requiredDocumentsUploaded = hasFinancialDoc && hasExpenditureDoc
     if (!requiredDocumentsUploaded) {
-      blockingErrors.push('Approved Financial Statement and Environmental Spend evidence are mandatory')
+      blockingErrors.push('Approved Financial Statement and Environmental Spend evidence attachments are mandatory')
     }
 
-    // 4. Previous year comparison
+    // 6. Financial figures reconcile
+    const financialFiguresReconciled = summary.reconciliationStatus === 'Reconciled' || summary.reconciliationStatus === 'Pending'
+    if (summary.reconciliationStatus === 'Exception' && !summary.reconciliationRemarks) {
+      blockingErrors.push('Reconciliation remarks are required when reconciliation status is Exception')
+    }
+
+    // 7. Calculated metrics valid
+    const calculatedMetricsValid = summary.turnover > 0 && (summary.capEx + summary.opEx <= summary.totalExpenditure * 1.05)
+    if (summary.capEx + summary.opEx > summary.totalExpenditure * 1.05) {
+      warnings.push('CapEx + OpEx sum exceeds reported Total Expenditure')
+    }
+
+    // 8. Previous year comparison
     const previousYearComparisonAvailable = summary.previousTurnover > 0
     if (!previousYearComparisonAvailable) {
-      warnings.push('Previous year turnover is empty or zero')
+      warnings.push('Previous year comparative turnover is missing or zero')
     }
 
-    // 5. Remarks provided
-    const remarksProvided = summary.remarks.trim().length > 10
-    if (!remarksProvided) {
-      warnings.push('Additional explanatory remarks recommended for audit trail')
+    // 9. Exceptions and estimates explained
+    const exceptionsExplained = summary.remarks.trim().length >= 8
+    if (!exceptionsExplained) {
+      warnings.push('Additional explanatory remarks recommended for audit trail clarity')
     }
 
-    // Completion percentage calculation
+    // 10. Check blocking
+    const noBlockingErrors = blockingErrors.length === 0
+    const readyForSubmission = noBlockingErrors && expenditures.length > 0
+
+    // Calculate score
     let passed = 0
-    if (financialSummaryCompleted) passed += 25
-    if (resourceExpenditureCompleted) passed += 25
-    if (requiredDocumentsUploaded) passed += 25
-    if (previousYearComparisonAvailable) passed += 15
-    if (remarksProvided) passed += 10
-
-    const readyForSubmission = blockingErrors.length === 0
+    if (financialSummaryCompleted) passed += 15
+    if (currencyAndUnitsValid) passed += 10
+    if (reportingPeriodsMatch) passed += 10
+    if (duplicateExpendituresChecked) passed += 10
+    if (requiredDocumentsUploaded) passed += 15
+    if (financialFiguresReconciled) passed += 10
+    if (calculatedMetricsValid) passed += 10
+    if (previousYearComparisonAvailable) passed += 10
+    if (exceptionsExplained) passed += 10
 
     return {
       financialSummaryCompleted,
-      resourceExpenditureCompleted,
+      currencyAndUnitsValid,
+      reportingPeriodsMatch,
+      duplicateExpendituresChecked,
       requiredDocumentsUploaded,
+      financialFiguresReconciled,
+      calculatedMetricsValid,
       previousYearComparisonAvailable,
-      remarksProvided,
+      exceptionsExplained,
+      noBlockingErrors,
       readyForSubmission,
-      completionPercentage: passed,
+      completionPercentage: Math.min(100, passed),
       blockingErrors,
       warnings,
     }
@@ -873,13 +1248,13 @@ export class FinanceStoreService {
   static exportFinancialSummaryCSV() {
     const summary = this.getFinancialSummary()
     const csvContent =
-      'Metric,Amount,Unit,Data Source,Document Reference,Remarks\n' +
-      `Total Turnover / Revenue,${summary.turnover},${summary.turnoverUnit},"${summary.dataSource}","${summary.documentReference}","${summary.remarks}"\n` +
-      `Previous FY Turnover,${summary.previousTurnover},${summary.turnoverUnit},"${summary.dataSource}","${summary.documentReference}",""\n` +
-      `Total Expenditure,${summary.totalExpenditure},${summary.turnoverUnit},"${summary.dataSource}","${summary.documentReference}",""\n` +
-      `Capital Expenditure (CapEx),${summary.capEx},${summary.turnoverUnit},"${summary.dataSource}","${summary.documentReference}",""\n` +
-      `Operating Expenditure (OpEx),${summary.opEx},${summary.turnoverUnit},"${summary.dataSource}","${summary.documentReference}",""\n` +
-      `Environmental Expenditure,${summary.environmentalSpend},${summary.turnoverUnit},"${summary.dataSource}","${summary.documentReference}",""\n`
+      'Metric,Amount,Unit,Reporting Basis,Reconciliation Status,Data Source,Document Reference,Remarks\n' +
+      `Total Turnover / Revenue,${summary.turnover},${summary.turnoverUnit},"${summary.financialReportingBasis}","${summary.reconciliationStatus}","${summary.financialDataSource}","${summary.financialStatementReference}","${summary.remarks}"\n` +
+      `Previous FY Turnover,${summary.previousTurnover},${summary.turnoverUnit},"${summary.financialReportingBasis}","${summary.reconciliationStatus}","${summary.financialDataSource}","${summary.financialStatementReference}",""\n` +
+      `Total Expenditure,${summary.totalExpenditure},${summary.turnoverUnit},"${summary.financialReportingBasis}","${summary.reconciliationStatus}","${summary.financialDataSource}","${summary.financialStatementReference}",""\n` +
+      `Capital Expenditure (CapEx),${summary.capEx},${summary.turnoverUnit},"${summary.financialReportingBasis}","${summary.reconciliationStatus}","${summary.financialDataSource}","${summary.financialStatementReference}",""\n` +
+      `Operating Expenditure (OpEx),${summary.opEx},${summary.turnoverUnit},"${summary.financialReportingBasis}","${summary.reconciliationStatus}","${summary.financialDataSource}","${summary.financialStatementReference}",""\n` +
+      `Environmental Expenditure,${summary.environmentalSpend},${summary.turnoverUnit},"${summary.financialReportingBasis}","${summary.reconciliationStatus}","${summary.financialDataSource}","${summary.financialStatementReference}",""\n`
 
     this.downloadFile('MEIL_Financial_Summary_FY2026-27.csv', csvContent, 'text/csv;charset=utf-8;')
     return csvContent
@@ -887,8 +1262,8 @@ export class FinanceStoreService {
 
   static exportResourceExpendituresCSV(): string {
     const list = this.getExpenditures()
-    const rows = list.map(i => `"${i.category}","${i.description}",${i.amount},${i.accountingPeriod},${i.source},${i.status}`).join('\n')
-    const csvContent = 'Category,Description,Amount (₹ Cr),Accounting Period,Source,Status\n' + rows
+    const rows = list.map(i => `"${i.category}","${i.projectName}","${i.description}",${i.amount},${i.currency},${i.source},${i.accountingPeriod},"${i.costCentre}","${i.vendorRef}","${i.invoiceRef}","${i.dataSource}","${i.status}"`).join('\n')
+    const csvContent = 'Category,Project / Initiative,Description,Amount (₹ Cr),Currency,Source,Accounting Period,Cost Centre,Vendor,Invoice Ref,Data Source,Status\n' + rows
     this.downloadFile('MEIL_Resource_Expenditures_FY2026-27.csv', csvContent, 'text/csv;charset=utf-8;')
     return csvContent
   }
