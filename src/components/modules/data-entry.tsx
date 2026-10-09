@@ -67,7 +67,7 @@ const STEPS = ['Enter Data', 'Attach Evidence', 'Validate', 'Submit'] as const
 
 /* ---------- Main component ---------- */
 export function DataEntryModule({ subModule: subModuleProp }: { subModule: string }) {
-  const { user, setDataEntrySubModule } = useApp()
+  const { user, setDataEntrySubModule, selectedProjectId: appProjectId } = useApp()
   const roleKey = user?.roles?.[0]?.key ?? ''
   const readOnly = READ_ONLY_ROLES.has(roleKey)
 
@@ -124,6 +124,7 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
         setPeriods(ov.periods || [])
         const scopeProj = user?.scopes?.find(s => s.scopeType === 'PROJECT')
         const defaultProject =
+          (appProjectId ? flat.find(p => p.id === appProjectId || p.projectCode === appProjectId) : null) ||
           (scopeProj ? flat.find(p => p.id === scopeProj.scopeId) : null) ||
           flat.find(p => p.projectCode === 'MEIL-SOL-GJT') ||
           flat[0] || null

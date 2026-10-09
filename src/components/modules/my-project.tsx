@@ -1679,6 +1679,7 @@ export function MyProjectModule() {
   const [projectSubs, setProjectSubs] = useState<SubmissionItem[]>([])
   const [projectEvidence, setProjectEvidence] = useState<EvidenceItem[]>([])
 
+  const { selectedProjectId: appProjectId } = useApp()
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -1729,7 +1730,8 @@ export function MyProjectModule() {
         setAllSubs(subs.items ?? [])
         const projects = flattenProjects(tr)
         if (projects.length > 0) {
-          setSelectedProjectId(projects[0].id)
+          const matched = appProjectId ? projects.find(p => p.id === appProjectId || p.projectCode === appProjectId) : null
+          setSelectedProjectId(matched ? matched.id : projects[0].id)
         }
         setLoading(false)
       })

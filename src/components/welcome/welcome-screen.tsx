@@ -1,15 +1,33 @@
 'use client'
 /**
- * MEIL ESG — Premium Liquid Glass Welcome Screen
- * Flow: WELCOME → CHOOSE ROLE → LOGIN (morph)
- * Glassmorphism, floating orbs, ESG concept diagram, role-card fan interaction.
+ * MEIL ESG — High-Intensity iOS Liquid Glass Welcome & Project Selection Platform
+ * Design System: design.md + Official MEIL Reference Layout
+ * Flow:
+ *  1. WELCOME SCREEN (Org & Business Unit Selection + 3D Orbital ESG Diagram + Pillars)
+ *  2. PROJECT SELECTION SCREEN (Next screen: BU-related Projects Grid with iOS Liquid Glass)
+ *  3. ROLE SELECTION (15 RBAC Roles for chosen site)
+ *  4. LOGIN MORPH (Instant demo authentication)
  */
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowRight, Building2, Leaf, Users, ShieldCheck, Package, HeartHandshake, Scale, FileCheck, Briefcase, BarChart3, Gavel, Eye, Crown, Settings2, ChevronDown, Check, Sparkles } from 'lucide-react'
-import { useApp } from '@/lib/auth-context'
 
-type Stage = 'welcome' | 'role' | 'login'
+import { useState, useMemo, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  ArrowRight, ArrowLeft, Building2, Leaf, Users, ShieldCheck,
+  ChevronDown, Check, Sparkles, MapPin, Search, Route, Flame,
+  SunMedium, Zap, Droplets, Waves, Globe, CheckCircle2,
+  Settings2, Package, HeartHandshake, Scale, FileCheck, Briefcase,
+  BarChart3, Gavel, Eye, Crown, Compass, Activity, ShieldAlert
+} from 'lucide-react'
+import { useApp } from '@/lib/auth-context'
+import {
+  MEIL_BUSINESS_UNITS,
+  MEIL_ORGANIZATIONS,
+  type MeilBusinessUnit,
+  type MeilProject,
+  getBusinessUnitById,
+} from '@/lib/meil-portfolio'
+
+type Stage = 'welcome' | 'project' | 'role' | 'login'
 
 interface RoleCardDef {
   key: string
@@ -23,42 +41,94 @@ interface RoleCardDef {
 }
 
 const ROLES: RoleCardDef[] = [
-  { key: 'SUPER_ADMIN', name: 'Arjun Mehta', email: 'admin@meil-esg.in', role: 'Super Admin', phase: 3, icon: Settings2, tint: 'from-slate-500 to-slate-700', blurb: 'Full system & master data control' },
-  { key: 'PROJECT_USER', name: 'Rohit Kumar', email: 'rohit@meil-esg.in', role: 'Project / Site User', phase: 1, icon: Building2, tint: 'from-sky-500 to-blue-600', blurb: 'Site-level source data entry' },
-  { key: 'HR_USER', name: 'Sunita Rao', email: 'sunita@meil-esg.in', role: 'HR User', phase: 1, icon: Users, tint: 'from-cyan-500 to-teal-600', blurb: 'Workforce & HR data' },
-  { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS / Safety User', phase: 1, icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Safety & environmental incidents' },
-  { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement User', phase: 1, icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Supplier & value chain' },
-  { key: 'CSR_USER', name: 'Imran Sheikh', email: 'imran@meil-esg.in', role: 'CSR / Community User', phase: 1, icon: HeartHandshake, tint: 'from-rose-500 to-pink-600', blurb: 'CSR & community impact' },
-  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance / Governance', phase: 1, icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Governance & ethics' },
-  { key: 'BU_REVIEWER', name: 'Rakesh Verma', email: 'rakesh@meil-esg.in', role: 'BU Reviewer', phase: 2, icon: FileCheck, tint: 'from-blue-500 to-indigo-600', blurb: 'BU review & approval' },
-  { key: 'SUBSIDIARY_REVIEWER', name: 'Nisha Pillai', email: 'nisha@meil-esg.in', role: 'Subsidiary Reviewer', phase: 2, icon: Briefcase, tint: 'from-indigo-500 to-blue-700', blurb: 'Subsidiary consolidation review' },
-  { key: 'GROUP_REVIEWER', name: 'Vikram Shah', email: 'vikram@meil-esg.in', role: 'Group / HQ Reviewer', phase: 2, icon: Gavel, tint: 'from-blue-600 to-cyan-700', blurb: 'Group final review & lock' },
-  { key: 'ESG_MANAGER', name: 'Anita Desai', email: 'anita@meil-esg.in', role: 'ESG Manager', phase: 3, icon: BarChart3, tint: 'from-teal-500 to-emerald-600', blurb: 'ESG data quality & methodology' },
-  { key: 'BRSR_MANAGER', name: 'Meena Iyer', email: 'meena@meil-esg.in', role: 'BRSR Manager', phase: 3, icon: FileCheck, tint: 'from-emerald-600 to-teal-700', blurb: 'BRSR reporting workflow' },
-  { key: 'AUDITOR', name: 'Karthik S.', email: 'karthik@meil-esg.in', role: 'Auditor / Assurance', phase: 3, icon: Eye, tint: 'from-slate-600 to-gray-700', blurb: 'Assurance read-only scope' },
-  { key: 'EXECUTIVE', name: 'Rajesh Khanna', email: 'rajesh@meil-esg.in', role: 'Executive', phase: 3, icon: Crown, tint: 'from-amber-600 to-yellow-700', blurb: 'Executive reporting access' },
+  { key: 'SUPER_ADMIN', name: 'Arjun Mehta', email: 'admin@meil-esg.in', role: 'Super Admin', phase: 3, icon: Settings2, tint: 'from-slate-500 to-slate-700', blurb: 'Full enterprise data & user administration' },
+  { key: 'PROJECT_USER', name: 'Rohit Kumar', email: 'rohit@meil-esg.in', role: 'Project / Site Engineer', phase: 1, icon: Building2, tint: 'from-sky-500 to-blue-600', blurb: 'Direct site-level source data & evidence entry' },
+  { key: 'HR_USER', name: 'Sunita Rao', email: 'sunita@meil-esg.in', role: 'HR & Workforce Lead', phase: 1, icon: Users, tint: 'from-cyan-500 to-teal-600', blurb: 'Workforce diversity, human rights & trainings' },
+  { key: 'EHS_USER', name: 'K. Venkat', email: 'kvenkat@meil-esg.in', role: 'EHS & Safety Officer', phase: 1, icon: ShieldCheck, tint: 'from-amber-500 to-orange-600', blurb: 'Safety operations, zero harm & environmental compliance' },
+  { key: 'PROCUREMENT_USER', name: 'Priya Nair', email: 'priya@meil-esg.in', role: 'Procurement Specialist', phase: 1, icon: Package, tint: 'from-violet-500 to-purple-600', blurb: 'Sustainable sourcing & Scope 3 supply chain' },
+  { key: 'CSR_USER', name: 'Imran Sheikh', email: 'imran@meil-esg.in', role: 'CSR & Community Lead', phase: 1, icon: HeartHandshake, tint: 'from-rose-500 to-pink-600', blurb: 'Community welfare, local sourcing & impact tracking' },
+  { key: 'COMPLIANCE_USER', name: 'Deepika Joshi', email: 'deepika@meil-esg.in', role: 'Compliance & Ethics Lead', phase: 1, icon: Scale, tint: 'from-emerald-500 to-green-600', blurb: 'Statutory compliance & BRSR governance' },
+  { key: 'BU_REVIEWER', name: 'Rakesh Verma', email: 'rakesh@meil-esg.in', role: 'Business Unit Reviewer', phase: 2, icon: FileCheck, tint: 'from-blue-500 to-indigo-600', blurb: 'BU-level technical validation & review approval' },
+  { key: 'SUBSIDIARY_REVIEWER', name: 'Nisha Pillai', email: 'nisha@meil-esg.in', role: 'Subsidiary Reviewer', phase: 2, icon: Briefcase, tint: 'from-indigo-500 to-blue-700', blurb: 'Subsidiary consolidation & sign-off review' },
+  { key: 'GROUP_REVIEWER', name: 'Vikram Shah', email: 'vikram@meil-esg.in', role: 'Group / HQ Reviewer', phase: 2, icon: Gavel, tint: 'from-blue-600 to-cyan-700', blurb: 'Conglomerate-level sign-off & audit lock' },
+  { key: 'ESG_MANAGER', name: 'Anita Desai', email: 'anita@meil-esg.in', role: 'ESG Manager', phase: 3, icon: BarChart3, tint: 'from-teal-500 to-emerald-600', blurb: 'Data completeness, emission factors & GHG calculation' },
+  { key: 'BRSR_MANAGER', name: 'Meena Iyer', email: 'meena@meil-esg.in', role: 'BRSR Lead Manager', phase: 3, icon: FileCheck, tint: 'from-emerald-600 to-teal-700', blurb: 'SEBI BRSR Core disclosures & report generation' },
+  { key: 'AUDITOR', name: 'Karthik S.', email: 'karthik@meil-esg.in', role: 'Assurance Auditor', phase: 3, icon: Eye, tint: 'from-slate-600 to-gray-700', blurb: 'Read-only assurance testing & audit trail' },
+  { key: 'EXECUTIVE', name: 'Rajesh Khanna', email: 'rajesh@meil-esg.in', role: 'Executive Board Member', phase: 3, icon: Crown, tint: 'from-amber-600 to-yellow-700', blurb: 'Strategic ESG metrics, risks & executive dashboards' },
 ]
 
-const PHASE_LABELS = { 1: 'Phase 1 — Data Entry', 2: 'Phase 2 — Review & Consolidation', 3: 'Phase 3 — Analysis & Reporting' }
+const PHASE_LABELS = {
+  1: 'Phase 1 — Site & Operational Data Entry',
+  2: 'Phase 2 — Multi-Level Review & Approvals',
+  3: 'Phase 3 — BRSR Core, Assurance & Analytics'
+}
+
+function getBuIcon(iconName: string) {
+  switch (iconName) {
+    case 'Route': return Route
+    case 'Building2': return Building2
+    case 'Flame': return Flame
+    case 'SunMedium': return SunMedium
+    case 'Zap': return Zap
+    case 'Droplets': return Droplets
+    case 'Waves': return Waves
+    case 'Globe': return Globe
+    default: return Building2
+  }
+}
 
 export function WelcomeScreen() {
-  const { login } = useApp()
+  const { login, selectedBuId, setSelectedBuId, selectedProjectId, setSelectedProjectId } = useApp()
   const [stage, setStage] = useState<Stage>('welcome')
-  const [selected, setSelected] = useState<RoleCardDef | null>(null)
-  const [hovered, setHovered] = useState<string | null>(null)
+
+  // Organization & Business Unit selection state
+  const [selectedOrgId, setSelectedOrgId] = useState<string>('MEIL-GROUP')
+  const [activeBuId, setActiveBuId] = useState<string>(selectedBuId || 'bu-transportation')
+  const [activeProjectId, setActiveProjectId] = useState<string>(selectedProjectId || 'trans-01')
+
+  // Role & login state
+  const [selectedRole, setSelectedRole] = useState<RoleCardDef | null>(null)
+  const [hoveredRole, setHoveredRole] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('esg12345')
   const [remember, setRemember] = useState(true)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  function pickRole(r: RoleCardDef) {
-    setSelected(r)
-    setEmail(r.email)
+  // Current active BU & Project objects
+  const currentBu = useMemo(
+    () => getBusinessUnitById(activeBuId) || MEIL_BUSINESS_UNITS[0],
+    [activeBuId]
+  )
+
+  const currentProject = useMemo(() => {
+    const list = currentBu.projects
+    return list.find(p => p.id === activeProjectId) || list[0]
+  }, [currentBu, activeProjectId])
+
+  // Sync to app context whenever selection changes
+  const handleSelectBu = (buId: string) => {
+    setActiveBuId(buId)
+    setSelectedBuId(buId)
+    const bu = getBusinessUnitById(buId)
+    if (bu && bu.projects.length > 0) {
+      setActiveProjectId(bu.projects[0].id)
+      setSelectedProjectId(bu.projects[0].id)
+    }
+  }
+
+  const handleSelectProject = (project: MeilProject) => {
+    setActiveProjectId(project.id)
+    setSelectedProjectId(project.id)
+  }
+
+  const handlePickRole = (role: RoleCardDef) => {
+    setSelectedRole(role)
+    setEmail(role.email)
     setStage('login')
   }
 
-  async function submit(e: React.FormEvent) {
+  const handleSubmitLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy(true)
     setError('')
@@ -68,311 +138,1042 @@ export function WelcomeScreen() {
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden">
-      <Background />
+    <div className="relative min-h-screen w-full overflow-hidden bg-[#e0f2fe] text-slate-800">
+      <BackgroundAtmosphere />
 
-      <header className="relative z-20 flex items-center justify-between px-6 py-5 md:px-12">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-600 to-red-700 text-white shadow-lg shadow-rose-600/30">
-            <span className="text-lg font-black">M</span>
+      {/* Outer Viewport Container */}
+      <div className="relative z-10 flex min-h-screen flex-col justify-between px-3 py-4 md:px-8 md:py-6">
+        
+        {/* Top Header inside viewport */}
+        <header className="mx-auto flex w-full max-w-[1240px] items-center justify-between pb-3 pt-1">
+          {/* Left: Official MEIL Logo representation */}
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-md shadow-red-500/25">
+              <span className="text-xl font-black tracking-tighter">M</span>
+            </div>
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black tracking-tight text-slate-900">meil</span>
+              </div>
+              <div className="text-[9px] font-semibold tracking-wider text-slate-500 uppercase">
+                Megha Engineering & Infrastructures Ltd.
+              </div>
+            </div>
           </div>
-          <div className="leading-tight">
-            <div className="text-base font-bold tracking-tight text-slate-800">meil<span className="text-rose-600">ESG</span></div>
-            <div className="text-[11px] font-medium text-slate-500">ESG & BRSR Reporting Platform</div>
+
+          {/* Right: Engineering A Sustainable Tomorrow */}
+          <div className="text-right">
+            <div className="text-xs font-semibold text-slate-700">Engineering</div>
+            <div className="text-[11px] font-medium text-slate-500">A Sustainable Tomorrow</div>
           </div>
-        </div>
-        <div className="hidden text-right md:block">
-          <div className="text-xs font-semibold tracking-wide text-slate-600">ENGINEERING A SUSTAINABLE TOMORROW</div>
-          <div className="text-[10px] text-slate-400">BRSR-aligned • GHG Protocol • ISO 14064</div>
-        </div>
-      </header>
+        </header>
 
-      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-88px)] max-w-7xl items-center px-4 pb-10 md:px-12">
-        <div className="grid w-full items-center gap-8 lg:grid-cols-2">
-          <AnimatePresence>
-            {stage !== 'login' && (
-              <motion.div
-                key="concept"
-                initial={{ opacity: 0, x: -30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -40, transition: { duration: 0.3 } }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="relative hidden h-[520px] lg:block"
-              >
-                <EsgConceptDiagram />
-              </motion.div>
-            )}
-          </AnimatePresence>
+        {/* Central Liquid Glass Container */}
+        <main className="mx-auto my-auto flex w-full max-w-[1240px] items-center justify-center">
+          <div className="glass-ios-liquid w-full rounded-[36px] p-6 shadow-2xl transition-all md:p-10 lg:p-12">
+            <AnimatePresence mode="wait">
+              {stage === 'welcome' && (
+                <motion.div
+                  key="stage-welcome"
+                  initial={{ opacity: 0, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                  className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12"
+                >
+                  {/* Left Column: 3D Orbit ESG Visual Diagram (5 Cols) */}
+                  <div className="relative hidden lg:col-span-5 lg:block">
+                    <LiquidGlassOrbitDiagram />
+                  </div>
 
-          <AnimatePresence mode="wait">
-            {stage === 'welcome' && (
-              <motion.div key="welcome" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20, transition: { duration: 0.25 } }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
-                <WelcomePanel onContinue={() => setStage('role')} />
-              </motion.div>
-            )}
-            {stage === 'role' && (
-              <motion.div key="role" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20, transition: { duration: 0.25 } }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
-                <RolePicker roles={ROLES} hovered={hovered} setHovered={setHovered} onPick={pickRole} onBack={() => setStage('welcome')} />
-              </motion.div>
-            )}
-            {stage === 'login' && selected && (
-              <motion.div key="login" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.25 } }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>
-                <LoginMorph role={selected} email={email} setEmail={setEmail} password={password} setPassword={setPassword} remember={remember} setRemember={setRemember} error={error} busy={busy} onSubmit={submit} onBack={() => { setStage('role'); setSelected(null) }} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </main>
+                  {/* Right Column: Welcome Headline, Org + BU Dropdowns, Continue, Pillars (7 Cols) */}
+                  <div className="lg:col-span-7">
+                    <WelcomePanel
+                      selectedOrgId={selectedOrgId}
+                      setSelectedOrgId={setSelectedOrgId}
+                      activeBuId={activeBuId}
+                      onSelectBu={handleSelectBu}
+                      onContinue={() => setStage('project')}
+                    />
+                  </div>
+                </motion.div>
+              )}
+
+              {stage === 'project' && (
+                <motion.div
+                  key="stage-project"
+                  initial={{ opacity: 0, x: 30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -30, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <ProjectSelectionScreen
+                    currentBu={currentBu}
+                    selectedProjectId={activeProjectId}
+                    onSelectBu={handleSelectBu}
+                    onSelectProject={handleSelectProject}
+                    onBack={() => setStage('welcome')}
+                    onProceed={() => setStage('role')}
+                  />
+                </motion.div>
+              )}
+
+              {stage === 'role' && (
+                <motion.div
+                  key="stage-role"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <RolePickerScreen
+                    project={currentProject}
+                    bu={currentBu}
+                    roles={ROLES}
+                    hovered={hoveredRole}
+                    setHovered={setHoveredRole}
+                    onPick={handlePickRole}
+                    onBack={() => setStage('project')}
+                  />
+                </motion.div>
+              )}
+
+              {stage === 'login' && selectedRole && (
+                <motion.div
+                  key="stage-login"
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <LoginScreen
+                    project={currentProject}
+                    bu={currentBu}
+                    role={selectedRole}
+                    email={email}
+                    setEmail={setEmail}
+                    password={password}
+                    setPassword={setPassword}
+                    remember={remember}
+                    setRemember={setRemember}
+                    error={error}
+                    busy={busy}
+                    onSubmit={handleSubmitLogin}
+                    onBack={() => {
+                      setStage('role')
+                      setSelectedRole(null)
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </main>
+
+        {/* Compact Footer */}
+        <footer className="mx-auto flex w-full max-w-[1240px] items-center justify-between pt-3 text-[11px] text-slate-500">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700">MEIL ESG & BRSR Reporting Platform</span>
+            <span>·</span>
+            <span>SEBI Compliant</span>
+            <span>·</span>
+            <span>GHG Protocol</span>
+          </div>
+          <div className="text-[10px] text-slate-400">
+            © {new Date().getFullYear()} Megha Engineering & Infrastructures Ltd.
+          </div>
+        </footer>
+
+      </div>
     </div>
   )
 }
 
-function Background() {
+/**
+ * Ambient background with floating 3D spheres & light reflections
+ */
+function BackgroundAtmosphere() {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="orb animate-orb" style={{ width: 420, height: 420, top: -120, left: -80, background: 'radial-gradient(circle, rgba(125,181,255,0.6), transparent 70%)' }} />
-      <div className="orb animate-orb" style={{ width: 360, height: 360, top: '40%', right: -60, background: 'radial-gradient(circle, rgba(170,210,255,0.55), transparent 70%)', animationDelay: '3s' }} />
-      <div className="orb animate-orb" style={{ width: 300, height: 300, bottom: -80, left: '30%', background: 'radial-gradient(circle, rgba(200,230,255,0.5), transparent 70%)', animationDelay: '6s' }} />
-      <div className="orb animate-orb" style={{ width: 180, height: 180, top: '20%', left: '45%', background: 'radial-gradient(circle, rgba(150,200,255,0.4), transparent 70%)', animationDelay: '4.5s' }} />
-      {[...Array(6)].map((_, i) => (
-        <motion.div key={i}
-          className="glass-subtle absolute rounded-2xl"
-          style={{ width: 44 + (i % 3) * 18, height: 44 + (i % 3) * 18, top: `${15 + i * 14}%`, left: `${8 + i * 15}%`, opacity: 0.35 }}
-          animate={{ y: [0, -16, 0], rotate: [0, i % 2 ? 8 : -8, 0] }}
-          transition={{ duration: 8 + i, repeat: Infinity, ease: 'easeInOut', delay: i * 0.7 }}
+    <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      {/* Soft Sky Blue Radial Orbs */}
+      <div className="orb animate-orb" style={{ width: 500, height: 500, top: -140, right: -100, background: 'radial-gradient(circle, rgba(125,211,252,0.65), transparent 70%)' }} />
+      <div className="orb animate-orb" style={{ width: 440, height: 440, bottom: -120, left: -80, background: 'radial-gradient(circle, rgba(186,230,253,0.7), transparent 70%)', animationDelay: '3s' }} />
+      <div className="orb animate-orb" style={{ width: 320, height: 320, top: '35%', left: '15%', background: 'radial-gradient(circle, rgba(224,242,254,0.75), transparent 70%)', animationDelay: '5s' }} />
+
+      {/* Floating 3D Glossy Translucent Spheres / Bubbles */}
+      {[
+        { size: 48, top: '12%', left: '8%', delay: 0 },
+        { size: 28, top: '24%', left: '22%', delay: 1.5 },
+        { size: 64, top: '48%', left: '4%', delay: 2 },
+        { size: 36, top: '78%', left: '12%', delay: 0.8 },
+        { size: 54, top: '16%', right: '14%', delay: 2.5 },
+        { size: 32, top: '42%', right: '6%', delay: 1.2 },
+        { size: 44, top: '72%', right: '18%', delay: 3 },
+      ].map((s, idx) => (
+        <motion.div
+          key={idx}
+          className="glass-sphere-3d absolute pointer-events-none"
+          style={{ width: s.size, height: s.size, top: s.top, left: (s as any).left, right: (s as any).right }}
+          animate={{
+            y: [0, -18, 0],
+            x: [0, idx % 2 === 0 ? 8 : -8, 0],
+            scale: [1, 1.04, 1],
+          }}
+          transition={{
+            duration: 6 + idx * 1.2,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: s.delay,
+          }}
         />
       ))}
     </div>
   )
 }
 
-function WelcomePanel({ onContinue }: { onContinue: () => void }) {
+/**
+ * 3D Orbit ESG Visual Diagram (Left Column of Welcome Screen)
+ * Exactly reproduces the center cushion card, orbiting tiles, dashed rings, and bottom metric blocks.
+ */
+function LiquidGlassOrbitDiagram() {
   return (
-    <div className="glass-strong rounded-[28px] p-8 md:p-10">
-      <div className="mb-6 flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-blue-600" />
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Welcome to MEIL ESG</span>
+    <div className="relative flex flex-col items-center justify-center p-2">
+      <div className="relative h-[380px] w-full max-w-[420px]">
+        {/* Concentric SVG Orbital Rings */}
+        <svg className="absolute inset-0 h-full w-full pointer-events-none" viewBox="0 0 420 380" fill="none">
+          {/* Inner ring */}
+          <circle cx="210" cy="180" r="105" stroke="rgba(14,165,233,0.3)" strokeWidth="1.5" strokeDasharray="4 6">
+            <animateTransform attributeName="transform" type="rotate" from="0 210 180" to="360 210 180" dur="50s" repeatCount="indefinite" />
+          </circle>
+          {/* Outer ring */}
+          <circle cx="210" cy="180" r="145" stroke="rgba(56,189,248,0.22)" strokeWidth="1.5" strokeDasharray="3 8">
+            <animateTransform attributeName="transform" type="rotate" from="360 210 180" to="0 210 180" dur="70s" repeatCount="indefinite" />
+          </circle>
+          {/* Radial glowing connection lines */}
+          <line x1="210" y1="180" x2="210" y2="45" stroke="rgba(14,165,233,0.3)" strokeWidth="1" strokeDasharray="3 4" />
+          <line x1="210" y1="180" x2="68" y2="180" stroke="rgba(14,165,233,0.3)" strokeWidth="1" strokeDasharray="3 4" />
+          <line x1="210" y1="180" x2="352" y2="180" stroke="rgba(14,165,233,0.3)" strokeWidth="1" strokeDasharray="3 4" />
+        </svg>
+
+        {/* Orbit Node Top: Environment */}
+        <motion.div
+          initial={{ opacity: 0, y: -15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          whileHover={{ scale: 1.05 }}
+          className="glass-ios-liquid absolute left-1/2 top-4 -translate-x-1/2 flex flex-col items-center justify-center rounded-2xl px-5 py-3 shadow-md"
+        >
+          <div className="mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 shadow-sm">
+            <Leaf className="h-4 w-4" />
+          </div>
+          <span className="text-[11px] font-semibold text-slate-700">Environment</span>
+        </motion.div>
+
+        {/* Orbit Node Left: Social */}
+        <motion.div
+          initial={{ opacity: 0, x: -15 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          whileHover={{ scale: 1.05 }}
+          className="glass-ios-liquid absolute left-2 top-[138px] flex flex-col items-center justify-center rounded-2xl px-5 py-3 shadow-md"
+        >
+          <div className="mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-sky-50 text-sky-600 shadow-sm">
+            <Users className="h-4 w-4" />
+          </div>
+          <span className="text-[11px] font-semibold text-slate-700">Social</span>
+        </motion.div>
+
+        {/* Orbit Node Right: Governance */}
+        <motion.div
+          initial={{ opacity: 0, x: 15 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          whileHover={{ scale: 1.05 }}
+          className="glass-ios-liquid absolute right-2 top-[138px] flex flex-col items-center justify-center rounded-2xl px-5 py-3 shadow-md"
+        >
+          <div className="mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 shadow-sm">
+            <ShieldCheck className="h-4 w-4" />
+          </div>
+          <span className="text-[11px] font-semibold text-slate-700">Governance</span>
+        </motion.div>
+
+        {/* Orbit Node Bottom Right: Bar Chart indicator */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="glass-ios-liquid absolute bottom-7 right-20 flex h-9 w-9 items-center justify-center rounded-xl text-sky-600 shadow-md"
+        >
+          <BarChart3 className="h-4 w-4" />
+        </motion.div>
+
+        {/* Central 3D Cushion Card: ESG SUSTAINABLE GROWTH */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.85 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="glass-cushion-3d absolute left-1/2 top-[180px] -translate-x-1/2 -translate-y-1/2 flex h-36 w-36 flex-col items-center justify-center rounded-[32px] p-4 text-center"
+        >
+          {/* Leaf Icon with soft radial glow */}
+          <div className="mb-1.5 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-sky-400 to-blue-500 text-white shadow-md shadow-sky-500/30">
+            <Leaf className="h-5 w-5" />
+          </div>
+          <div className="text-2xl font-black tracking-tight text-slate-900">ESG</div>
+          <div className="text-[9px] font-bold tracking-widest text-slate-500 uppercase">
+            SUSTAINABLE
+          </div>
+          <div className="text-[8px] font-bold tracking-widest text-sky-600 uppercase">
+            GROWTH
+          </div>
+        </motion.div>
       </div>
-      <h1 className="text-3xl font-bold leading-tight tracking-tight text-slate-800 md:text-4xl">
-        Corporate sustainability tracking & <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">BRSR compliance</span>, end to end.
-      </h1>
-      <p className="mt-4 text-sm leading-relaxed text-slate-600 md:text-base">
-        A controlled chain from <span className="font-semibold text-slate-700">source data</span> collected at the project/site, through evidence, validation, calculation, approval, consolidation and BRSR mapping — to a final report with full audit traceability.
-      </p>
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        {[
-          { icon: Building2, label: 'Collect', desc: 'Project-level source data' },
-          { icon: FileCheck, label: 'Validate', desc: 'Server-side checks & calc' },
-          { icon: BarChart3, label: 'Report', desc: 'BRSR-ready + audit trace' },
-        ].map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 + i * 0.08 }}
-            className="glass-subtle rounded-xl p-3">
-            <div className="mb-1.5 flex h-8 w-8 items-center justify-center rounded-lg bg-white/70 text-blue-600"><s.icon className="h-4 w-4" /></div>
-            <div className="text-xs font-bold text-slate-700">{s.label}</div>
-            <div className="text-[10px] leading-tight text-slate-500">{s.desc}</div>
-          </motion.div>
-        ))}
+
+      {/* Bottom 3 Metric Columns with subtle dividers */}
+      <div className="mt-4 flex w-full max-w-[380px] items-center justify-between border-t border-slate-200/60 pt-4">
+        <div className="flex-1 text-center">
+          <div className="text-xs font-bold text-slate-800">Measure</div>
+          <div className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">REAL IMPACT</div>
+        </div>
+        <div className="h-6 w-px bg-slate-200" />
+        <div className="flex-1 text-center">
+          <div className="text-xs font-bold text-slate-800">Manage</div>
+          <div className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">RESPONSIBLY</div>
+        </div>
+        <div className="h-6 w-px bg-slate-200" />
+        <div className="flex-1 text-center">
+          <div className="text-xs font-bold text-slate-800">Report</div>
+          <div className="text-[9px] font-semibold tracking-wider text-slate-400 uppercase">TRANSPARENTLY</div>
+        </div>
       </div>
-      <div className="mt-7 flex items-center gap-3">
-        <button onClick={onContinue} className="btn-glass-primary group flex flex-1 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold transition-transform hover:scale-[1.02] active:scale-[0.99]">
-          Choose Role to Continue
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-        </button>
-        <button onClick={onContinue} className="glass rounded-full px-5 py-3.5 text-sm font-semibold text-slate-600 hover:text-blue-600">
-          Demo
-        </button>
-      </div>
-      <p className="mt-4 text-[11px] text-slate-400">Demo accounts are explicitly marked ILLUSTRATIVE. Password: <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-slate-600">esg12345</code></p>
     </div>
   )
 }
 
-function RolePicker({ roles, hovered, setHovered, onPick, onBack }: { roles: RoleCardDef[]; hovered: string | null; setHovered: (s: string | null) => void; onPick: (r: RoleCardDef) => void; onBack: () => void }) {
-  const phases = [1, 2, 3] as const
-  return (
-    <div className="glass-strong rounded-[28px] p-6 md:p-8">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800">Choose your role</h2>
-          <p className="text-xs text-slate-500">Role-based access with backend-enforced permissions.</p>
-        </div>
-        <button onClick={onBack} className="glass-subtle rounded-full px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700">Back</button>
-      </div>
-      <div className="max-h-[56vh] space-y-5 overflow-y-auto scroll-elegant pr-1">
-        {phases.map(ph => (
-          <div key={ph}>
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{PHASE_LABELS[ph]}</span>
-              <div className="h-px flex-1 bg-slate-200/60" />
-            </div>
-            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3">
-              {roles.filter(r => r.phase === ph).map((r, idx) => {
-                const Icon = r.icon
-                const isHover = hovered === r.key
-                return (
-                  <motion.button
-                    key={r.key}
-                    onMouseEnter={() => setHovered(r.key)}
-                    onMouseLeave={() => setHovered(null)}
-                    onClick={() => onPick(r)}
-                    initial={{ opacity: 0, y: 14, rotate: (idx % 3 - 1) * 1.5 }}
-                    animate={{ opacity: 1, y: 0, rotate: isHover ? 0 : (idx % 3 - 1) * 1.5, scale: isHover ? 1.04 : 1, zIndex: isHover ? 10 : 1 }}
-                    whileHover={{ y: -6 }}
-                    transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1], delay: idx * 0.03 }}
-                    className={`glass glass-shimmer relative overflow-hidden rounded-2xl p-3 text-left transition-shadow ${isHover ? 'shadow-xl shadow-blue-500/10' : ''}`}
-                  >
-                    <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${r.tint} text-white shadow-md`}>
-                      <Icon style={{ width: 18, height: 18 }} />
-                    </div>
-                    <div className="text-xs font-bold leading-tight text-slate-800">{r.role}</div>
-                    <div className="mt-0.5 text-[10px] font-medium text-slate-500">{r.name}</div>
-                    <div className="mt-1 text-[10px] leading-tight text-slate-400">{r.blurb}</div>
-                  </motion.button>
-                )
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+/**
+ * Welcome Panel (Right Column) with Organization & Business Unit Dropdowns
+ */
+function WelcomePanel({
+  selectedOrgId,
+  setSelectedOrgId,
+  activeBuId,
+  onSelectBu,
+  onContinue,
+}: {
+  selectedOrgId: string
+  setSelectedOrgId: (id: string) => void
+  activeBuId: string
+  onSelectBu: (id: string) => void
+  onContinue: () => void
+}) {
+  const [buDropdownOpen, setBuDropdownOpen] = useState(false)
+  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false)
+
+  const activeBu = useMemo(
+    () => getBusinessUnitById(activeBuId) || MEIL_BUSINESS_UNITS[0],
+    [activeBuId]
   )
-}
 
-function LoginMorph({ role, email, setEmail, password, setPassword, remember, setRemember, error, busy, onSubmit, onBack }: any) {
-  const Icon = role.icon
+  const activeOrg = useMemo(
+    () => MEIL_ORGANIZATIONS.find(o => o.id === selectedOrgId) || MEIL_ORGANIZATIONS[0],
+    [selectedOrgId]
+  )
+
+  const BuIcon = getBuIcon(activeBu.iconName)
+
   return (
-    <div className="glass-strong overflow-hidden rounded-[28px]">
-      <div className="grid md:grid-cols-2">
-        <div className="relative hidden flex-col justify-between bg-gradient-to-br from-blue-50/80 to-cyan-50/80 p-8 md:flex">
-          <button onClick={onBack} className="glass-subtle mb-4 flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700">
-            <ChevronDown className="h-3 w-3 rotate-90" /> Change role
-          </button>
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="flex flex-col items-center text-center">
-            <div className={`mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br ${role.tint} text-white shadow-xl shadow-blue-500/20`}>
-              <Icon className="h-9 w-9" />
-            </div>
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Phase {role.phase}</div>
-            <h3 className="mt-1 text-2xl font-bold text-slate-800">{role.role}</h3>
-            <p className="mt-2 max-w-xs text-sm text-slate-600">{role.blurb}</p>
-            <div className="mt-4 flex items-center gap-2 rounded-full bg-white/70 px-3 py-1.5">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-slate-600 to-slate-800 text-[10px] font-bold text-white">{role.name.split(' ').map((n: string) => n[0]).join('')}</div>
-              <span className="text-xs font-semibold text-slate-700">{role.name}</span>
-            </div>
-          </motion.div>
-          <div className="flex items-center justify-center gap-2 text-[10px] text-slate-400">
-            <ShieldCheck className="h-3.5 w-3.5" /> Backend-enforced RBAC + org scope
-          </div>
+    <div className="flex flex-col space-y-6">
+      {/* Header Tag & Title */}
+      <div>
+        <div className="text-[11px] font-bold tracking-[0.2em] text-slate-400 uppercase">
+          W E L C O M E &nbsp; T O
         </div>
+        <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
+          MEIL <span className="bg-gradient-to-r from-blue-600 via-sky-500 to-cyan-500 bg-clip-text text-transparent">ESG</span>
+        </h1>
+        <h2 className="mt-0.5 text-base font-semibold text-slate-700">
+          ESG & BRSR Reporting Platform
+        </h2>
+        <p className="mt-2 text-xs leading-relaxed text-slate-500 md:text-sm">
+          A unified platform for responsible data collection, transparent reporting and a sustainable future.
+        </p>
+      </div>
 
-        <div className="p-7 md:p-9">
-          <div className="mb-6">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Sign in as</div>
-            <div className="mt-1 flex items-center gap-2">
-              <div className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${role.tint} text-white`}><Icon className="h-4 w-4" /></div>
+      {/* Select Organization & Business Unit Dropdowns */}
+      <div className="space-y-3.5">
+        
+        {/* Dropdown 1: Select Organization */}
+        <div className="relative">
+          <label className="mb-1.5 block text-xs font-semibold text-slate-600">
+            Select Organization
+          </label>
+          <div
+            onClick={() => {
+              setOrgDropdownOpen(!orgDropdownOpen)
+              setBuDropdownOpen(false)
+            }}
+            className="glass-ios-liquid flex cursor-pointer items-center justify-between rounded-2xl px-4 py-3 transition hover:border-sky-300"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-50 text-sky-600 shadow-sm">
+                <Building2 className="h-4 w-4" />
+              </div>
               <div>
-                <div className="text-base font-bold text-slate-800">{role.role}</div>
-                <div className="text-[11px] text-slate-500">{role.name}</div>
+                <div className="text-xs font-bold text-slate-800">{activeOrg.name}</div>
+                <div className="text-[10px] text-slate-400">{activeOrg.legalName}</div>
               </div>
             </div>
+            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${orgDropdownOpen ? 'rotate-180' : ''}`} />
           </div>
+
+          {/* Org Dropdown Menu */}
+          <AnimatePresence>
+            {orgDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="glass-strong absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-2xl border border-white/80 p-1.5 shadow-xl backdrop-blur-2xl"
+              >
+                {MEIL_ORGANIZATIONS.map(org => (
+                  <div
+                    key={org.id}
+                    onClick={() => {
+                      setSelectedOrgId(org.id)
+                      setOrgDropdownOpen(false)
+                    }}
+                    className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-xs transition ${
+                      org.id === selectedOrgId ? 'bg-sky-50 font-semibold text-sky-700' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div>
+                      <div className="font-semibold">{org.name}</div>
+                      <div className="text-[10px] text-slate-400">{org.legalName}</div>
+                    </div>
+                    {org.id === selectedOrgId && <Check className="h-4 w-4 text-sky-600" />}
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Dropdown 2: Select Business Unit */}
+        <div className="relative">
+          <div className="mb-1.5 flex items-center justify-between">
+            <label className="text-xs font-semibold text-slate-600">
+              Select Business Unit
+            </label>
+            <span className="text-[10px] font-semibold text-sky-600">
+              {MEIL_BUSINESS_UNITS.length} Core Portfolios
+            </span>
+          </div>
+          
+          <div
+            onClick={() => {
+              setBuDropdownOpen(!buDropdownOpen)
+              setOrgDropdownOpen(false)
+            }}
+            className="glass-ios-liquid flex cursor-pointer items-center justify-between rounded-2xl px-4 py-3 transition hover:border-sky-300"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br ${activeBu.gradient} text-white shadow-sm`}>
+                <BuIcon className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-800">{activeBu.name}</span>
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
+                    {activeBu.projects.length} Sites
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400">{activeBu.sector}</div>
+              </div>
+            </div>
+            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${buDropdownOpen ? 'rotate-180' : ''}`} />
+          </div>
+
+          {/* BU Dropdown Menu */}
+          <AnimatePresence>
+            {buDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="glass-strong absolute left-0 right-0 top-full z-30 mt-1.5 max-h-72 overflow-y-auto scroll-elegant rounded-2xl border border-white/80 p-1.5 shadow-2xl backdrop-blur-2xl"
+              >
+                {MEIL_BUSINESS_UNITS.map(bu => {
+                  const IconComp = getBuIcon(bu.iconName)
+                  const isSelected = bu.id === activeBuId
+                  return (
+                    <div
+                      key={bu.id}
+                      onClick={() => {
+                        onSelectBu(bu.id)
+                        setBuDropdownOpen(false)
+                      }}
+                      className={`flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-xs transition ${
+                        isSelected ? 'bg-sky-50 font-semibold text-sky-700' : 'text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={`flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br ${bu.gradient} text-white shadow-xs`}>
+                          <IconComp className="h-3.5 w-3.5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold">{bu.name}</span>
+                            <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] text-slate-500 font-mono">
+                              {bu.projects.length}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-slate-400 line-clamp-1">{bu.sector}</div>
+                        </div>
+                      </div>
+                      {isSelected && <Check className="h-4 w-4 text-sky-600" />}
+                    </div>
+                  )
+                })}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+      </div>
+
+      {/* Prominent Continue Button (Electric Blue Pill with Arrow) */}
+      <button
+        onClick={onContinue}
+        className="btn-liquid-blue group flex w-full items-center justify-center gap-2.5 rounded-full py-3.5 text-sm font-bold shadow-lg"
+      >
+        <span>Continue to Project Sites ({activeBu.projects.length})</span>
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+      </button>
+
+      {/* Bottom: OUR ESG PILLARS with 3 Frosted Glass Cards */}
+      <div className="pt-1">
+        <div className="relative mb-3.5 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200/70" />
+          </div>
+          <span className="relative bg-[#ffffff]/60 px-3 text-[10px] font-bold tracking-widest text-slate-400 uppercase backdrop-blur-xs">
+            OUR ESG PILLARS
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          {/* Pillar 1: Environment */}
+          <div className="glass-ios-liquid flex flex-col items-center justify-center rounded-2xl p-2.5 text-center">
+            <div className="mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+              <Leaf className="h-3.5 w-3.5" />
+            </div>
+            <div className="text-[10px] font-bold leading-tight text-slate-700">Environment</div>
+            <div className="text-[9px] text-slate-400">Protection</div>
+          </div>
+
+          {/* Pillar 2: Social */}
+          <div className="glass-ios-liquid flex flex-col items-center justify-center rounded-2xl p-2.5 text-center">
+            <div className="mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-sky-50 text-sky-600">
+              <Users className="h-3.5 w-3.5" />
+            </div>
+            <div className="text-[10px] font-bold leading-tight text-slate-700">Social</div>
+            <div className="text-[9px] text-slate-400">Responsibility</div>
+          </div>
+
+          {/* Pillar 3: Governance */}
+          <div className="glass-ios-liquid flex flex-col items-center justify-center rounded-2xl p-2.5 text-center">
+            <div className="mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+              <ShieldCheck className="h-3.5 w-3.5" />
+            </div>
+            <div className="text-[10px] font-bold leading-tight text-slate-700">Good</div>
+            <div className="text-[9px] text-slate-400">Governance</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * NEXT SCREEN: Project Selection Screen
+ * Displays the list of all projects belonging to the selected Business Unit in an
+ * ultra-premium iOS Liquid Glass interactive grid!
+ */
+function ProjectSelectionScreen({
+  currentBu,
+  selectedProjectId,
+  onSelectBu,
+  onSelectProject,
+  onBack,
+  onProceed,
+}: {
+  currentBu: MeilBusinessUnit
+  selectedProjectId: string
+  onSelectBu: (id: string) => void
+  onSelectProject: (p: MeilProject) => void
+  onBack: () => void
+  onProceed: () => void
+}) {
+  const [search, setSearch] = useState('')
+  const BuIcon = getBuIcon(currentBu.iconName)
+
+  // Filter projects based on search query
+  const filteredProjects = useMemo(() => {
+    if (!search.trim()) return currentBu.projects
+    const q = search.toLowerCase()
+    return currentBu.projects.filter(
+      p =>
+        p.name.toLowerCase().includes(q) ||
+        p.location.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        p.stateOrCountry.toLowerCase().includes(q)
+    )
+  }, [currentBu.projects, search])
+
+  const activeProject = useMemo(() => {
+    return currentBu.projects.find(p => p.id === selectedProjectId) || currentBu.projects[0]
+  }, [currentBu.projects, selectedProjectId])
+
+  return (
+    <div className="space-y-5">
+      {/* Top Header with Back Button & Breadcrumbs */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/60 pb-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="glass-subtle flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-white hover:text-sky-600 shadow-xs"
+            title="Back to Welcome Screen"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Step 2 of 3</span>
+              <span className="text-slate-300">•</span>
+              <span className="text-[10px] font-bold text-sky-600 uppercase">Project Site Selection</span>
+            </div>
+            <h2 className="text-xl font-extrabold tracking-tight text-slate-900 md:text-2xl">
+              Select Project Site in {currentBu.name}
+            </h2>
+          </div>
+        </div>
+
+        {/* Search Input */}
+        <div className="relative min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={`Search ${currentBu.projects.length} sites in ${currentBu.shortName}...`}
+            className="w-full rounded-full border border-slate-200/80 bg-white/70 py-1.5 pl-9 pr-4 text-xs text-slate-800 outline-none backdrop-blur-md transition focus:border-sky-400 focus:bg-white focus:ring-2 focus:ring-sky-100"
+          />
+        </div>
+      </div>
+
+      {/* Business Unit Switcher Pill Tabs */}
+      <div className="flex items-center gap-2 overflow-x-auto scroll-elegant pb-1">
+        {MEIL_BUSINESS_UNITS.map(bu => {
+          const Icon = getBuIcon(bu.iconName)
+          const isSelected = bu.id === currentBu.id
+          return (
+            <button
+              key={bu.id}
+              onClick={() => onSelectBu(bu.id)}
+              className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                isSelected
+                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md shadow-sky-500/25'
+                  : 'glass-subtle text-slate-600 hover:bg-white hover:text-slate-900'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span>{bu.shortName}</span>
+              <span className={`rounded-full px-1.5 py-0.2 text-[9px] font-bold ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-200/60 text-slate-600'}`}>
+                {bu.projects.length}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Project Cards Grid */}
+      <div className="max-h-[50vh] overflow-y-auto scroll-elegant pr-1">
+        {filteredProjects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Compass className="h-10 w-10 text-slate-300" />
+            <div className="mt-2 text-sm font-semibold text-slate-700">No project sites found</div>
+            <div className="text-xs text-slate-400">Try searching for a different keyword or switch Business Unit.</div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {filteredProjects.map((p, idx) => {
+              const isSelected = p.id === selectedProjectId
+              return (
+                <motion.div
+                  key={p.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: idx * 0.02 }}
+                  onClick={() => onSelectProject(p)}
+                  className={`group relative flex cursor-pointer flex-col justify-between rounded-2xl p-4 transition-all ${
+                    isSelected
+                      ? 'border-2 border-sky-500 bg-white/95 shadow-lg shadow-sky-500/15 ring-2 ring-sky-200/60'
+                      : 'glass-ios-liquid hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white/90'
+                  }`}
+                >
+                  {/* Top: Category Tag + Status Badge */}
+                  <div>
+                    <div className="mb-2 flex items-start justify-between gap-2">
+                      <span className="rounded-md bg-sky-50 px-2 py-0.5 text-[10px] font-bold text-sky-700">
+                        {p.category}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        <span className="text-[10px] font-semibold text-slate-500">
+                          {p.status === 'IN_OPERATION' ? 'Operating' : 'Active'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Project Title */}
+                    <h3 className="text-sm font-bold leading-snug text-slate-800 group-hover:text-sky-700 transition-colors">
+                      {p.name}
+                    </h3>
+
+                    {/* Location with Pin */}
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                      <MapPin className="h-3 w-3 text-sky-500 shrink-0" />
+                      <span className="line-clamp-1">{p.location}</span>
+                    </div>
+
+                    {/* Description */}
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500 line-clamp-2">
+                      {p.description}
+                    </p>
+                  </div>
+
+                  {/* Bottom: ESG Metrics Pill & Selection Radio */}
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+                        BRSR Core
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-400">
+                        ESG {p.esgScore}%
+                      </span>
+                    </div>
+
+                    <div className={`flex h-5 w-5 items-center justify-center rounded-full transition ${
+                      isSelected ? 'bg-sky-500 text-white shadow-xs' : 'border border-slate-300 text-transparent'
+                    }`}>
+                      <Check className="h-3 w-3" />
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Sticky Action Bar: Selected Project Summary & Proceed Button */}
+      <div className="flex flex-col gap-3 rounded-2xl bg-white/80 p-4 backdrop-blur-xl border border-sky-100 sm:flex-row sm:items-center sm:justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-sm">
+            <BuIcon className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Selected Project</span>
+              <span className="rounded bg-sky-100 px-1.5 py-0.2 text-[9px] font-bold text-sky-700">{currentBu.name}</span>
+            </div>
+            <div className="text-sm font-extrabold text-slate-800">
+              {activeProject ? activeProject.name : 'Choose a project'}
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {activeProject?.location} • Owner: {activeProject?.reportingOwner}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={onBack}
+            className="glass-subtle rounded-full px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-800"
+          >
+            Back
+          </button>
+          <button
+            onClick={onProceed}
+            className="btn-liquid-blue flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-bold shadow-md"
+          >
+            <span>Proceed to Role Access</span>
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Screen 3: Role Selection Screen (Phase 1, 2, 3 Enterprise RBAC roles)
+ */
+function RolePickerScreen({
+  project,
+  bu,
+  roles,
+  hovered,
+  setHovered,
+  onPick,
+  onBack,
+}: {
+  project: MeilProject
+  bu: MeilBusinessUnit
+  roles: RoleCardDef[]
+  hovered: string | null
+  setHovered: (s: string | null) => void
+  onPick: (r: RoleCardDef) => void
+  onBack: () => void
+}) {
+  const phases = [1, 2, 3] as const
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="glass-subtle flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-white hover:text-sky-600 shadow-xs"
+            title="Back to Project Sites"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Step 3 of 3</span>
+              <span className="text-slate-300">•</span>
+              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[9px] font-bold text-sky-700">
+                {project.name}
+              </span>
+            </div>
+            <h2 className="text-xl font-extrabold tracking-tight text-slate-900 md:text-2xl">
+              Choose Persona / Access Role
+            </h2>
+          </div>
+        </div>
+
+        <button
+          onClick={onBack}
+          className="glass-subtle hidden sm:block rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+        >
+          Change Site
+        </button>
+      </div>
+
+      {/* Role Phases Grid */}
+      <div className="max-h-[54vh] space-y-5 overflow-y-auto scroll-elegant pr-1">
+        {phases.map(ph => (
+          <div key={ph}>
+            <div className="mb-2.5 flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                {PHASE_LABELS[ph]}
+              </span>
+              <div className="h-px flex-1 bg-slate-200/60" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-4">
+              {roles
+                .filter(r => r.phase === ph)
+                .map((r, idx) => {
+                  const Icon = r.icon
+                  const isHover = hovered === r.key
+                  return (
+                    <motion.button
+                      key={r.key}
+                      onMouseEnter={() => setHovered(r.key)}
+                      onMouseLeave={() => setHovered(null)}
+                      onClick={() => onPick(r)}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      transition={{ duration: 0.2, delay: idx * 0.02 }}
+                      className={`glass-ios-liquid group relative flex flex-col justify-between overflow-hidden rounded-2xl p-3.5 text-left transition-all ${
+                        isHover ? 'shadow-xl shadow-sky-500/15 border-sky-400' : ''
+                      }`}
+                    >
+                      <div>
+                        <div className={`mb-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${r.tint} text-white shadow-md`}>
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="text-xs font-bold leading-tight text-slate-800 group-hover:text-sky-700">
+                          {r.role}
+                        </div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-slate-500">
+                          {r.name}
+                        </div>
+                        <div className="mt-1 text-[10px] leading-snug text-slate-400 line-clamp-2">
+                          {r.blurb}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[9px] font-semibold text-sky-600">
+                        <span>Select Role</span>
+                        <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    </motion.button>
+                  )
+                })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Screen 4: Login Morph (Pre-filled demo credentials)
+ */
+function LoginScreen({
+  project,
+  bu,
+  role,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  remember,
+  setRemember,
+  error,
+  busy,
+  onSubmit,
+  onBack,
+}: any) {
+  const Icon = role.icon
+  return (
+    <div className="glass-strong overflow-hidden rounded-[28px] border border-white/80 shadow-2xl">
+      <div className="grid md:grid-cols-2">
+        {/* Left Side: Role Profile Card */}
+        <div className="relative flex flex-col justify-between bg-gradient-to-br from-blue-50/90 to-sky-50/80 p-8">
+          <button
+            onClick={onBack}
+            className="glass-subtle mb-4 flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Roles
+          </button>
+
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="flex flex-col items-center text-center"
+          >
+            <div className={`mb-4 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br ${role.tint} text-white shadow-xl shadow-sky-500/20`}>
+              <Icon className="h-9 w-9" />
+            </div>
+
+            <div className="rounded-full bg-white/70 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-700 shadow-xs">
+              Phase {role.phase} Access
+            </div>
+            <h3 className="mt-2 text-2xl font-extrabold text-slate-900">{role.role}</h3>
+            <p className="mt-1 text-xs text-slate-500 max-w-xs">{role.blurb}</p>
+
+            <div className="mt-4 flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 shadow-xs">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-[10px] font-bold text-white">
+                {role.name.split(' ').map((n: string) => n[0]).join('')}
+              </div>
+              <span className="text-xs font-bold text-slate-700">{role.name}</span>
+            </div>
+
+            {/* Selected Project Pill */}
+            <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-sky-100/70 px-2.5 py-1 text-[10px] font-semibold text-sky-800">
+              <MapPin className="h-3 w-3 text-sky-600" />
+              <span>{project.name} ({bu.shortName})</span>
+            </div>
+          </motion.div>
+
+          <div className="flex items-center justify-center gap-1.5 text-[10px] font-medium text-slate-400">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            <span>Backend-enforced RBAC + scope access</span>
+          </div>
+        </div>
+
+        {/* Right Side: Login Form */}
+        <div className="p-7 md:p-9">
+          <div className="mb-6">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Sign in to platform</div>
+            <div className="mt-1 text-base font-extrabold text-slate-800">{role.role}</div>
+            <div className="text-[11px] text-slate-500">{role.email}</div>
+          </div>
+
           <form onSubmit={onSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                className="w-full rounded-xl border border-slate-200 bg-white/70 px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                placeholder="you@meil-esg.in" />
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 text-sm text-slate-800 outline-none backdrop-blur-md transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                placeholder="user@meil-esg.in"
+              />
             </div>
+
             <div>
-              <label className="mb-1.5 block text-xs font-semibold text-slate-600">Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                className="w-full rounded-xl border border-slate-200 bg-white/70 px-4 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                placeholder="••••••••" />
+              <label className="mb-1.5 block text-xs font-semibold text-slate-700">Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2.5 text-sm text-slate-800 outline-none backdrop-blur-md transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                placeholder="••••••••"
+              />
             </div>
+
             <div className="flex items-center justify-between">
               <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
-                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-200" />
-                Remember session
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={e => setRemember(e.target.checked)}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-sky-600 focus:ring-sky-200"
+                />
+                <span>Remember session</span>
               </label>
-              <button type="button" className="text-xs font-medium text-blue-600 hover:underline">Forgot password?</button>
+              <span className="text-xs font-semibold text-sky-600">Demo enabled</span>
             </div>
+
             {error && (
-              <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+              <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+                <ShieldAlert className="h-4 w-4" />
                 <span>{error}</span>
               </motion.div>
             )}
-            <button type="submit" disabled={busy}
-              className="btn-glass-primary group flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60">
-              {busy ? 'Signing in…' : <>Sign In <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></>}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="btn-liquid-blue group flex w-full items-center justify-center gap-2 rounded-full py-3 text-sm font-bold shadow-md disabled:opacity-60"
+            >
+              {busy ? (
+                <span>Authenticating…</span>
+              ) : (
+                <>
+                  <span>Enter Workspace as {role.name.split(' ')[0]}</span>
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </>
+              )}
             </button>
           </form>
-          <div className="mt-5 flex items-center gap-2 rounded-xl bg-blue-50/60 px-3 py-2 text-[11px] text-slate-500">
-            <Check className="h-3.5 w-3.5 text-emerald-600" />
-            Demo credentials pre-filled. Password: <code className="rounded bg-white px-1 py-0.5 font-mono text-slate-600">esg12345</code>
+
+          <div className="mt-5 flex items-center gap-2 rounded-xl bg-sky-50/80 px-3.5 py-2.5 text-[11px] text-slate-600">
+            <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>
+              Pre-filled demo login. Default password: <code className="rounded bg-white px-1.5 py-0.5 font-mono font-bold text-sky-700 shadow-2xs">esg12345</code>
+            </span>
           </div>
         </div>
-      </div>
-    </div>
-  )
-}
-
-function EsgConceptDiagram() {
-  const satellites = [
-    { label: 'Environment', icon: Leaf, color: 'from-emerald-400 to-green-600', angle: -90, key: 'ENV' },
-    { label: 'Social', icon: Users, color: 'from-amber-400 to-orange-600', angle: 30, key: 'SOC' },
-    { label: 'Governance', icon: Scale, color: 'from-blue-400 to-indigo-600', angle: 150, key: 'GOV' },
-  ]
-  const cx = 260, cy = 260, r = 150
-  return (
-    <div className="relative h-full w-full">
-      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 520 520" fill="none">
-        {satellites.map((s) => {
-          const rad = (s.angle * Math.PI) / 180
-          const x = cx + r * Math.cos(rad)
-          const y = cy + r * Math.sin(rad)
-          return (
-            <g key={s.key}>
-              <line x1={cx} y1={cy} x2={x} y2={y} stroke="rgba(59,130,246,0.25)" strokeWidth="2" strokeDasharray="4 6">
-                <animate attributeName="stroke-dashoffset" from="0" to="-20" dur="3s" repeatCount="indefinite" />
-              </line>
-              <circle cx={x} cy={y} r="3" fill="rgba(59,130,246,0.4)">
-                <animate attributeName="r" values="3;6;3" dur="2s" repeatCount="indefinite" />
-              </circle>
-            </g>
-          )
-        })}
-      </svg>
-      <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="glass-strong absolute left-1/2 top-1/2 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-3xl">
-        <div className="text-lg font-black text-slate-800">ESG</div>
-        <div className="text-[9px] font-semibold uppercase tracking-wider text-blue-600">Sustainable</div>
-        <div className="text-[9px] font-semibold uppercase tracking-wider text-blue-600">Growth</div>
-      </motion.div>
-      {satellites.map((s, i) => {
-        const rad = (s.angle * Math.PI) / 180
-        const x = cx + r * Math.cos(rad) - 60
-        const y = cy + r * Math.sin(rad) - 60
-        const Icon = s.icon
-        return (
-          <motion.div key={s.key}
-            initial={{ opacity: 0, scale: 0.6 }}
-            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-            transition={{ delay: 0.2 + i * 0.15, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={{ scale: 1.08, y: -4 }}
-            className="glass glass-shimmer absolute flex h-28 w-28 flex-col items-center justify-center rounded-3xl"
-            style={{ left: x, top: y }}
-          >
-            <div className={`mb-1.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br ${s.color} text-white shadow-lg`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-700">{s.label}</div>
-          </motion.div>
-        )
-      })}
-      <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-2">
-        {['Measure', 'Manage', 'Report'].map((s, i) => (
-          <motion.div key={s} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 + i * 0.1 }}
-            className="glass-subtle rounded-full px-3 py-1 text-[10px] font-semibold text-slate-600">{s}</motion.div>
-        ))}
       </div>
     </div>
   )

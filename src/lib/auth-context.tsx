@@ -40,8 +40,12 @@ interface AppState {
   loading: boolean
   activeModule: ModuleKey
   dataEntrySubModule: string
+  selectedBuId: string
+  selectedProjectId: string
   setActiveModule: (m: ModuleKey) => void
   setDataEntrySubModule: (s: string) => void
+  setSelectedBuId: (b: string) => void
+  setSelectedProjectId: (p: string) => void
   refreshUser: () => Promise<void>
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
   logout: () => Promise<void>
@@ -54,6 +58,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [activeModule, setActiveModule] = useState<ModuleKey>('overview')
   const [dataEntrySubModule, setDataEntrySubModule] = useState('energy')
+  const [selectedBuId, setSelectedBuIdState] = useState<string>('bu-transportation')
+  const [selectedProjectId, setSelectedProjectIdState] = useState<string>('trans-01')
+
+  useEffect(() => {
+    try {
+      const savedBu = localStorage.getItem('meil_selected_bu_id')
+      if (savedBu) setSelectedBuIdState(savedBu)
+      const savedProj = localStorage.getItem('meil_selected_project_id')
+      if (savedProj) setSelectedProjectIdState(savedProj)
+    } catch {
+      // ignore in environments without localStorage
+    }
+  }, [])
+
+  const setSelectedBuId = useCallback((id: string) => {
+    setSelectedBuIdState(id)
+    try { localStorage.setItem('meil_selected_bu_id', id) } catch {}
+  }, [])
+
+  const setSelectedProjectId = useCallback((id: string) => {
+    setSelectedProjectIdState(id)
+    try { localStorage.setItem('meil_selected_project_id', id) } catch {}
+  }, [])
 
   const refreshUser = useCallback(async () => {
     try {
@@ -90,7 +117,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <Ctx.Provider value={{ user, loading, activeModule, dataEntrySubModule, setActiveModule, setDataEntrySubModule, refreshUser, login, logout }}>
+    <Ctx.Provider value={{
+      user, loading, activeModule, dataEntrySubModule, selectedBuId, selectedProjectId,
+      setActiveModule, setDataEntrySubModule, setSelectedBuId, setSelectedProjectId,
+      refreshUser, login, logout
+    }}>
       {children}
     </Ctx.Provider>
   )
