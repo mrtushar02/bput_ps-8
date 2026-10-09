@@ -104,9 +104,28 @@
 }
 
 @layer base {
-  * {
+  *, *::before, *::after {
     @apply border-border outline-ring/50;
+    /* Eliminate blinking caret bar on non-editable text when clicking */
+    caret-color: transparent;
   }
+
+  /* Only editable inputs and textareas show the text insertion caret */
+  input,
+  textarea,
+  [contenteditable="true"],
+  [contenteditable=""] {
+    caret-color: #2563eb !important;
+  }
+
+  /* Prevent accidental caret and selection on dashboard titles, badges, and controls */
+  h1, h2, h3, h4, h5, h6,
+  button, nav, [role="button"] {
+    user-select: none;
+    -webkit-user-select: none;
+    caret-color: transparent !important;
+  }
+
   html, body {
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
