@@ -917,6 +917,9 @@ function ProjectSelectionScreen({
 
 /**
  * Screen 3: Role Selection Screen (Phase 1, 2, 3 Enterprise RBAC roles)
+ * Matches the reference design with high-intensity iOS Liquid Glass,
+ * bold modern typography, deep blue drop shadows, left/right nav chevrons,
+ * and bottom slogan.
  */
 function RolePickerScreen({
   project,
@@ -935,97 +938,164 @@ function RolePickerScreen({
   onPick: (r: RoleCardDef) => void
   onBack: () => void
 }) {
-  const phases = [1, 2, 3] as const
-  return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="glass-subtle flex h-9 w-9 items-center justify-center rounded-full text-slate-600 transition hover:bg-white hover:text-sky-600 shadow-xs"
-            title="Back to Project Sites"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Step 3 of 3</span>
-              <span className="text-slate-300">•</span>
-              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[9px] font-bold text-sky-700">
-                {project.name}
-              </span>
-            </div>
-            <h2 className="text-xl font-extrabold tracking-tight text-slate-900 md:text-2xl">
-              Choose Persona / Access Role
-            </h2>
-          </div>
-        </div>
+  const [currentPage, setCurrentPage] = useState(0)
+  const pageSize = 6
+  const totalPages = Math.ceil(roles.length / pageSize)
 
+  const displayedRoles = useMemo(() => {
+    const start = currentPage * pageSize
+    return roles.slice(start, start + pageSize)
+  }, [roles, currentPage, pageSize])
+
+  const nextPage = () => setCurrentPage(prev => (prev + 1) % totalPages)
+  const prevPage = () => setCurrentPage(prev => (prev - 1 + totalPages) % totalPages)
+
+  return (
+    <div className="relative flex flex-col items-center justify-between py-2 sm:py-4">
+      {/* Top Navigation Row: Back to Site + Step Indicator */}
+      <div className="relative w-full flex items-center justify-between mb-2">
         <button
           onClick={onBack}
-          className="glass-subtle hidden sm:block rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900"
+          className="glass-subtle flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-white hover:text-sky-600 shadow-xs"
         >
-          Change Site
+          <ArrowLeft className="h-3.5 w-3.5" />
+          <span>Change Project</span>
+        </button>
+
+        {/* Top Step Pill Badge */}
+        <div className="flex items-center justify-center">
+          <span className="rounded-full bg-white/90 px-3.5 py-1 text-[10px] font-extrabold tracking-[0.2em] text-sky-600 uppercase border border-sky-100 shadow-xs backdrop-blur-md">
+            STEP 3 OF 3 • {project.name}
+          </span>
+        </div>
+
+        <div className="hidden sm:block text-[11px] font-semibold text-slate-400">
+          {bu.shortName}
+        </div>
+      </div>
+
+      {/* Main Headline & Subtitle */}
+      <div className="text-center my-3 sm:my-5">
+        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900">
+          Choose Your{' '}
+          <span className="bg-gradient-to-r from-blue-600 via-sky-500 to-blue-700 bg-clip-text text-transparent">
+            Role
+          </span>
+        </h2>
+        <p className="mt-2 text-xs sm:text-sm font-medium text-slate-500 max-w-lg mx-auto leading-relaxed">
+          Select your role to continue to the MEIL ESG platform
+        </p>
+      </div>
+
+      {/* Horizontal Carousel Track with Left & Right Chevrons */}
+      <div className="relative w-full flex items-center justify-center gap-2 sm:gap-4 my-2 sm:my-4">
+        {/* Left Arrow Button */}
+        <button
+          onClick={prevPage}
+          aria-label="Previous roles"
+          className="glass-ios-liquid z-20 flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full text-sky-600 hover:text-sky-700 hover:scale-105 active:scale-95 transition shadow-lg shadow-sky-500/15"
+        >
+          <ChevronDown className="h-5 w-5 rotate-90" />
+        </button>
+
+        {/* Cards Row */}
+        <div className="w-full overflow-hidden px-1 py-4">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentPage}
+              initial={{ opacity: 0, x: 25 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -25 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-center justify-center gap-3 sm:gap-4 lg:gap-5 flex-wrap md:flex-nowrap"
+            >
+              {displayedRoles.map((r, idx) => {
+                const Icon = r.icon
+                const isHover = hovered === r.key
+                // Highlight CSR user by default on page 0 if nothing hovered, matching screenshot
+                const isDefaultActive = !hovered && currentPage === 0 && r.key === 'CSR_USER'
+                const isHighlighted = isHover || isDefaultActive
+
+                return (
+                  <motion.div
+                    key={r.key}
+                    onMouseEnter={() => setHovered(r.key)}
+                    onMouseLeave={() => setHovered(null)}
+                    onClick={() => onPick(r)}
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.25, delay: idx * 0.04 }}
+                    whileHover={{ y: -8, scale: 1.03 }}
+                    className={`group relative flex cursor-pointer flex-col items-center justify-between rounded-[28px] p-5 text-center transition-all ${
+                      isHighlighted
+                        ? 'w-44 sm:w-48 lg:w-52 h-72 sm:h-80 bg-white/95 border-2 border-sky-400 shadow-role-active -translate-y-2 scale-[1.02] z-10'
+                        : 'w-44 sm:w-48 lg:w-52 h-72 sm:h-80 bg-white/80 border-1.5 border-white/90 shadow-role-card hover:bg-white hover:border-sky-300'
+                    }`}
+                  >
+                    {/* Top Squircle Icon */}
+                    <div className="flex flex-col items-center mt-2">
+                      <div className="mb-4 flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-[22px] bg-gradient-to-tr from-sky-50 via-blue-50 to-indigo-50/80 text-blue-600 border border-white shadow-inner shadow-blue-500/10">
+                        <Icon className="h-7 w-7 text-blue-600 group-hover:scale-110 transition-transform duration-200" />
+                      </div>
+
+                      {/* Role Title */}
+                      <h3 className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-sky-700 transition-colors leading-tight">
+                        {r.role}
+                      </h3>
+
+                      {/* Description */}
+                      <p className="mt-2 text-[11px] sm:text-xs leading-relaxed text-slate-500 font-normal px-1 line-clamp-3">
+                        {r.blurb}
+                      </p>
+                    </div>
+
+                    {/* Bottom Access Indicator */}
+                    <div className="mt-auto w-full pt-2">
+                      <div className={`mx-auto flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[10px] font-bold transition ${
+                        isHighlighted
+                          ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-500 group-hover:bg-sky-50 group-hover:text-sky-700'
+                      }`}>
+                        <span>Select Role</span>
+                        <ArrowRight className="h-3 w-3" />
+                      </div>
+                    </div>
+                  </motion.div>
+                )
+              })}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Right Arrow Button */}
+        <button
+          onClick={nextPage}
+          aria-label="Next roles"
+          className="glass-ios-liquid z-20 flex h-10 w-10 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-full text-sky-600 hover:text-sky-700 hover:scale-105 active:scale-95 transition shadow-lg shadow-sky-500/15"
+        >
+          <ChevronDown className="h-5 w-5 -rotate-90" />
         </button>
       </div>
 
-      {/* Role Phases Grid */}
-      <div className="max-h-[54vh] space-y-5 overflow-y-auto scroll-elegant pr-1">
-        {phases.map(ph => (
-          <div key={ph}>
-            <div className="mb-2.5 flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                {PHASE_LABELS[ph]}
-              </span>
-              <div className="h-px flex-1 bg-slate-200/60" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-4">
-              {roles
-                .filter(r => r.phase === ph)
-                .map((r, idx) => {
-                  const Icon = r.icon
-                  const isHover = hovered === r.key
-                  return (
-                    <motion.button
-                      key={r.key}
-                      onMouseEnter={() => setHovered(r.key)}
-                      onMouseLeave={() => setHovered(null)}
-                      onClick={() => onPick(r)}
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      whileHover={{ y: -4, scale: 1.02 }}
-                      transition={{ duration: 0.2, delay: idx * 0.02 }}
-                      className={`glass-ios-liquid group relative flex flex-col justify-between overflow-hidden rounded-2xl p-3.5 text-left transition-all ${
-                        isHover ? 'shadow-xl shadow-sky-500/15 border-sky-400' : ''
-                      }`}
-                    >
-                      <div>
-                        <div className={`mb-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br ${r.tint} text-white shadow-md`}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="text-xs font-bold leading-tight text-slate-800 group-hover:text-sky-700">
-                          {r.role}
-                        </div>
-                        <div className="mt-0.5 text-[10px] font-semibold text-slate-500">
-                          {r.name}
-                        </div>
-                        <div className="mt-1 text-[10px] leading-snug text-slate-400 line-clamp-2">
-                          {r.blurb}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[9px] font-semibold text-sky-600">
-                        <span>Select Role</span>
-                        <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
-                      </div>
-                    </motion.button>
-                  )
-                })}
-            </div>
-          </div>
+      {/* Pagination Dots */}
+      <div className="my-3 flex items-center justify-center gap-2">
+        {Array.from({ length: totalPages }).map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrentPage(i)}
+            aria-label={`Go to page ${i + 1}`}
+            className={`transition-all ${
+              i === currentPage
+                ? 'h-1.5 w-6 rounded-full bg-blue-600 shadow-sm shadow-blue-500/30'
+                : 'h-1.5 w-1.5 rounded-full bg-sky-200 hover:bg-sky-400'
+            }`}
+          />
         ))}
+      </div>
+
+      {/* Bottom Slogan matching the reference design */}
+      <div className="mt-1 text-center text-[11px] sm:text-xs font-medium tracking-wide text-slate-400">
+        Together for a Cleaner, Safer and More Responsible Tomorrow
       </div>
     </div>
   )
