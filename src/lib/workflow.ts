@@ -224,72 +224,192 @@ export async function fetchSourceRecords(
   module: string,
 ): Promise<SourceRecordSummary[]> {
   if (recordIds.length === 0) return []
-  switch (module) {
-    case 'ENERGY': {
-      const rows = await db.energyRecord.findMany({
-        where: { id: { in: recordIds } },
-        select: SOURCE_COMMON_SELECT,
-      })
-      return rows as unknown as SourceRecordSummary[]
+  const out: SourceRecordSummary[] = []
+  const remainingIds = new Set(recordIds)
+
+  // 1. Try Prisma models where applicable
+  try {
+    switch (module) {
+      case 'ENERGY': {
+        const rows = await db.energyRecord.findMany({
+          where: { id: { in: Array.from(remainingIds) } },
+          select: {
+            id: true,
+            projectId: true,
+            reportingPeriodId: true,
+            module: true,
+            evidenceId: true,
+            validationStatus: true,
+            calculationStatus: true,
+            revisionNumber: true,
+            status: true,
+            enteredBy: true,
+            enteredAt: true,
+            updatedAt: true,
+          },
+        })
+        for (const r of rows) {
+          out.push(r as unknown as SourceRecordSummary)
+          remainingIds.delete(r.id)
+        }
+        break
+      }
+      case 'WATER': {
+        const rows = await db.waterRecord.findMany({
+          where: { id: { in: Array.from(remainingIds) } },
+          select: {
+            id: true,
+            projectId: true,
+            reportingPeriodId: true,
+            module: true,
+            evidenceId: true,
+            validationStatus: true,
+            calculationStatus: true,
+            revisionNumber: true,
+            status: true,
+            enteredBy: true,
+            enteredAt: true,
+            updatedAt: true,
+          },
+        })
+        for (const r of rows) {
+          out.push(r as unknown as SourceRecordSummary)
+          remainingIds.delete(r.id)
+        }
+        break
+      }
+      case 'WASTE': {
+        const rows = await db.wasteRecord.findMany({
+          where: { id: { in: Array.from(remainingIds) } },
+          select: {
+            id: true,
+            projectId: true,
+            reportingPeriodId: true,
+            module: true,
+            evidenceId: true,
+            validationStatus: true,
+            calculationStatus: true,
+            revisionNumber: true,
+            status: true,
+            enteredBy: true,
+            enteredAt: true,
+            updatedAt: true,
+          },
+        })
+        for (const r of rows) {
+          out.push(r as unknown as SourceRecordSummary)
+          remainingIds.delete(r.id)
+        }
+        break
+      }
+      case 'PEOPLE':
+      case 'TRAINING': {
+        const rows = await db.workforceRecord.findMany({
+          where: { id: { in: Array.from(remainingIds) } },
+          select: {
+            id: true,
+            projectId: true,
+            reportingPeriodId: true,
+            module: true,
+            evidenceId: true,
+            validationStatus: true,
+            revisionNumber: true,
+            status: true,
+            enteredBy: true,
+            enteredAt: true,
+            updatedAt: true,
+          },
+        })
+        for (const r of rows) {
+          out.push({
+            ...r,
+            calculationStatus: 'NOT_APPLICABLE',
+          } as unknown as SourceRecordSummary)
+          remainingIds.delete(r.id)
+        }
+        break
+      }
+      case 'SAFETY': {
+        const rows = await db.safetyRecord.findMany({
+          where: { id: { in: Array.from(remainingIds) } },
+          select: {
+            id: true,
+            projectId: true,
+            reportingPeriodId: true,
+            module: true,
+            evidenceId: true,
+            validationStatus: true,
+            revisionNumber: true,
+            status: true,
+            enteredBy: true,
+            enteredAt: true,
+            updatedAt: true,
+          },
+        })
+        for (const r of rows) {
+          out.push({
+            ...r,
+            calculationStatus: 'COMPUTED',
+          } as unknown as SourceRecordSummary)
+          remainingIds.delete(r.id)
+        }
+        break
+      }
+      case 'TRAVEL': {
+        const rows = await db.travelRecord.findMany({
+          where: { id: { in: Array.from(remainingIds) } },
+          select: {
+            id: true,
+            projectId: true,
+            reportingPeriodId: true,
+            module: true,
+            evidenceId: true,
+            validationStatus: true,
+            calculationStatus: true,
+            revisionNumber: true,
+            status: true,
+            enteredBy: true,
+            enteredAt: true,
+            updatedAt: true,
+          },
+        })
+        for (const r of rows) {
+          out.push(r as unknown as SourceRecordSummary)
+          remainingIds.delete(r.id)
+        }
+        break
+      }
     }
-    case 'WATER': {
-      const rows = await db.waterRecord.findMany({
-        where: { id: { in: recordIds } },
-        select: SOURCE_COMMON_SELECT,
-      })
-      return rows as unknown as SourceRecordSummary[]
-    }
-    case 'WASTE': {
-      const rows = await db.wasteRecord.findMany({
-        where: { id: { in: recordIds } },
-        select: SOURCE_COMMON_SELECT,
-      })
-      return rows as unknown as SourceRecordSummary[]
-    }
-    case 'PEOPLE': {
-      const rows = await db.workforceRecord.findMany({
-        where: { id: { in: recordIds } },
-        select: SOURCE_COMMON_SELECT,
-      })
-      return rows as unknown as SourceRecordSummary[]
-    }
-    case 'SAFETY': {
-      const rows = await db.safetyRecord.findMany({
-        where: { id: { in: recordIds } },
-        select: SOURCE_COMMON_SELECT,
-      })
-      return rows as unknown as SourceRecordSummary[]
-    }
-    case 'TRAVEL': {
-      const rows = await db.travelRecord.findMany({
-        where: { id: { in: recordIds } },
-        select: SOURCE_COMMON_SELECT,
-      })
-      return rows as unknown as SourceRecordSummary[]
-    }
-    default: {
-      // Check level-records store for any extended level records
-      const { getLevelRecordById } = await import('@/lib/level-records')
-      const customRows = recordIds
-        .map((id) => getLevelRecordById(id))
-        .filter((r): r is NonNullable<typeof r> => Boolean(r))
-        .map((r) => ({
-          id: r.id,
-          projectId: r.projectId,
-          reportingPeriodId: r.reportingPeriodId,
-          module: r.module,
-          evidenceId: r.evidenceId ?? null,
-          validationStatus: r.validationStatus,
-          calculationStatus: r.calculationStatus,
-          revisionNumber: r.revisionNumber,
-          status: r.status,
-          enteredBy: r.enteredBy,
-          enteredAt: new Date(r.enteredAt),
-          updatedAt: r.updatedAt ? new Date(r.updatedAt) : null,
-        }))
-      return customRows as unknown as SourceRecordSummary[]
+  } catch (err) {
+    console.warn('Prisma fetchSourceRecords lookup notice:', err)
+  }
+
+  // 2. For any record not found in Prisma (or for extended modules like EMISSIONS, COMPLIANCE, INCIDENTS, INITIATIVES), check level-records store
+  if (remainingIds.size > 0) {
+    const { getLevelRecordById } = await import('@/lib/level-records')
+    for (const id of Array.from(remainingIds)) {
+      const lr = getLevelRecordById(id)
+      if (lr) {
+        out.push({
+          id: lr.id,
+          projectId: lr.projectId,
+          reportingPeriodId: lr.reportingPeriodId,
+          module: lr.module,
+          evidenceId: lr.evidenceId ?? null,
+          validationStatus: lr.validationStatus,
+          calculationStatus: lr.calculationStatus,
+          revisionNumber: lr.revisionNumber,
+          status: lr.status,
+          enteredBy: lr.enteredBy,
+          enteredAt: new Date(lr.enteredAt),
+          updatedAt: lr.updatedAt ? new Date(lr.updatedAt) : null,
+        })
+        remainingIds.delete(id)
+      }
     }
   }
+
+  return out
 }
 
 /**

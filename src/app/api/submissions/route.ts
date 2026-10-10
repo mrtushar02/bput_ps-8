@@ -40,7 +40,15 @@ export async function GET(req: NextRequest) {
   if (projectId) where.projectId = projectId
   if (periodId) where.reportingPeriodId = periodId
   if (moduleFilter) where.module = moduleFilter
-  if (status) where.status = status
+  if (status) {
+    if (status === 'SUBMITTED') {
+      where.status = { in: ['SUBMITTED', 'RESUBMITTED'] }
+    } else if (status === 'APPROVED') {
+      where.status = { in: ['APPROVED', 'BU_APPROVED', 'SUBSIDIARY_APPROVED', 'HQ_REVIEW'] }
+    } else {
+      where.status = status
+    }
+  }
 
   try {
     const [submissions, total] = await Promise.all([
@@ -212,25 +220,57 @@ export async function POST(req: NextRequest) {
       titleRaw ||
       `${project.projectName} — ${moduleKey} ${period.periodLabel}`
 
-    const created = await db.submission.create({
-      data: {
+    // Check if an existing DRAFT submission exists for the same project + period + module
+    const existingDraft = await db.submission.findFirst({
+      where: {
         projectId,
         reportingPeriodId,
         module: moduleKey,
-        title,
         status: 'DRAFT',
-        recordIds: JSON.stringify(records.map((r) => r.id)),
-        completionPct: rollup.completionPct,
-        evidenceCount: rollup.evidenceCount,
-        validationPassed: rollup.validationPassed,
-        validationErrors: rollup.validationErrors,
-        submittedBy: user.id,
       },
-      include: {
-        project: { select: { id: true, projectCode: true, projectName: true } },
-        reportingPeriod: { select: { id: true, periodLabel: true, year: true } },
-      },
+      orderBy: { updatedAt: 'desc' },
     })
+
+    let created
+    if (existingDraft) {
+      const mergedRecordIds = Array.from(new Set([...parseRecordIds(existingDraft.recordIds), ...records.map((r) => r.id)]))
+      created = await db.submission.update({
+        where: { id: existingDraft.id },
+        data: {
+          title,
+          recordIds: JSON.stringify(mergedRecordIds),
+          completionPct: rollup.completionPct,
+          evidenceCount: rollup.evidenceCount,
+          validationPassed: rollup.validationPassed,
+          validationErrors: rollup.validationErrors,
+          submittedBy: user.id,
+        },
+        include: {
+          project: { select: { id: true, projectCode: true, projectName: true } },
+          reportingPeriod: { select: { id: true, periodLabel: true, year: true } },
+        },
+      })
+    } else {
+      created = await db.submission.create({
+        data: {
+          projectId,
+          reportingPeriodId,
+          module: moduleKey,
+          title,
+          status: 'DRAFT',
+          recordIds: JSON.stringify(records.map((r) => r.id)),
+          completionPct: rollup.completionPct,
+          evidenceCount: rollup.evidenceCount,
+          validationPassed: rollup.validationPassed,
+          validationErrors: rollup.validationErrors,
+          submittedBy: user.id,
+        },
+        include: {
+          project: { select: { id: true, projectCode: true, projectName: true } },
+          reportingPeriod: { select: { id: true, periodLabel: true, year: true } },
+        },
+      })
+    }
 
     await appendAudit({
       actorId: user.id,

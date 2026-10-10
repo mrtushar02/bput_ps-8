@@ -9,7 +9,13 @@ import {
   type ValidationIssue,
   type CalculationPayload,
 } from '@/lib/level-records'
-import { appendActivity, appendAudit, primaryRoleLabel } from '@/lib/workflow'
+import {
+  appendActivity,
+  appendAudit,
+  appendHistory,
+  parseRecordIds,
+  primaryRoleLabel,
+} from '@/lib/workflow'
 
 export const runtime = 'nodejs'
 
@@ -520,6 +526,97 @@ export async function POST(req: NextRequest) {
       console.warn('Prisma sync optional warning:', dbErr)
     }
 
+    const isSubmittingForReview = Boolean(body.submitForReview)
+    if (isSubmittingForReview) {
+      record.status = 'SUBMITTED'
+      saveLevelRecord(record)
+    }
+
+    // Auto-sync into db.submission so it immediately appears in Submissions module
+    let synchedSubmission: any = null
+    try {
+      const proj = await db.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, projectName: true, projectCode: true },
+      })
+      const per = await db.reportingPeriod.findUnique({
+        where: { id: reportingPeriodId },
+        select: { id: true, periodLabel: true, year: true },
+      })
+
+      const submissionTitle = `${proj?.projectName || 'Project'} — ${record.levelName} (${per?.periodLabel || 'FY 2026-27'})`
+
+      // Look for an existing DRAFT submission for the same project + period + module
+      const existingDraft = await db.submission.findFirst({
+        where: {
+          projectId,
+          reportingPeriodId,
+          module: record.module,
+          status: 'DRAFT',
+        },
+        orderBy: { updatedAt: 'desc' },
+      })
+
+      if (existingDraft) {
+        const existingRecordIds = parseRecordIds(existingDraft.recordIds)
+        if (!existingRecordIds.includes(recId)) existingRecordIds.push(recId)
+        synchedSubmission = await db.submission.update({
+          where: { id: existingDraft.id },
+          data: {
+            title: submissionTitle,
+            recordIds: JSON.stringify(existingRecordIds),
+            status: isSubmittingForReview ? 'SUBMITTED' : 'DRAFT',
+            submittedAt: isSubmittingForReview ? new Date() : null,
+            submittedBy: user.id,
+            completionPct: hasErrors ? 50 : 100,
+            evidenceCount: evidenceId ? Math.max(1, existingDraft.evidenceCount) : existingDraft.evidenceCount,
+            validationPassed: hasErrors ? 0 : Math.max(1, existingDraft.validationPassed),
+            validationErrors: hasErrors ? issues.length : 0,
+          },
+          include: {
+            project: { select: { id: true, projectCode: true, projectName: true } },
+            reportingPeriod: { select: { id: true, periodLabel: true, year: true } },
+          },
+        })
+      } else {
+        synchedSubmission = await db.submission.create({
+          data: {
+            projectId,
+            reportingPeriodId,
+            module: record.module,
+            title: submissionTitle,
+            status: isSubmittingForReview ? 'SUBMITTED' : 'DRAFT',
+            recordIds: JSON.stringify([recId]),
+            submittedAt: isSubmittingForReview ? new Date() : null,
+            submittedBy: user.id,
+            completionPct: hasErrors ? 50 : 100,
+            evidenceCount: evidenceId ? 1 : 0,
+            validationPassed: hasErrors ? 0 : 1,
+            validationErrors: hasErrors ? issues.length : 0,
+          },
+          include: {
+            project: { select: { id: true, projectCode: true, projectName: true } },
+            reportingPeriod: { select: { id: true, periodLabel: true, year: true } },
+          },
+        })
+      }
+
+      if (isSubmittingForReview && synchedSubmission) {
+        await appendHistory({
+          submissionId: synchedSubmission.id,
+          fromStatus: 'DRAFT',
+          toStatus: 'SUBMITTED',
+          actorId: user.id,
+          actorName: user.name,
+          actorRole: primaryRoleLabel(user),
+          action: 'SUBMIT',
+          comment: `Submitted via Data Entry Workspace — ${record.levelName}`,
+        }).catch(() => {})
+      }
+    } catch (syncErr) {
+      console.warn('Submission synchronization notice:', syncErr)
+    }
+
     // Append activity and audit log for cross-screen integration
     try {
       await appendActivity({
@@ -527,22 +624,22 @@ export async function POST(req: NextRequest) {
         actorId: user.id,
         actorName: user.name,
         actorRole: primaryRoleLabel(user),
-        action: 'DATA_ENTRY',
-        title: `${record.levelName} saved as Draft`,
+        action: isSubmittingForReview ? 'SUBMIT' : 'DATA_ENTRY',
+        title: `${record.levelName} ${isSubmittingForReview ? 'submitted for BU review' : 'saved as Draft'}`,
         description: `Source record ${recId.slice(-8)} captured with ${issues.length} issue(s).`,
         module: record.module,
-        status: validationStatus,
+        status: isSubmittingForReview ? 'SUBMITTED' : validationStatus,
       }).catch(() => {})
 
       await appendAudit({
         actorId: user.id,
         actorName: user.name,
         actorRole: primaryRoleLabel(user),
-        action: 'CREATE',
+        action: isSubmittingForReview ? 'SUBMIT' : 'CREATE',
         entityType: 'DataEntryRecord',
         entityId: recId,
-        newState: { level, levelName, validationStatus, calculation },
-        reason: 'Source record captured via Data Entry Module',
+        newState: { level, levelName, validationStatus, calculation, status: record.status },
+        reason: isSubmittingForReview ? 'Source record submitted for review' : 'Source record captured via Data Entry Module',
       }).catch(() => {})
     } catch {}
 
@@ -551,6 +648,8 @@ export async function POST(req: NextRequest) {
       issues,
       calculation,
       derivedLtifr: calculation?.derivedLtifr,
+      submission: synchedSubmission,
+      submissionId: synchedSubmission?.id,
     })
   } catch (e: any) {
     console.error('POST /api/data-entry error', e)

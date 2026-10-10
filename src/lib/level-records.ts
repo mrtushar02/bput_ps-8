@@ -239,3 +239,16 @@ export function deleteLevelRecord(id: string): boolean {
   }
   return false
 }
+
+export function updateLevelRecordStatus(id: string, status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'LOCKED'): boolean {
+  const all = readStore()
+  const rec = all.find((r) => r.id === id)
+  if (rec) {
+    rec.status = status
+    rec.updatedAt = new Date().toISOString()
+    writeStore(all)
+    return true
+  }
+  return false
+}
+

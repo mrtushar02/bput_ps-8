@@ -2236,25 +2236,69 @@ export function SiteUserOverview() {
     }
   }, [fetchActivities, fetchOverview])
 
-  const handleSaveQuickRecord = (record: any) => {
-    // Add locally to submissions
-    const newSub: SubmissionItem = {
-      id: `local-${Date.now()}`,
-      projectId: 'p1',
-      module: record.metric.toLowerCase().includes('water') ? 'water' : record.metric.toLowerCase().includes('diesel') ? 'fuel' : 'energy',
-      title: `${record.metric} Entry — ${record.period}`,
-      status: 'DRAFT',
-      recordIds: 'rec-new',
-      completionPct: 100,
-      evidenceCount: 1,
-      validationPassed: 3,
-      validationErrors: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      project: { id: 'p1', projectCode: 'GS-01', projectName: 'Gayatri Solar Project' },
-      reportingPeriod: { id: 'per-curr', periodLabel: record.period, year: 2026, month: 6 },
+  const handleSaveQuickRecord = async (record: any) => {
+    try {
+      const metricStr = String(record.metric || '').toLowerCase()
+      const isWater = metricStr.includes('water')
+      const level = isWater ? 2 : 1
+      const levelKey = isWater ? 'level2' : 'level1'
+      const levelName = isWater ? 'Level 2 — Water Management' : 'Level 1 — Energy Consumption'
+      const moduleKey = isWater ? 'WATER' : 'ENERGY'
+
+      const periodMap: Record<string, string> = {
+        'June 2026': 'cmv0skxfn009he9cgg61xsb4c',
+        'May 2026': 'cmv0skxfg009fe9cgmzebod5o',
+        'April 2026': 'cmv0skxf7009de9cggd2my30r',
+      }
+      const reportingPeriodId = periodMap[record.period] || 'cmv0skxfn009he9cgg61xsb4c'
+      const projectId = 'cmv0skx6l0071e9cgt6sn5w7i' // Gayatri Solar Plant
+
+      const dataPayload = isWater
+        ? {
+            waterSource: 'Groundwater',
+            waterActivity: 'Cooling / Cleaning',
+            waterQuantity: Number(record.value) || 10,
+            unit: 'kL',
+            reportingPeriod: record.period,
+            remarks: record.notes || 'Quick Log entry',
+          }
+        : {
+            energySource: record.metric,
+            energyActivity: 'Site Auxiliary',
+            consumptionQuantity: Number(record.value) || 100,
+            unit: metricStr.includes('diesel') ? 'litres' : 'kWh',
+            reportingPeriod: record.period,
+            remarks: record.notes || 'Quick Log entry',
+          }
+
+      const res = await fetch('/api/data-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level,
+          levelKey,
+          levelName,
+          module: moduleKey,
+          projectId,
+          reportingPeriodId,
+          data: dataPayload,
+          submitForReview: true,
+        }),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to save quick record')
+      }
+
+      await Promise.all([fetchSubmissions(), fetchActivities(), fetchOverview()])
+      toast.success(`Logged and submitted ${record.value} for ${record.metric}`, {
+        description: 'Submission is now active and visible in the Submissions section.',
+      })
+    } catch (e: any) {
+      console.error('handleSaveQuickRecord error', e)
+      toast.error('Quick Log error', { description: e?.message || 'Could not save record' })
     }
-    setSubmissions(prev => [newSub, ...prev])
   }
 
   // Guard: still loading initial data

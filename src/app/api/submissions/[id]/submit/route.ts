@@ -65,21 +65,24 @@ export async function POST(
       )
     }
 
-    // --- Validation gate: every referenced record must be PASSED ---
+    // --- Validation gate: blocking errors prevent submission ---
     const recordIds = parseRecordIds(submission.recordIds)
     const records = await fetchSourceRecords(recordIds, submission.module)
     const blocking = records.filter(
-      (r) => r.validationStatus !== 'PASSED',
+      (r) =>
+        r.validationStatus === 'FAILED' ||
+        r.validationStatus === 'ERROR' ||
+        r.validationStatus === 'BLOCKING',
     )
     if (blocking.length > 0) {
       return NextResponse.json(
         {
-          error: 'Validation failed — cannot submit',
+          error: 'Validation failed — cannot submit with blocking errors',
           blockingErrors: blocking.map((r) => ({
             recordId: r.id,
             module: r.module,
             validationStatus: r.validationStatus,
-            reason: `Record ${r.id} has validation status ${r.validationStatus} (must be PASSED)`,
+            reason: `Record ${r.id} has validation status ${r.validationStatus} (resolve errors before submitting)`,
           })),
         },
         { status: 400 },
@@ -105,6 +108,14 @@ export async function POST(
         reportingPeriod: { select: { id: true, periodLabel: true } },
       },
     })
+
+    // Also update underlying level records if applicable
+    try {
+      const { updateLevelRecordStatus } = await import('@/lib/level-records')
+      for (const rid of recordIds) {
+        updateLevelRecordStatus(rid, 'SUBMITTED')
+      }
+    } catch {}
 
     await appendHistory({
       submissionId: id,

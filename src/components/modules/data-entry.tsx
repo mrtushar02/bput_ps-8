@@ -424,13 +424,22 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
   }
 
   // ---- Action Handlers ----
-  const handleSaved = (result: SavedRecord) => {
+  const handleSaved = (result: SavedRecord, submitted = false) => {
     setSaved(result)
-    setStep(2)
-    setActionInfo(`Draft saved for ${activeSub.brsrTitle}. Attached evidence can now be linked in Step 2.`)
-    toast.success(`${activeSub.label} draft recorded`, {
-      description: `Record ID #${result.id.slice(-8)} validated. Status: ${result.validationStatus || 'DRAFT'}`,
-    })
+    if (submitted) {
+      setStep(4)
+      setSubmitResult({ submissionId: result.id, status: 'SUBMITTED' })
+      setActionInfo(`Submitted for BU review. Status: SUBMITTED. Visible in Submissions module.`)
+      toast.success('Submitted for Review!', {
+        description: `${activeSub.label} record #${result.id.slice(-8)} submitted and now visible in Submissions module.`,
+      })
+    } else {
+      setStep(2)
+      setActionInfo(`Draft saved for ${activeSub.brsrTitle}. Saved as Draft in Submissions module.`)
+      toast.success(`${activeSub.label} draft recorded`, {
+        description: `Record ID #${result.id.slice(-8)} saved as Draft and visible in Submissions section.`,
+      })
+    }
     refreshExistingRecords()
   }
 
@@ -1329,7 +1338,7 @@ interface LevelFormProps {
   evidence: EvidenceItem[]
   readOnly: boolean
   formStateRef: React.MutableRefObject<Record<string, Record<string, any>>>
-  onSaved: (r: SavedRecord) => void
+  onSaved: (r: SavedRecord, submitted?: boolean) => void
 }
 
 const inputClass =
@@ -1366,11 +1375,13 @@ function FormSaveActions({
   submitting,
   readOnly,
   onSave,
+  onSubmitForReview,
 }: {
   error: string
   submitting: boolean
   readOnly: boolean
   onSave: () => void
+  onSubmitForReview?: () => void
 }) {
   return (
     <div className="sm:col-span-2 pt-2">
@@ -1383,7 +1394,7 @@ function FormSaveActions({
         <button
           onClick={onSave}
           disabled={readOnly || submitting}
-          className="btn-glass-primary flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
+          className="glass-subtle flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitting ? (
             <Clock className="h-3.5 w-3.5 animate-spin" />
@@ -1392,8 +1403,22 @@ function FormSaveActions({
           )}
           Save Draft (Step 1)
         </button>
+        {onSubmitForReview && (
+          <button
+            onClick={onSubmitForReview}
+            disabled={readOnly || submitting}
+            className="btn-glass-primary flex items-center gap-1.5 rounded-full px-5 py-2 text-xs font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {submitting ? (
+              <Clock className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
+            Submit for Review
+          </button>
+        )}
         <span className="text-[11px] text-slate-400">
-          Validates rules &amp; stores deterministic calculation on save.
+          Syncs directly to Submissions workflow &amp; Overview dashboard.
         </span>
       </div>
     </div>
@@ -1487,7 +1512,7 @@ function Level1EnergyForm({
     : 0.716
   const estTco2e = qty > 0 ? (qty * factor) / 1000 : 0
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!consumptionQuantity || Number(consumptionQuantity) <= 0) {
       setError('Consumption quantity must be > 0')
@@ -1507,11 +1532,12 @@ function Level1EnergyForm({
           reportingPeriodId: periodId,
           evidenceId: evidenceId || undefined,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Energy record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -1703,7 +1729,7 @@ function Level1EnergyForm({
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -1759,7 +1785,7 @@ function Level2WaterForm({
   const reused = Number(waterReusedRecycled) || 0
   const circularityPct = qty > 0 ? ((reused / qty) * 100).toFixed(1) : '0'
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!waterQuantity || Number(waterQuantity) <= 0) {
       setError('Water quantity must be > 0')
@@ -1778,11 +1804,12 @@ function Level2WaterForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Water record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -1987,7 +2014,7 @@ function Level2WaterForm({
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -2034,7 +2061,7 @@ function Level3GhgForm({
     emissionFactorRef, calculationMethod, supportingEvidence, remarks, formStateRef,
   ])
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!activityQuantity && !testResult) {
       setError('Either activity quantity or measured test result must be provided.')
@@ -2053,11 +2080,12 @@ function Level3GhgForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save GHG record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -2218,7 +2246,7 @@ function Level3GhgForm({
         />
       </FormField>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -2290,7 +2318,7 @@ function Level4WasteForm({
   const totalDiverted = reused + recycled + recovered
   const divPct = gen > 0 ? ((totalDiverted / gen) * 100).toFixed(1) : '0'
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (quantityGenerated === '' || Number(quantityGenerated) < 0) {
       setError('Quantity generated must be ≥ 0')
@@ -2309,11 +2337,12 @@ function Level4WasteForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Waste record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -2509,7 +2538,7 @@ function Level4WasteForm({
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -2564,7 +2593,7 @@ function Level5SafetyForm({
   const isLti = incidentType.toLowerCase().includes('lost-time') || incidentType.toLowerCase().includes('lti')
   const ltifr = mhw > 0 ? (((isLti ? 1 : 0) * 1000000) / mhw).toFixed(3) : '0.000'
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!totalPersonHoursWorked || Number(totalPersonHoursWorked) <= 0) {
       setError('Total person-hours worked must be > 0')
@@ -2583,11 +2612,12 @@ function Level5SafetyForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Safety record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -2803,7 +2833,7 @@ function Level5SafetyForm({
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -2854,7 +2884,7 @@ function Level6TrainingForm({
   const durHrs = durationUnit === 'Minutes' ? dur / 60 : dur
   const totalPersonHrs = (pCount * durHrs).toFixed(1)
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!trainingProgramme) {
       setError('Training programme name is required')
@@ -2877,11 +2907,12 @@ function Level6TrainingForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Training record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -3068,7 +3099,7 @@ function Level6TrainingForm({
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -3124,7 +3155,7 @@ function Level7ComplianceForm({
     daysRemaining = Math.round((exp - Date.now()) / 86400000)
   }
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!permitNumber) {
       setError('Permit number is required')
@@ -3143,11 +3174,12 @@ function Level7ComplianceForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Permit record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -3346,7 +3378,7 @@ function Level7ComplianceForm({
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -3393,7 +3425,7 @@ function Level8IncidentsForm({
     dueDate, currentStatus, resolutionDate, supportingEvidence, formStateRef,
   ])
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!dateReported) {
       setError('Date reported is required')
@@ -3416,11 +3448,12 @@ function Level8IncidentsForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Incident record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -3586,7 +3619,7 @@ function Level8IncidentsForm({
         />
       </FormField>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }
@@ -3637,7 +3670,7 @@ function Level9InitiativesForm({
   const diff = bVal > rVal ? bVal - rVal : 0
   const pctSaved = bVal > 0 ? ((diff / bVal) * 100).toFixed(1) : '0'
 
-  const save = async () => {
+  const save = async (submitForReview = false) => {
     setError('')
     if (!activityInitiativeName) {
       setError('Initiative name is required')
@@ -3656,11 +3689,12 @@ function Level9InitiativesForm({
           projectId,
           reportingPeriodId: periodId,
           data: formStateRef.current[key],
+          submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Initiative record')
-      onSaved(d.record)
+      onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
     } finally {
@@ -3839,7 +3873,7 @@ function Level9InitiativesForm({
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={save} />
+      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
 }

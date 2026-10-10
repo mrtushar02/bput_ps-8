@@ -337,15 +337,15 @@ export function SubmissionsModule() {
   }, [])
 
   // ----- list URL builder -----
+  // ----- list URL builder -----
   const buildUrl = useCallback(() => {
     const q = new URLSearchParams()
     if (periodId !== 'all') q.set('periodId', periodId)
     if (projectId !== 'all') q.set('projectId', projectId)
     if (moduleKey !== 'all') q.set('module', moduleKey)
-    const sf = STATUS_CHIPS.find(c => c.key === chipFilter)
-    if (sf && sf.filter) q.set('status', sf.filter)
+    q.set('take', '100')
     return `/api/submissions?${q.toString()}`
-  }, [periodId, projectId, moduleKey, chipFilter])
+  }, [periodId, projectId, moduleKey])
 
   const fetchList = useCallback(() => {
     setLoading(true)
@@ -384,22 +384,38 @@ export function SubmissionsModule() {
     return m
   }, [items])
 
+  // Filter items by selected chip
+  const filteredItems = useMemo(() => {
+    if (chipFilter === 'all') return items
+    const sf = STATUS_CHIPS.find(c => c.key === chipFilter)
+    if (!sf || !sf.filter) return items
+    if (sf.filter === 'SUBMITTED') {
+      return items.filter(it => it.status === 'SUBMITTED' || it.status === 'RESUBMITTED')
+    }
+    if (sf.filter === 'APPROVED') {
+      return items.filter(it =>
+        it.status === 'APPROVED' || it.status === 'BU_APPROVED' || it.status === 'SUBSIDIARY_APPROVED' || it.status === 'HQ_REVIEW'
+      )
+    }
+    return items.filter(it => it.status === sf.filter)
+  }, [items, chipFilter])
+
   // ----- sorted + paginated items -----
   const sortedItems = useMemo(() => {
-    const sorted = [...items].sort((a, b) => {
+    const sorted = [...filteredItems].sort((a, b) => {
       let cmp = 0
       if (sortKey === 'title') cmp = (a.title || '').localeCompare(b.title || '')
       else if (sortKey === 'period') cmp = (a.reportingPeriod?.periodLabel || '').localeCompare(b.reportingPeriod?.periodLabel || '')
       else if (sortKey === 'completion') cmp = (a.completionPct || 0) - (b.completionPct || 0)
       else if (sortKey === 'submittedAt') {
-        const da = a.submittedAt ? new Date(a.submittedAt).getTime() : 0
-        const db = b.submittedAt ? new Date(b.submittedAt).getTime() : 0
+        const da = a.submittedAt ? new Date(a.submittedAt).getTime() : new Date(a.updatedAt || a.createdAt).getTime()
+        const db = b.submittedAt ? new Date(b.submittedAt).getTime() : new Date(b.updatedAt || b.createdAt).getTime()
         cmp = da - db
       } else if (sortKey === 'status') cmp = (a.status || '').localeCompare(b.status || '')
       return sortDir === 'asc' ? cmp : -cmp
     })
     return sorted
-  }, [items, sortKey, sortDir])
+  }, [filteredItems, sortKey, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(sortedItems.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -559,6 +575,20 @@ export function SubmissionsModule() {
 
   const roleLabel = user?.roles?.[0]?.name ?? 'User'
 
+  // Live KPI values from items & status counts
+  const liveKpis = useMemo(() => {
+    const totalComp = items.reduce((acc, it) => acc + (it.completionPct || 0), 0)
+    const avgComp = items.length > 0 ? Math.round(totalComp / items.length) : 0
+    return {
+      reviewSubs: kpis?.reviewSubs ?? chipCounts.SUBMITTED,
+      corrections: kpis?.corrections ?? chipCounts.CORRECTION_REQUIRED,
+      draftSubs: kpis?.draftSubs ?? chipCounts.DRAFT,
+      openExceptions: kpis?.openExceptions ?? items.reduce((acc, it) => acc + (it.validationErrors || 0), 0),
+      approvedSubs: kpis?.approvedSubs ?? (chipCounts.APPROVED + chipCounts.LOCKED),
+      completion: kpis?.completion ?? avgComp,
+    }
+  }, [kpis, items, chipCounts])
+
   // ---------- Render ----------
   return (
     <div className="space-y-5">
@@ -585,12 +615,12 @@ export function SubmissionsModule() {
 
       {/* KPI STRIP */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <KpiTile delay={0.05} icon={Clock} tileClass="bg-amber-50 text-amber-600" label="Awaiting Review" value={kpis?.reviewSubs ?? 0} />
-        <KpiTile delay={0.1} icon={AlertTriangle} tileClass="bg-rose-50 text-rose-600" label="Pending Corrections" value={kpis?.corrections ?? 0} />
-        <KpiTile delay={0.15} icon={Files} tileClass="bg-blue-50 text-blue-600" label="Draft Submissions" value={kpis?.draftSubs ?? 0} />
-        <KpiTile delay={0.2} icon={AlertOctagon} tileClass="bg-rose-50 text-rose-600" label="Validation Errors" value={kpis?.openExceptions ?? 0} />
-        <KpiTile delay={0.25} icon={CheckCircle2} tileClass="bg-emerald-50 text-emerald-600" label="Approved Subs" value={kpis?.approvedSubs ?? 0} />
-        <KpiTile delay={0.3} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="Completion" value={kpis?.completion ?? 0} unit="%" />
+        <KpiTile delay={0.05} icon={Clock} tileClass="bg-amber-50 text-amber-600" label="Awaiting Review" value={liveKpis.reviewSubs} />
+        <KpiTile delay={0.1} icon={AlertTriangle} tileClass="bg-rose-50 text-rose-600" label="Pending Corrections" value={liveKpis.corrections} />
+        <KpiTile delay={0.15} icon={Files} tileClass="bg-blue-50 text-blue-600" label="Draft Submissions" value={liveKpis.draftSubs} />
+        <KpiTile delay={0.2} icon={AlertOctagon} tileClass="bg-rose-50 text-rose-600" label="Validation Errors" value={liveKpis.openExceptions} />
+        <KpiTile delay={0.25} icon={CheckCircle2} tileClass="bg-emerald-50 text-emerald-600" label="Approved Subs" value={liveKpis.approvedSubs} />
+        <KpiTile delay={0.3} icon={FileCheck2} tileClass="bg-teal-50 text-teal-600" label="Completion" value={liveKpis.completion} unit="%" />
       </div>
 
       {/* STATUS CHIPS + FILTERS */}
