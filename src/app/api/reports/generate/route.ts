@@ -4,7 +4,7 @@ import { getCurrentUser, userHasPermission } from '@/lib/session'
 
 export const runtime = 'nodejs'
 
-const ALLOWED_TYPES = ['ESG_SUMMARY', 'EMISSIONS', 'ENERGY', 'WATER', 'WASTE', 'WORKFORCE', 'SAFETY', 'AUDIT_PACKAGE']
+const ALLOWED_TYPES = ['ESG_SUMMARY', 'EMISSIONS', 'ENERGY', 'WATER', 'WASTE', 'WORKFORCE', 'SAFETY', 'AUDIT_PACKAGE', 'BRSR_ANNEXURE_I']
 
 // POST /api/reports/generate — generate a real report from DB data.
 // Body: { reportType, frameworkId, reportingYear, periodLabel, scopeType, scopeId, scopeName }
@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       case 'AUDIT_PACKAGE':
         content = await buildAuditPackageContent()
         break
+      case 'BRSR_ANNEXURE_I':
       case 'ESG_SUMMARY':
       default:
         content = await buildEsgSummaryContent(projectFilter, periodFilter, frameworkId)
@@ -95,7 +96,10 @@ export async function POST(req: NextRequest) {
     })
     const nextVersion = (last?.version ?? 0) + 1
     const safeScope = scopeName ?? scopeId ?? 'group'
-    const fileName = `${reportType}-${reportingYear ?? 'current'}-${safeScope.replace(/\s+/g, '-')}-v${nextVersion}.csv`
+    const isPdfType = reportType === 'BRSR_ANNEXURE_I' || reportType === 'ESG_SUMMARY'
+    const fileName = isPdfType
+      ? `MEIL-BRSR-Annexure-I-FY${reportingYear ?? 2026}-v${nextVersion}.pdf`
+      : `${reportType}-${reportingYear ?? 'current'}-${safeScope.replace(/\s+/g, '-')}-v${nextVersion}.csv`
 
     const report = await db.report.create({
       data: {
@@ -110,7 +114,7 @@ export async function POST(req: NextRequest) {
         generatedByName: user.name,
         status: 'COMPLETED',
         fileName,
-        fileType: reportType === 'AUDIT_PACKAGE' ? 'CSV' : 'CSV',
+        fileType: isPdfType ? 'PDF' : 'CSV',
         content: JSON.stringify(content),
         version: nextVersion,
       },

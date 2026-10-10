@@ -39,7 +39,7 @@ export function ModuleRouter() {
     case 'fin-activity':
       return <FinanceWorkspace />
     // Shared modules
-    case 'my-project': return <DataEntryModule subModule={dataEntrySubModule} />
+    case 'my-project': return <MyProjectModule />
     case 'data-entry': return <DataEntryModule subModule={dataEntrySubModule} />
     case 'evidence': return <EvidenceModule />
     case 'submissions': return <SubmissionsModule />
