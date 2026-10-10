@@ -37,7 +37,7 @@ export interface LevelRecord {
   calculationStatus: 'COMPUTED' | 'NOT_APPLICABLE' | 'PENDING'
   calculation: CalculationPayload | null
   issues: ValidationIssue[]
-  status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'LOCKED'
+  status: 'DRAFT' | 'SUBMITTED' | 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'ACTIVE' | 'CORRECTION_REQUESTED' | 'LOCKED'
   revisionNumber: number
   enteredBy: string
   enteredAt: string
@@ -240,7 +240,7 @@ export function deleteLevelRecord(id: string): boolean {
   return false
 }
 
-export function updateLevelRecordStatus(id: string, status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'LOCKED'): boolean {
+export function updateLevelRecordStatus(id: string, status: 'DRAFT' | 'SUBMITTED' | 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'ACTIVE' | 'CORRECTION_REQUESTED' | 'LOCKED'): boolean {
   const all = readStore()
   const rec = all.find((r) => r.id === id)
   if (rec) {

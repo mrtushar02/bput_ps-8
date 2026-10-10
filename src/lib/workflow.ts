@@ -13,35 +13,44 @@ import { db } from '@/lib/db'
 export const SUBMISSION_STATES = [
   'DRAFT',
   'SUBMITTED',
+  'PENDING',
   'UNDER_REVIEW',
   'CORRECTION_REQUESTED',
   'RESUBMITTED',
   'BU_APPROVED',
   'SUBSIDIARY_APPROVED',
   'HQ_REVIEW',
+  'APPROVED',
+  'ACTIVE',
   'LOCKED',
 ] as const
 export type SubmissionState = (typeof SUBMISSION_STATES)[number]
 
-// Explicit allowed transitions (single-hop).
+// Explicit allowed transitions.
 const ALLOWED: Record<string, string[]> = {
-  DRAFT: ['SUBMITTED'],
-  SUBMITTED: ['UNDER_REVIEW'],
-  UNDER_REVIEW: ['CORRECTION_REQUESTED', 'BU_APPROVED'],
-  CORRECTION_REQUESTED: ['RESUBMITTED'],
-  RESUBMITTED: ['UNDER_REVIEW'],
-  BU_APPROVED: ['SUBSIDIARY_APPROVED'],
-  SUBSIDIARY_APPROVED: ['HQ_REVIEW'],
-  HQ_REVIEW: ['LOCKED'],
+  DRAFT: ['SUBMITTED', 'PENDING'],
+  SUBMITTED: ['UNDER_REVIEW', 'BU_APPROVED', 'CORRECTION_REQUESTED', 'APPROVED', 'ACTIVE'],
+  PENDING: ['UNDER_REVIEW', 'BU_APPROVED', 'CORRECTION_REQUESTED', 'APPROVED', 'ACTIVE'],
+  UNDER_REVIEW: ['CORRECTION_REQUESTED', 'BU_APPROVED', 'APPROVED', 'ACTIVE'],
+  CORRECTION_REQUESTED: ['RESUBMITTED', 'DRAFT', 'SUBMITTED', 'PENDING'],
+  RESUBMITTED: ['UNDER_REVIEW', 'BU_APPROVED', 'CORRECTION_REQUESTED', 'APPROVED', 'ACTIVE'],
+  BU_APPROVED: ['SUBSIDIARY_APPROVED', 'APPROVED', 'ACTIVE'],
+  SUBSIDIARY_APPROVED: ['HQ_REVIEW', 'APPROVED', 'ACTIVE'],
+  HQ_REVIEW: ['LOCKED', 'APPROVED', 'ACTIVE'],
+  APPROVED: ['LOCKED', 'ACTIVE'],
+  ACTIVE: ['LOCKED'],
   LOCKED: [],
 }
 
 export function canTransition(from: string, to: string): boolean {
+  if (from === to) return true
   return (ALLOWED[from] || []).includes(to)
 }
 
 // Approve step sequence (used by /approve endpoint — derive next from current).
 const APPROVE_SEQUENCE: SubmissionState[] = [
+  'DRAFT',
+  'SUBMITTED',
   'UNDER_REVIEW',
   'BU_APPROVED',
   'SUBSIDIARY_APPROVED',
@@ -50,6 +59,12 @@ const APPROVE_SEQUENCE: SubmissionState[] = [
 ]
 
 export function nextApproveStatus(current: string): string | null {
+  if (current === 'SUBMITTED' || current === 'PENDING' || current === 'RESUBMITTED') {
+    return 'BU_APPROVED'
+  }
+  if (current === 'UNDER_REVIEW') {
+    return 'BU_APPROVED'
+  }
   const idx = APPROVE_SEQUENCE.indexOf(current as SubmissionState)
   if (idx < 0 || idx + 1 >= APPROVE_SEQUENCE.length) return null
   return APPROVE_SEQUENCE[idx + 1]

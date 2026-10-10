@@ -277,21 +277,68 @@ export function FinanceWorkspace() {
   }
 
   // Submit record for review
-  const handleSubmitForReview = () => {
+  const handleSubmitForReview = async () => {
     const res = financeStore.validateRecord(financialData, expenditures, documents)
     if (!res.readyForSubmission) {
       alert(`Cannot submit record:\n\n• ${res.blockingErrors.join('\n• ')}`)
       return
     }
     financeStore.submitRecordForReview(financialData.common?.entityId || 'MEIL-SOL-GJT')
+
+    // Also post to backend /api/data-entry so it shows in SubmissionsModule and Reviewer queue
+    try {
+      await fetch('/api/data-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 9,
+          levelKey: 'level9',
+          levelName: 'BRSR Finance & Resource Expenditures',
+          module: 'FINANCE',
+          projectId: 'cmv0skx6l0071e9cgt6sn5w7i',
+          reportingPeriodId: 'cmv0skxfn009he9cgg61xsb4c',
+          data: {
+            activityInitiativeName: 'Resource Efficiency & Environmental Capital Expenditure',
+            baselineValue: financialData.turnover || 1450,
+            reportingPeriodValue: financialData.environmentalSpend || 120,
+            outputUnit: 'INR Crores',
+            remarks: 'Submitted from Finance Contributor Workspace',
+          },
+          submitForReview: true,
+        }),
+      }).catch((e) => console.warn('Finance data-entry post warning:', e))
+    } catch {}
+
     refreshData()
     showToast('Record version v1.3 submitted for BU review approval!')
     setActiveModule('fin-submissions')
   }
 
   // Resubmit record returned for correction
-  const handleResubmit = (subId: string) => {
+  const handleResubmit = async (subId: string) => {
     financeStore.resubmitRecord(subId)
+    try {
+      await fetch('/api/data-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level: 9,
+          levelKey: 'level9',
+          levelName: 'BRSR Finance & Resource Expenditures (Resubmitted)',
+          module: 'FINANCE',
+          projectId: 'cmv0skx6l0071e9cgt6sn5w7i',
+          reportingPeriodId: 'cmv0skxfn009he9cgg61xsb4c',
+          data: {
+            activityInitiativeName: 'Resource Efficiency & Environmental Capital Expenditure',
+            baselineValue: financialData.turnover || 1450,
+            reportingPeriodValue: financialData.environmentalSpend || 120,
+            outputUnit: 'INR Crores',
+            remarks: 'Resubmitted after addressing reviewer remarks',
+          },
+          submitForReview: true,
+        }),
+      }).catch(() => {})
+    } catch {}
     refreshData()
     setSelectedSubmission(null)
     showToast('Corrected record resubmitted for review approval!')

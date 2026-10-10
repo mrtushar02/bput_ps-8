@@ -10,6 +10,7 @@ import {
   isLocked,
   primaryRoleLabel,
 } from '@/lib/workflow'
+import { updateLevelRecordStatus } from '@/lib/level-records'
 
 export const runtime = 'nodejs'
 
@@ -80,12 +81,15 @@ export async function POST(
     }
 
     if (fields.length === 0) {
-      return NextResponse.json(
+      const fallbackComment = generalComment || 'Reviewer requested correction on submitted data'
+      fields = [
         {
-          error: 'At least one correction field is required',
+          field: 'General Data Review',
+          issue: fallbackComment,
+          severity: 'WARNING',
+          comment: fallbackComment,
         },
-        { status: 400 },
-      )
+      ]
     }
 
     // Create correction requests for each field issue
@@ -129,6 +133,29 @@ export async function POST(
         corrections: { orderBy: { createdAt: 'asc' } },
       },
     })
+
+    // Sync underlying data entry records to 'CORRECTION_REQUESTED'
+    try {
+      let rids: string[] = []
+      if (typeof submission.recordIds === 'string') {
+        try {
+          const parsed = JSON.parse(submission.recordIds)
+          if (Array.isArray(parsed)) rids = parsed
+        } catch {}
+      }
+      for (const rid of rids) {
+        updateLevelRecordStatus(rid, 'CORRECTION_REQUESTED')
+        await Promise.allSettled([
+          db.energyRecord.updateMany({ where: { id: rid }, data: { status: 'CORRECTION_REQUESTED' } }),
+          db.waterRecord.updateMany({ where: { id: rid }, data: { status: 'CORRECTION_REQUESTED' } }),
+          db.wasteRecord.updateMany({ where: { id: rid }, data: { status: 'CORRECTION_REQUESTED' } }),
+          db.safetyRecord.updateMany({ where: { id: rid }, data: { status: 'CORRECTION_REQUESTED' } }),
+          db.workforceRecord.updateMany({ where: { id: rid }, data: { status: 'CORRECTION_REQUESTED' } }),
+        ])
+      }
+    } catch (syncErr) {
+      console.warn('Reject underlying record sync warning:', syncErr)
+    }
 
     await appendHistory({
       submissionId: id,

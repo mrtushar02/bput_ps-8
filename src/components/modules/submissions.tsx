@@ -154,10 +154,10 @@ const MODULE_OPTIONS = [
 const STATUS_CHIPS = [
   { key: 'all', label: 'All', filter: '' },
   { key: 'DRAFT', label: 'Draft', filter: 'DRAFT' },
-  { key: 'SUBMITTED', label: 'Submitted', filter: 'SUBMITTED' },
+  { key: 'SUBMITTED', label: 'Pending', filter: 'SUBMITTED' },
   { key: 'UNDER_REVIEW', label: 'Under Review', filter: 'UNDER_REVIEW' },
   { key: 'CORRECTION_REQUIRED', label: 'Correction', filter: 'CORRECTION_REQUESTED' },
-  { key: 'APPROVED', label: 'Approved', filter: 'APPROVED' },
+  { key: 'APPROVED', label: 'Active', filter: 'APPROVED' },
   { key: 'LOCKED', label: 'Locked', filter: 'LOCKED' },
 ] as const
 
@@ -169,15 +169,17 @@ const PIPELINE = [
 
 const PIPELINE_LABEL: Record<string, string> = {
   DRAFT: 'Draft',
-  SUBMITTED: 'Submitted',
+  SUBMITTED: 'Pending',
+  PENDING: 'Pending',
   UNDER_REVIEW: 'Under Review',
-  BU_APPROVED: 'BU Approved',
-  SUBSIDIARY_APPROVED: 'Subsidiary',
+  BU_APPROVED: 'Active (BU Approved)',
+  SUBSIDIARY_APPROVED: 'Active (Subsidiary)',
   HQ_REVIEW: 'HQ Review',
-  APPROVED: 'Approved',
+  APPROVED: 'Active',
+  ACTIVE: 'Active',
   LOCKED: 'Locked',
-  CORRECTION_REQUESTED: 'Correction',
-  RESUBMITTED: 'Resubmitted',
+  CORRECTION_REQUESTED: 'Correction Required',
+  RESUBMITTED: 'Pending (Resubmitted)',
 }
 
 const ACTION_LABEL: Record<string, string> = {
@@ -203,9 +205,9 @@ function useRoleGate(): RoleGate {
     return { canSubmit: true, canReview: true, canReject: true, canApprove: true, canLock: true, isReadOnly: false }
   }
   return {
-    canSubmit: key === 'PROJECT_USER',
+    canSubmit: key === 'PROJECT_USER' || key === 'HR_USER' || key === 'EHS_USER' || key === 'PROCUREMENT_USER' || key === 'CSR_USER' || key === 'COMPLIANCE_USER' || key === 'FINANCE_USER',
     canReview: key === 'BU_REVIEWER' || key === 'SUBSIDIARY_REVIEWER' || key === 'GROUP_REVIEWER',
-    canReject: key === 'BU_REVIEWER',
+    canReject: key === 'BU_REVIEWER' || key === 'SUBSIDIARY_REVIEWER' || key === 'GROUP_REVIEWER',
     canApprove: key === 'BU_REVIEWER' || key === 'SUBSIDIARY_REVIEWER' || key === 'GROUP_REVIEWER',
     canLock: key === 'GROUP_REVIEWER',
     isReadOnly: key === 'AUDITOR' || key === 'EXECUTIVE' || key === 'ESG_MANAGER' || key === 'ESG_ANALYST',
@@ -218,12 +220,14 @@ function statusPillClass(status: string): string {
   switch (status) {
     case 'DRAFT': return 'status-draft'
     case 'SUBMITTED':
+    case 'PENDING':
     case 'RESUBMITTED': return 'status-submitted'
     case 'UNDER_REVIEW':
     case 'HQ_REVIEW': return 'status-review'
     case 'BU_APPROVED':
     case 'SUBSIDIARY_APPROVED':
-    case 'APPROVED': return 'status-approved'
+    case 'APPROVED':
+    case 'ACTIVE': return 'status-approved'
     case 'LOCKED': return 'status-locked'
     case 'CORRECTION_REQUESTED': return 'status-warning'
     default: return 'status-draft'
@@ -375,10 +379,10 @@ export function SubmissionsModule() {
     const m: Record<string, number> = { all: items.length, DRAFT: 0, SUBMITTED: 0, UNDER_REVIEW: 0, CORRECTION_REQUIRED: 0, APPROVED: 0, LOCKED: 0 }
     for (const it of items) {
       if (it.status === 'DRAFT') m.DRAFT++
-      else if (it.status === 'SUBMITTED' || it.status === 'RESUBMITTED') m.SUBMITTED++
+      else if (it.status === 'SUBMITTED' || it.status === 'RESUBMITTED' || it.status === 'PENDING') m.SUBMITTED++
       else if (it.status === 'UNDER_REVIEW') m.UNDER_REVIEW++
       else if (it.status === 'CORRECTION_REQUESTED') m.CORRECTION_REQUIRED++
-      else if (it.status === 'APPROVED' || it.status === 'BU_APPROVED' || it.status === 'SUBSIDIARY_APPROVED' || it.status === 'HQ_REVIEW') m.APPROVED++
+      else if (it.status === 'APPROVED' || it.status === 'ACTIVE' || it.status === 'BU_APPROVED' || it.status === 'SUBSIDIARY_APPROVED' || it.status === 'HQ_REVIEW') m.APPROVED++
       else if (it.status === 'LOCKED') m.LOCKED++
     }
     return m
@@ -390,11 +394,11 @@ export function SubmissionsModule() {
     const sf = STATUS_CHIPS.find(c => c.key === chipFilter)
     if (!sf || !sf.filter) return items
     if (sf.filter === 'SUBMITTED') {
-      return items.filter(it => it.status === 'SUBMITTED' || it.status === 'RESUBMITTED')
+      return items.filter(it => it.status === 'SUBMITTED' || it.status === 'RESUBMITTED' || it.status === 'PENDING')
     }
     if (sf.filter === 'APPROVED') {
       return items.filter(it =>
-        it.status === 'APPROVED' || it.status === 'BU_APPROVED' || it.status === 'SUBSIDIARY_APPROVED' || it.status === 'HQ_REVIEW'
+        it.status === 'APPROVED' || it.status === 'ACTIVE' || it.status === 'BU_APPROVED' || it.status === 'SUBSIDIARY_APPROVED' || it.status === 'HQ_REVIEW'
       )
     }
     return items.filter(it => it.status === sf.filter)
@@ -550,12 +554,15 @@ export function SubmissionsModule() {
         if (gate.canSubmit) out.push({ action: 'submit', label: 'Submit', tone: 'blue' })
         break
       case 'SUBMITTED':
+      case 'PENDING':
       case 'RESUBMITTED':
+        if (gate.canApprove) out.push({ action: 'approve', label: 'Approve', tone: 'emerald' })
+        if (gate.canReject) out.push({ action: 'reject', label: 'Reject', tone: 'rose' })
         if (gate.canReview) out.push({ action: 'review', label: 'Start Review', tone: 'amber' })
         break
       case 'UNDER_REVIEW':
-        if (gate.canReject) out.push({ action: 'reject', label: 'Reject', tone: 'rose' })
         if (gate.canApprove) out.push({ action: 'approve', label: 'Approve', tone: 'emerald' })
+        if (gate.canReject) out.push({ action: 'reject', label: 'Reject', tone: 'rose' })
         break
       case 'BU_APPROVED':
       case 'SUBSIDIARY_APPROVED':

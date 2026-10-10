@@ -182,15 +182,15 @@ function formatNumber(n: number, digits = 1): string {
 
 function statusClass(status?: string | null): string {
   switch ((status ?? '').toUpperCase()) {
-    case 'APPROVED': case 'COMPLETED': case 'RESOLVED': case 'CLOSED': return 'status-approved'
-    case 'SUBMITTED': return 'status-submitted'
+    case 'ACTIVE': case 'APPROVED': case 'COMPLETED': case 'RESOLVED': case 'CLOSED': return 'status-approved'
+    case 'SUBMITTED': case 'PENDING': case 'RESUBMITTED': return 'status-submitted'
     case 'UNDER_REVIEW': case 'REVIEW': case 'OPEN': return 'status-review'
-    case 'DRAFT': case 'PENDING': return 'status-draft'
+    case 'DRAFT': return 'status-draft'
     case 'LOCKED': return 'status-locked'
     case 'MISSING': case 'ERROR': case 'BLOCKING': return 'status-missing'
-    case 'WARNING': return 'status-warning'
+    case 'WARNING': case 'CORRECTION_REQUESTED': return 'status-warning'
     case 'EVIDENCE_VERIFIED': case 'VERIFIED': return 'status-verified'
-    case 'BU_APPROVED': case 'SUBSIDIARY_APPROVED': case 'HQ_REVIEW': return 'status-verified'
+    case 'BU_APPROVED': case 'SUBSIDIARY_APPROVED': case 'HQ_REVIEW': return 'status-approved'
     default: return 'status-draft'
   }
 }
@@ -634,7 +634,7 @@ function ReviewQueueScreen({
   onReject: (id: string) => void
   actingId: string | null
 }) {
-  const actionable = ['SUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'SUBSIDIARY_APPROVED', 'HQ_REVIEW']
+  const actionable = ['SUBMITTED', 'PENDING', 'RESUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'SUBSIDIARY_APPROVED', 'HQ_REVIEW']
   const queue = useMemo(
     () => subs.filter(s => actionable.includes((s.status || '').toUpperCase()))
       .sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1)),
@@ -735,7 +735,13 @@ function ReviewQueueScreen({
                       </td>
                       <td className="px-3 py-2">
                         <span className={`status-pill text-[9px] ${statusClass(s.status)}`}>
-                          {status.replace(/_/g, ' ').toLowerCase()}
+                          {status === 'SUBMITTED' || status === 'PENDING' || status === 'RESUBMITTED'
+                            ? 'Pending'
+                            : status === 'BU_APPROVED' || status === 'APPROVED' || status === 'ACTIVE'
+                            ? 'Active'
+                            : status === 'CORRECTION_REQUESTED'
+                            ? 'Correction'
+                            : status.replace(/_/g, ' ').toLowerCase()}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-700">{s.completionPct.toFixed(0)}%</td>

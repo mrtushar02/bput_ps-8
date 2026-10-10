@@ -136,7 +136,7 @@ interface PipelineStage {
   icon: typeof Building2
 }
 const PIPELINE_STAGES: PipelineStage[] = [
-  { key: 'SUBSIDIARY', label: 'Subsidiary', sub: 'BU submissions collected', statuses: ['SUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED'], icon: Building2 },
+  { key: 'SUBSIDIARY', label: 'Subsidiary', sub: 'BU submissions collected', statuses: ['SUBMITTED', 'PENDING', 'RESUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'ACTIVE'], icon: Building2 },
   { key: 'HQ', label: 'HQ Review', sub: 'Subsidiary approved → HQ', statuses: ['SUBSIDIARY_APPROVED', 'HQ_REVIEW'], icon: Network },
   { key: 'LOCKED', label: 'Locked', sub: 'Final locked for reporting', statuses: ['LOCKED', 'APPROVED'], icon: Lock },
 ]
@@ -158,11 +158,11 @@ function timeAgo(iso: string): string {
 function subStatusPill(status: string | undefined): string {
   if (!status) return 'status-draft'
   const s = status.toUpperCase()
-  if (s === 'APPROVED' || s === 'LOCKED') return 'status-approved'
+  if (s === 'APPROVED' || s === 'ACTIVE' || s === 'LOCKED') return 'status-approved'
   if (s === 'DRAFT') return 'status-draft'
-  if (s === 'SUBMITTED') return 'status-submitted'
+  if (s === 'SUBMITTED' || s === 'PENDING' || s === 'RESUBMITTED') return 'status-submitted'
   if (s === 'UNDER_REVIEW') return 'status-review'
-  if (s === 'BU_APPROVED' || s === 'SUBSIDIARY_APPROVED' || s === 'HQ_REVIEW') return 'status-verified'
+  if (s === 'BU_APPROVED' || s === 'SUBSIDIARY_APPROVED' || s === 'HQ_REVIEW') return 'status-approved'
   if (s.includes('CORRECTION') || s.includes('REJECTED')) return 'status-error'
   return 'status-locked'
 }

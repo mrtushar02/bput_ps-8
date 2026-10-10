@@ -1,5 +1,78 @@
 [
   {
+    "id": "rec-l5-mv1xe66b-agpp",
+    "level": 5,
+    "levelKey": "level5",
+    "levelName": "Health & Safety Operations",
+    "module": "SAFETY",
+    "projectId": "cmv0skx6l0071e9cgt6sn5w7i",
+    "reportingPeriodId": "cmv0skxfn009he9cgg61xsb4c",
+    "data": {
+      "incidentType": "Hazard Observation",
+      "severity": "Near Miss",
+      "personHoursWorked": 154000,
+      "lostTimeInjuries": 0,
+      "correctiveAction": "Safety barricading reinforced"
+    },
+    "evidenceId": null,
+    "validationStatus": "FAILED",
+    "calculationStatus": "COMPUTED",
+    "calculation": {
+      "calculatedValue": 0,
+      "resultUnit": "LTIFR (/1M person-hrs)",
+      "scope": "BRSR_SAFETY",
+      "derivedLtifr": 0,
+      "methodologyNote": "Formula: (0 LTI × 1,000,000) / 0 person-hours",
+      "sourceValue": 0,
+      "sourceUnit": "Hours"
+    },
+    "issues": [
+      {
+        "ruleCode": "SAF-HOURS-REQUIRED",
+        "severity": "ERROR",
+        "message": "Total person-hours worked must be > 0 for safety rate derivation",
+        "field": "totalPersonHoursWorked"
+      }
+    ],
+    "status": "CORRECTION_REQUESTED",
+    "revisionNumber": 1,
+    "enteredBy": "K. Venkat",
+    "enteredAt": "2026-10-10T05:00:17.219Z",
+    "updatedAt": "2026-10-10T05:00:19.644Z"
+  },
+  {
+    "id": "rec-l6-mv1xc8ze-dg6x",
+    "level": 6,
+    "levelKey": "level6",
+    "levelName": "Workforce Profile & Training",
+    "module": "HR",
+    "projectId": "cmv0skx6l0071e9cgt6sn5w7i",
+    "reportingPeriodId": "cmv0skxfn009he9cgg61xsb4c",
+    "data": {
+      "trainingProgramme": "ESG Governance Induction 2026",
+      "participants": 85,
+      "duration": 3,
+      "durationUnit": "Hours"
+    },
+    "evidenceId": null,
+    "validationStatus": "PASSED",
+    "calculationStatus": "COMPUTED",
+    "calculation": {
+      "calculatedValue": 255,
+      "resultUnit": "Person-Training-Hours",
+      "scope": "BRSR_PEOPLE",
+      "methodologyNote": "85 participants × 3.0 hours",
+      "sourceValue": 85,
+      "sourceUnit": "Participants"
+    },
+    "issues": [],
+    "status": "ACTIVE",
+    "revisionNumber": 1,
+    "enteredBy": "Sunita Rao",
+    "enteredAt": "2026-10-10T04:58:47.546Z",
+    "updatedAt": "2026-10-10T04:58:48.632Z"
+  },
+  {
     "id": "rec-l1-mv1u4u19-8503",
     "level": 1,
     "levelKey": "level1",

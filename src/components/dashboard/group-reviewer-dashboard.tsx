@@ -112,19 +112,21 @@ function timeAgo(iso: string): string {
 function subStatusPill(status: string | undefined): string {
   if (!status) return 'status-draft'
   const s = status.toUpperCase()
-  if (s === 'APPROVED' || s === 'LOCKED') return 'status-approved'
+  if (s === 'APPROVED' || s === 'ACTIVE' || s === 'LOCKED') return 'status-approved'
   if (s === 'DRAFT') return 'status-draft'
-  if (s === 'SUBMITTED') return 'status-submitted'
+  if (s === 'SUBMITTED' || s === 'PENDING' || s === 'RESUBMITTED') return 'status-submitted'
   if (s === 'UNDER_REVIEW') return 'status-review'
-  if (s === 'BU_APPROVED' || s === 'SUBSIDIARY_APPROVED' || s === 'HQ_REVIEW') return 'status-verified'
+  if (s === 'BU_APPROVED' || s === 'SUBSIDIARY_APPROVED' || s === 'HQ_REVIEW') return 'status-approved'
   if (s.includes('CORRECTION') || s.includes('REJECTED')) return 'status-error'
   return 'status-locked'
 }
 function stageLabel(s: string): string {
   const m: Record<string, string> = {
-    DRAFT: 'Draft', SUBMITTED: 'Submitted', UNDER_REVIEW: 'Under review',
-    BU_APPROVED: 'BU approved', SUBSIDIARY_APPROVED: 'Subsidiary approved',
-    HQ_REVIEW: 'HQ review', LOCKED: 'Locked', APPROVED: 'Approved',
+    DRAFT: 'Draft', SUBMITTED: 'Pending', PENDING: 'Pending', RESUBMITTED: 'Pending',
+    UNDER_REVIEW: 'Under review',
+    BU_APPROVED: 'Active (BU)', ACTIVE: 'Active',
+    SUBSIDIARY_APPROVED: 'Subsidiary approved',
+    HQ_REVIEW: 'HQ review', LOCKED: 'Locked', APPROVED: 'Active',
   }
   return m[s.toUpperCase()] || s
 }

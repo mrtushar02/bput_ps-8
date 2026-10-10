@@ -11,6 +11,7 @@ import {
   nextApproveStatus,
   primaryRoleLabel,
 } from '@/lib/workflow'
+import { updateLevelRecordStatus } from '@/lib/level-records'
 
 export const runtime = 'nodejs'
 
@@ -108,6 +109,29 @@ export async function POST(
         currentReviewer: { select: { id: true, name: true, email: true } },
       },
     })
+
+    // Sync underlying data entry records to 'ACTIVE'
+    try {
+      let rids: string[] = []
+      if (typeof submission.recordIds === 'string') {
+        try {
+          const parsed = JSON.parse(submission.recordIds)
+          if (Array.isArray(parsed)) rids = parsed
+        } catch {}
+      }
+      for (const rid of rids) {
+        updateLevelRecordStatus(rid, 'ACTIVE')
+        await Promise.allSettled([
+          db.energyRecord.updateMany({ where: { id: rid }, data: { status: 'ACTIVE' } }),
+          db.waterRecord.updateMany({ where: { id: rid }, data: { status: 'ACTIVE' } }),
+          db.wasteRecord.updateMany({ where: { id: rid }, data: { status: 'ACTIVE' } }),
+          db.safetyRecord.updateMany({ where: { id: rid }, data: { status: 'ACTIVE' } }),
+          db.workforceRecord.updateMany({ where: { id: rid }, data: { status: 'ACTIVE' } }),
+        ])
+      }
+    } catch (syncErr) {
+      console.warn('Approve underlying record sync warning:', syncErr)
+    }
 
     await appendHistory({
       submissionId: id,

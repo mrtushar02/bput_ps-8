@@ -252,6 +252,7 @@ interface SavedRecord {
   validationStatus?: string
   evidenceId?: string | null
   data?: Record<string, any>
+  status?: string
 }
 
 const READ_ONLY_ROLES = new Set([
@@ -703,8 +704,26 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
               </div>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
-              <span className={`status-pill ${saved ? 'status-approved' : 'status-draft'}`}>
-                {saved ? 'Draft Saved' : 'Unsaved Draft'}
+              <span className={`status-pill ${
+                saved
+                  ? (saved.status === 'ACTIVE' || saved.status === 'APPROVED' || saved.status === 'BU_APPROVED')
+                    ? 'status-approved'
+                    : (saved.status === 'SUBMITTED' || saved.status === 'PENDING')
+                    ? 'status-submitted'
+                    : saved.status === 'CORRECTION_REQUESTED'
+                    ? 'status-warning'
+                    : 'status-draft'
+                  : 'status-draft'
+              }`}>
+                {saved
+                  ? (saved.status === 'ACTIVE' || saved.status === 'APPROVED' || saved.status === 'BU_APPROVED')
+                    ? 'Active'
+                    : (saved.status === 'SUBMITTED' || saved.status === 'PENDING')
+                    ? 'Pending'
+                    : saved.status === 'CORRECTION_REQUESTED'
+                    ? 'Correction Required'
+                    : 'Draft Saved'
+                  : 'Unsaved Draft'}
               </span>
             </div>
           </div>
@@ -855,14 +874,22 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
                     <div className="flex min-w-0 items-center gap-2">
                       <span
                         className={`status-pill ${
-                          r.status === 'APPROVED'
+                          r.status === 'ACTIVE' || r.status === 'APPROVED' || r.status === 'BU_APPROVED'
                             ? 'status-approved'
-                            : r.status === 'SUBMITTED'
+                            : r.status === 'SUBMITTED' || r.status === 'PENDING'
                             ? 'status-submitted'
+                            : r.status === 'CORRECTION_REQUESTED'
+                            ? 'status-warning'
                             : 'status-draft'
                         }`}
                       >
-                        {r.status || 'DRAFT'}
+                        {r.status === 'ACTIVE' || r.status === 'APPROVED' || r.status === 'BU_APPROVED'
+                          ? 'Active'
+                          : r.status === 'SUBMITTED' || r.status === 'PENDING'
+                          ? 'Pending'
+                          : r.status === 'CORRECTION_REQUESTED'
+                          ? 'Correction Required'
+                          : 'Draft'}
                       </span>
                       <span className="truncate font-semibold text-slate-800">
                         {describeLevelRecord(r)}

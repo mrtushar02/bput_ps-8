@@ -139,24 +139,24 @@ interface PipelineStage {
 }
 const PIPELINE_STAGES: PipelineStage[] = [
   { key: 'DRAFT',              label: 'Draft',              short: 'D',  statuses: ['DRAFT'], icon: FileText },
-  { key: 'SUBMITTED',          label: 'Submitted',          short: 'S',  statuses: ['SUBMITTED'], icon: Send },
+  { key: 'SUBMITTED',          label: 'Pending',            short: 'P',  statuses: ['SUBMITTED', 'PENDING', 'RESUBMITTED'], icon: Send },
   { key: 'UNDER_REVIEW',       label: 'Under Review',       short: 'R',  statuses: ['UNDER_REVIEW'], icon: Eye },
-  { key: 'BU_APPROVED',        label: 'BU Approved',        short: 'B',  statuses: ['BU_APPROVED'], icon: ClipboardCheck },
+  { key: 'BU_APPROVED',        label: 'Active (BU)',        short: 'B',  statuses: ['BU_APPROVED', 'ACTIVE', 'APPROVED'], icon: ClipboardCheck },
   { key: 'SUBSIDIARY_APPROVED',label: 'Subsidiary Approved',short: 'SA', statuses: ['SUBSIDIARY_APPROVED'], icon: Building2 },
   { key: 'HQ_REVIEW',          label: 'HQ Review',          short: 'HQ', statuses: ['HQ_REVIEW'], icon: Network },
-  { key: 'LOCKED',             label: 'Locked',             short: 'L',  statuses: ['LOCKED', 'APPROVED'], icon: Lock },
+  { key: 'LOCKED',             label: 'Locked',             short: 'L',  statuses: ['LOCKED'], icon: Lock },
 ]
 
 /** Status pill mapping for reviewer view (re-uses global .status-* classes) */
 function reviewerStatusPill(status: string | undefined): string {
   if (!status) return 'status-draft'
   const s = status.toUpperCase()
-  if (s === 'APPROVED' || s === 'LOCKED')                     return 'status-approved'
-  if (s === 'DRAFT')                                            return 'status-draft'
-  if (s === 'SUBMITTED')                                        return 'status-submitted'
-  if (s === 'UNDER_REVIEW')                                    return 'status-review'
-  if (s === 'BU_APPROVED' || s === 'SUBSIDIARY_APPROVED' || s === 'HQ_REVIEW') return 'status-verified'
-  if (s.includes('CORRECTION') || s.includes('REJECTED'))       return 'status-error'
+  if (s === 'APPROVED' || s === 'ACTIVE' || s === 'LOCKED') return 'status-approved'
+  if (s === 'DRAFT') return 'status-draft'
+  if (s === 'SUBMITTED' || s === 'PENDING' || s === 'RESUBMITTED') return 'status-submitted'
+  if (s === 'UNDER_REVIEW') return 'status-review'
+  if (s === 'BU_APPROVED' || s === 'SUBSIDIARY_APPROVED' || s === 'HQ_REVIEW') return 'status-approved'
+  if (s.includes('CORRECTION') || s.includes('REJECTED')) return 'status-error'
   return 'status-locked'
 }
 
@@ -249,7 +249,7 @@ export function ReviewerDashboard() {
   /** Review queue = submissions that are at the reviewer's actionable stages
    * (Submitted, Under Review, BU Approved, Subsidiary Approved, HQ Review). */
   const reviewQueue = useMemo(() => {
-    const actionable = ['SUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'SUBSIDIARY_APPROVED', 'HQ_REVIEW']
+    const actionable = ['SUBMITTED', 'PENDING', 'RESUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'SUBSIDIARY_APPROVED', 'HQ_REVIEW']
     return submissions
       .filter(s => actionable.includes((s.status || '').toUpperCase()))
       .sort((a, b) => (b.updatedAt > a.updatedAt ? 1 : -1))
@@ -258,7 +258,7 @@ export function ReviewerDashboard() {
 
   /** Pending approvals = items awaiting the reviewer's decision now. */
   const pendingApprovals = useMemo(() => {
-    const actionable = ['SUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'SUBSIDIARY_APPROVED', 'HQ_REVIEW']
+    const actionable = ['SUBMITTED', 'PENDING', 'RESUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'SUBSIDIARY_APPROVED', 'HQ_REVIEW']
     return submissions.filter(s => actionable.includes((s.status || '').toUpperCase()))
   }, [submissions])
 
@@ -658,7 +658,11 @@ function ReviewQueueCard({ subs, onViewAll }: { subs: SubmissionItem[]; onViewAl
                     <td className="py-2 pr-3">
                       <span className={`status-pill ${statusPill}`}>
                         {hasErrors && <AlertTriangle className="h-3 w-3" />}
-                        {status}
+                        {status.toUpperCase() === 'SUBMITTED' || status.toUpperCase() === 'PENDING' || status.toUpperCase() === 'RESUBMITTED'
+                          ? 'Pending'
+                          : status.toUpperCase() === 'BU_APPROVED' || status.toUpperCase() === 'APPROVED' || status.toUpperCase() === 'ACTIVE'
+                          ? 'Active'
+                          : status}
                       </span>
                     </td>
                     <td className="py-2 pr-2">
