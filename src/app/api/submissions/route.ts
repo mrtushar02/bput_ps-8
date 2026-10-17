@@ -306,6 +306,3 @@ async function requireUserOrThrow() {
   if (!u) throw new Error('UNAUTHENTICATED')
   return u
 }
-
-// re-export parseRecordIds to keep module shape stable for tree-shaking
-export const _parseRecordIds = parseRecordIds

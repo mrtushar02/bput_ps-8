@@ -31,11 +31,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       const fs = await import('fs')
       const path = await import('path')
 
-      // Use the exact official 14-page SEBI BRSR Annexure-I PDF provided
+      // Always serve the official MEIL BRSR PDF provided at src/lib/meil-brsr-official.pdf
       const officialPdfCandidates = [
-        path.join(process.cwd(), 'public', 'reports', 'MEIL-BRSR-Annexure-I-FY2026-v11.pdf'),
         path.join(process.cwd(), 'src', 'lib', 'meil-brsr-official.pdf'),
-        'C:\\Users\\91814\\Downloads\\MEIL-BRSR-Annexure-I-FY2026-v11.pdf',
+        path.join(process.cwd(), 'public', 'reports', 'meil-brsr-official.pdf'),
+        path.join(process.cwd(), 'public', 'reports', 'MEIL-BRSR-Annexure-I-FY2026-v11.pdf'),
       ]
 
       let pdfBuffer: Buffer | null = null
@@ -58,9 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         pdfBuffer = Buffer.from(pdfDoc.output('arraybuffer'))
       }
 
-      const pdfFileName = report.fileName?.endsWith('.pdf')
-        ? report.fileName
-        : `MEIL-BRSR-Annexure-I-FY${report.reportingYear ?? 2026}-v${report.version}.pdf`
+      const pdfFileName = `MEIL-BRSR-Official-Report-FY${report.reportingYear ?? 2026}-v${report.version}.pdf`
 
       const isInline = req.nextUrl.searchParams.get('inline') === 'true'
       const disposition = isInline

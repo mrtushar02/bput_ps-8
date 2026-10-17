@@ -109,14 +109,6 @@ export async function POST(
       },
     })
 
-    // Also update underlying level records if applicable
-    try {
-      const { updateLevelRecordStatus } = await import('@/lib/level-records')
-      for (const rid of recordIds) {
-        updateLevelRecordStatus(rid, 'SUBMITTED')
-      }
-    } catch {}
-
     await appendHistory({
       submissionId: id,
       fromStatus: 'DRAFT',

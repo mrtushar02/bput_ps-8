@@ -17,7 +17,7 @@ import { toast } from 'sonner'
 import {
   FileText, Upload, Filter, RefreshCw, AlertOctagon, ShieldCheck, XCircle,
   History, Eye, CheckCircle2, Hash, Link2, User, Calendar, FileCheck2,
-  FileType2, Building2, FolderOpen, ArrowRight, Inbox, Loader2, Info, Lock,
+  FileType2, Building2, FolderOpen, ArrowRight, Inbox, Loader2, Info,
 } from 'lucide-react'
 import { useApp } from '@/lib/auth-context'
 import {
@@ -140,17 +140,14 @@ type RoleGate = {
 function useRoleGate(): RoleGate {
   const { user } = useApp()
   const key = user?.roles?.[0]?.key ?? ''
+  // Verifiers: SUPER_ADMIN, BU_REVIEWER, SUBSIDIARY_REVIEWER, GROUP_REVIEWER
   const canVerify =
     key === 'SUPER_ADMIN' ||
-    key === 'BU_REVIEWER'
-  const canUpload =
-    key === 'SUPER_ADMIN' ||
-    key === 'PROJECT_USER' ||
-    key === 'HR_USER' ||
-    key === 'EHS_USER' ||
-    key === 'PROCUREMENT_USER' ||
-    key === 'CSR_USER' ||
-    key === 'COMPLIANCE_USER'
+    key === 'BU_REVIEWER' ||
+    key === 'SUBSIDIARY_REVIEWER' ||
+    key === 'GROUP_REVIEWER'
+  // All authenticated users can upload evidence
+  const canUpload = !!user
   return { canVerify, canUpload }
 }
 
@@ -603,6 +600,7 @@ export function EvidenceModule() {
             projects={projects}
             periods={periods}
             onClose={() => setUploadOpen(false)}
+            onUploaded={() => { setUploadOpen(false); fetchList() }}
           />
         </SheetContent>
       </Sheet>
@@ -805,24 +803,8 @@ function EvidenceDetailPanel({
   const linkedSource = detail.linkedSourceRecord as Record<string, unknown> | null
   return (
     <div className="space-y-5 p-5">
-      {/* FAUX PREVIEW */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        className="glass-subtle relative flex h-56 items-center justify-center overflow-hidden rounded-2xl"
-      >
-        <div className="orb -top-8 left-8 h-32 w-32 bg-blue-200/40" />
-        <div className="orb -bottom-10 right-6 h-28 w-28 bg-sky-200/30" />
-        <div className="relative flex flex-col items-center gap-2 text-slate-500">
-          <div className="kpi-tile bg-white/70 text-blue-600"><FileType2 className="h-7 w-7" /></div>
-          <div className="text-sm font-semibold text-slate-700">{e.fileName}</div>
-          <div className="text-[11px] text-slate-400">{e.mimeType} · {fmtSize(e.fileSize)}</div>
-          <div className="mt-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-700">
-            Preview not rendered · metadata-only demo
-          </div>
-        </div>
-      </motion.div>
+      {/* FILE PREVIEW */}
+      <FilePreviewPanel evidence={e} />
 
       {/* STATUS ROW */}
       <div className="flex items-center justify-between rounded-xl bg-white/40 px-4 py-3">
@@ -972,46 +954,166 @@ function Meta({
   )
 }
 
+// FilePreviewPanel — renders the actual file inline (PDF / image) or shows a download link
+function FilePreviewPanel({ evidence: e }: { evidence: EvidenceItem }) {
+  const previewUrl = `/api/evidence/${e.id}/file`
+  const downloadUrl = `/api/evidence/${e.id}/file?download=true`
+
+  const isPdf = e.mimeType === 'application/pdf' || e.fileName.toLowerCase().endsWith('.pdf')
+  const isImage = e.mimeType.startsWith('image/')
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4 }}
+      className="glass-subtle relative overflow-hidden rounded-2xl"
+    >
+      <div className="flex items-center justify-between border-b border-white/40 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <FileType2 className="h-4 w-4 text-blue-600" />
+          <span className="text-xs font-semibold text-slate-700 truncate max-w-[260px]">{e.fileName}</span>
+          <span className="text-[10px] text-slate-400">{e.mimeType} · {fmtSize(e.fileSize)}</span>
+        </div>
+        <a
+          href={downloadUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100"
+        >
+          <Upload className="h-3 w-3 rotate-180" /> Download
+        </a>
+      </div>
+
+      {isPdf ? (
+        <iframe
+          src={previewUrl}
+          title={e.fileName}
+          className="h-96 w-full border-0 bg-white"
+          sandbox="allow-same-origin allow-scripts"
+        />
+      ) : isImage ? (
+        <img
+          src={previewUrl}
+          alt={e.fileName}
+          className="max-h-96 w-full object-contain bg-white p-2"
+        />
+      ) : (
+        <div className="flex h-32 items-center justify-center text-slate-400">
+          <div className="flex flex-col items-center gap-2">
+            <FileType2 className="h-8 w-8" />
+            <span className="text-xs">No inline preview for this file type.</span>
+            <a
+              href={downloadUrl}
+              className="text-xs font-semibold text-blue-600 underline"
+            >
+              Download to view
+            </a>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
 function UploadForm({
-  projects, periods, onClose,
+  projects, periods, onClose, onUploaded,
 }: {
   projects: ProjectOption[]
   periods: PeriodOption[]
   onClose: () => void
+  onUploaded?: () => void
 }) {
-  const [fileName, setFileName] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [docType, setDocType] = useState('INVOICE')
   const [docDate, setDocDate] = useState('')
   const [mod, setMod] = useState('ENERGY')
   const [projId, setProjId] = useState(projects[0]?.id ?? '')
   const [perId, setPerId] = useState(periods[0]?.id ?? '')
   const [busy, setBusy] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
 
-  const submit = () => {
-    if (!fileName.trim()) {
-      toast.error('File name is required')
+  const handleDrop = (ev: React.DragEvent<HTMLDivElement>) => {
+    ev.preventDefault()
+    setDragOver(false)
+    const f = ev.dataTransfer.files?.[0]
+    if (f) setFile(f)
+  }
+
+  const submit = async () => {
+    if (!file) {
+      toast.error('Please select a file to upload')
       return
     }
     setBusy(true)
-    // No upload endpoint exists in this build — metadata-only demo.
-    setTimeout(() => {
-      setBusy(false)
-      toast.success('Upload captured (demo)', {
-        description: 'Metadata-only — file persistence not wired in this build.',
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('documentType', docType)
+      if (docDate) fd.append('documentDate', docDate)
+      fd.append('module', mod)
+      if (projId) fd.append('projectId', projId)
+      if (perId) fd.append('periodId', perId)
+
+      const res = await fetch('/api/evidence', { method: 'POST', body: fd })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || `Upload failed (${res.status})`)
+
+      toast.success('Evidence uploaded', {
+        description: `${file.name} uploaded and saved successfully.`,
       })
       onClose()
-    }, 600)
+      onUploaded?.()
+    } catch (e: any) {
+      toast.error('Upload failed', { description: String(e?.message ?? e) })
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <div className="space-y-4 p-5">
-      <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] text-amber-700">
-        <Info className="h-3.5 w-3.5" /> This is a metadata-only demo. No file is persisted.
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs font-semibold text-slate-600">File name</Label>
-        <Input value={fileName} onChange={(e) => setFileName(e.target.value)} placeholder="e.g. GJT-Grid-Bill-Apr2026.pdf" className="bg-white/60" />
+      {/* DROP ZONE */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`relative flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center transition ${
+          dragOver
+            ? 'border-blue-400 bg-blue-50'
+            : file
+            ? 'border-emerald-400 bg-emerald-50'
+            : 'border-slate-200 bg-slate-50'
+        }`}
+      >
+        <Upload className={`h-8 w-8 ${ file ? 'text-emerald-600' : 'text-slate-300' }`} />
+        {file ? (
+          <>
+            <p className="text-sm font-semibold text-emerald-700">{file.name}</p>
+            <p className="text-[11px] text-slate-400">{fmtSize(file.size)} · {file.type || 'unknown type'}</p>
+            <button
+              type="button"
+              onClick={() => setFile(null)}
+              className="text-[11px] text-rose-500 underline"
+            >
+              Remove
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-slate-600">Drag &amp; drop a file here</p>
+            <p className="text-[11px] text-slate-400">or click to browse</p>
+          </>
+        )}
+        <input
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg,.xlsx,.csv,.docx,.zip"
+          className="absolute inset-0 cursor-pointer opacity-0"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) setFile(f)
+          }}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -1049,9 +1151,11 @@ function UploadForm({
           <Select value={projId} onValueChange={setProjId}>
             <SelectTrigger className="bg-white/60"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {projects.map(p => (
+              {projects.length > 0 ? projects.map(p => (
                 <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
-              ))}
+              )) : (
+                <SelectItem value="" className="text-xs text-slate-400">No projects loaded</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -1062,18 +1166,20 @@ function UploadForm({
         <Select value={perId} onValueChange={setPerId}>
           <SelectTrigger className="bg-white/60"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {periods.map(p => (
+            {periods.length > 0 ? periods.map(p => (
               <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
-            ))}
+            )) : (
+              <SelectItem value="" className="text-xs text-slate-400">No periods loaded</SelectItem>
+            )}
           </SelectContent>
         </Select>
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-white/60 pt-3">
         <Button variant="ghost" onClick={onClose} className="text-slate-600">Cancel</Button>
-        <Button onClick={submit} disabled={busy} className="btn-glass-primary rounded-full">
+        <Button onClick={submit} disabled={busy || !file} className="btn-glass-primary rounded-full">
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-          Upload
+          {busy ? 'Uploading…' : 'Upload'}
         </Button>
       </div>
     </div>

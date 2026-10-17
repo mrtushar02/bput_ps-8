@@ -894,7 +894,7 @@ export function FinanceWorkspace() {
                   <input
                     type="text"
                     readOnly
-                    value={financialData.common?.preparedBy || 'Rakesh Verma'}
+                    value={financialData.common?.preparedBy || 'Rahul Verma'}
                     className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs font-semibold text-slate-800 outline-none"
                   />
                 </div>

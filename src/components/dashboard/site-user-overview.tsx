@@ -1614,9 +1614,7 @@ function QuickLogModal({
     if (initialMetric) setMetric(initialMetric)
   }, [initialMetric])
 
-  if (!isOpen) return null
-
-  // Live emission estimation
+  // Live emission estimation — computed before the early return to keep hook order stable
   const emissionCalc = useMemo(() => {
     const val = parseFloat(value) || 0
     if (metric === 'Grid Electricity') return (val * 0.716 / 1000).toFixed(3) // CEA v19
@@ -1625,6 +1623,8 @@ function QuickLogModal({
     if (metric === 'Gas') return (val * 1.88 / 1000).toFixed(3)
     return (val * 0.5 / 1000).toFixed(3)
   }, [metric, value])
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
@@ -2187,9 +2187,12 @@ export function SiteUserOverview() {
       setError('')
     } catch (e) {
       if (!mountedRef.current) return
-      if (!overview) setError(e instanceof Error ? e.message : 'Failed to load overview')
+      setOverview(prev => {
+        if (!prev) setError(e instanceof Error ? e.message : 'Failed to load overview')
+        return prev
+      })
     }
-  }, [overview])
+  }, [])
 
   const fetchActivities = useCallback(async () => {
     try {

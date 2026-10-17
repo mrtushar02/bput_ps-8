@@ -15,6 +15,7 @@ async function main() {
   const roleDefs = [
     ['SUPER_ADMIN', 'Super Admin', 'Entire system administration', 3],
     ['PROJECT_USER', 'Project / Site User', 'Project-level source data entry', 1],
+    ['FINANCE_USER', 'Finance & Resource Data Contributor', 'Financial turnover, CapEx/OpEx and resource expenditure collection', 1],
     ['HR_USER', 'HR User', 'Workforce & HR data', 1],
     ['EHS_USER', 'EHS / Safety User', 'Safety & environmental incidents', 1],
     ['PROCUREMENT_USER', 'Procurement / Supply Chain User', 'Supplier & value chain', 1],
@@ -64,6 +65,13 @@ async function main() {
   }
   const rolePermMap: Record<string, string[]> = {
     PROJECT_USER: ['organization.read', 'project.read', 'esg.energy.write', 'esg.water.write', 'esg.waste.write', 'esg.people.write', 'esg.safety.write', 'esg.travel.write', 'evidence.upload', 'evidence.read', 'submission.submit', 'brsr.read', 'report.read', 'audit.read'],
+    // Phase-1 data-entry roles — each can write its own ESG module, upload evidence, and submit
+    FINANCE_USER: ['organization.read', 'project.read', 'esg.travel.write', 'evidence.upload', 'evidence.read', 'submission.submit', 'brsr.read', 'report.read', 'audit.read'],
+    HR_USER: ['organization.read', 'project.read', 'esg.people.write', 'evidence.upload', 'evidence.read', 'submission.submit', 'brsr.read', 'report.read', 'audit.read'],
+    EHS_USER: ['organization.read', 'project.read', 'esg.safety.write', 'esg.energy.write', 'esg.water.write', 'esg.waste.write', 'evidence.upload', 'evidence.read', 'submission.submit', 'brsr.read', 'report.read', 'audit.read'],
+    PROCUREMENT_USER: ['organization.read', 'project.read', 'esg.travel.write', 'evidence.upload', 'evidence.read', 'submission.submit', 'brsr.read', 'report.read', 'audit.read'],
+    CSR_USER: ['organization.read', 'project.read', 'evidence.upload', 'evidence.read', 'submission.submit', 'brsr.read', 'report.read', 'audit.read'],
+    COMPLIANCE_USER: ['organization.read', 'project.read', 'evidence.read', 'submission.submit', 'brsr.read', 'report.read', 'audit.read'],
     BU_REVIEWER: ['organization.read', 'project.read', 'submission.review', 'submission.reject', 'submission.approve', 'evidence.read', 'evidence.verify', 'brsr.read', 'report.read', 'audit.read'],
     SUBSIDIARY_REVIEWER: ['organization.read', 'project.read', 'submission.review', 'submission.approve', 'evidence.read', 'brsr.read', 'report.read', 'audit.read'],
     GROUP_REVIEWER: ['organization.read', 'project.read', 'submission.review', 'submission.approve', 'submission.lock', 'evidence.read', 'brsr.read', 'brsr.generate', 'report.read', 'report.generate', 'audit.read'],
@@ -116,6 +124,7 @@ async function main() {
     { email: 'priya@meil-esg.in', name: 'Priya Nair', code: 'MEIL-PRC-031', role: 'PROCUREMENT_USER', scope: { type: 'SUBSIDIARY', id: subA.id } },
     { email: 'imran@meil-esg.in', name: 'Imran Sheikh', code: 'MEIL-CSR-017', role: 'CSR_USER', scope: { type: 'SUBSIDIARY', id: subB.id } },
     { email: 'deepika@meil-esg.in', name: 'Deepika Joshi', code: 'MEIL-GOV-005', role: 'COMPLIANCE_USER', scope: { type: 'GROUP', id: group.id } },
+    { email: 'finance@meil-esg.in', name: 'Rahul Verma', code: 'MEIL-FIN-001', role: 'FINANCE_USER', scope: { type: 'GROUP', id: group.id } },
     { email: 'rakesh@meil-esg.in', name: 'Rakesh Verma', code: 'MEIL-BUR-002', role: 'BU_REVIEWER', scope: { type: 'BUSINESS_UNIT', id: bu1.id } },
     { email: 'nisha@meil-esg.in', name: 'Nisha Pillai', code: 'MEIL-SUB-001', role: 'SUBSIDIARY_REVIEWER', scope: { type: 'SUBSIDIARY', id: subA.id } },
     { email: 'vikram@meil-esg.in', name: 'Vikram Shah', code: 'MEIL-GRP-001', role: 'GROUP_REVIEWER', scope: { type: 'GROUP', id: group.id } },

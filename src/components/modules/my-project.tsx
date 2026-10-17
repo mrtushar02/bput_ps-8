@@ -738,7 +738,6 @@ function SafeImage({
       style={{ aspectRatio }}
     >
       {!error ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
           alt={alt}
@@ -1624,6 +1623,14 @@ function ProjectDetailsPanel({
     setShowEditModal(false)
   }, [project, editName, editLocation, editStatus, onUpdateProject])
 
+  // Hooks must run unconditionally — compute before the early return below.
+  const filteredImages = useMemo(() => {
+    if (!project) return []
+    const p = getProjectProfile(project)
+    if (imageCategoryFilter === 'All') return p.images
+    return p.images.filter(img => img.category === imageCategoryFilter)
+  }, [project, imageCategoryFilter])
+
   if (!project) {
     return (
       <div className="glass-ios-liquid rounded-[26px] p-10 flex flex-col items-center justify-center text-center min-h-[500px]">
@@ -1636,11 +1643,6 @@ function ProjectDetailsPanel({
 
   const profile = getProjectProfile(project)
   const modules = moduleCompletion(subs, kpis)
-
-  const filteredImages = useMemo(() => {
-    if (imageCategoryFilter === 'All') return profile.images
-    return profile.images.filter(img => img.category === imageCategoryFilter)
-  }, [profile.images, imageCategoryFilter])
 
   return (
     <div className="glass-ios-liquid glass-shimmer rounded-[26px] overflow-hidden flex flex-col h-full relative">
@@ -1788,7 +1790,6 @@ function ProjectDetailsPanel({
               >
                 <X className="h-6 w-6" />
               </button>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={lightboxImg.url}
                 alt={lightboxImg.title}
