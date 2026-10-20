@@ -23,6 +23,7 @@ import {
   Upload, RotateCcw, Download, Eye, FileSpreadsheet, Image as ImageIcon,
   Maximize2, Minimize2, ZoomIn, ZoomOut, X, FileQuestion,
   Plus, Trash2, Edit3, ArrowRight, ArrowLeft, Sun, Fuel, ListOrdered,
+  Waves, CloudRain, Wind, Truck, Factory, CloudFog, Box, Package, RefreshCw, ShieldAlert,
   type LucideIcon,
 } from 'lucide-react'
 import { useApp } from '@/lib/auth-context'
@@ -3134,26 +3135,26 @@ function Level1EnergyForm({
 
   return (
     <div className="space-y-4">
-      {/* FLOW NAVIGATION TABS: STEP 1 (ITEM DRAFTING) -> STEP 2 (ORGANIZE ALL ITEMS) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
-        <div className="flex items-center gap-2">
+      {/* FLOW NAVIGATION CONTROLLER: STEP 1 (ITEM DRAFTING) <-> STEP 2 (CONSOLIDATED SUMMARY) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3.5">
+        <div className="inline-flex items-center rounded-xl bg-slate-100/90 p-1 border border-slate-200/80 shadow-xs">
           <button
             type="button"
             onClick={() => setViewStep('ENTRY')}
-            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition shadow-xs ${
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
               viewStep === 'ENTRY'
-                ? 'bg-blue-600 text-white shadow-blue-500/20'
-                : 'bg-white/80 text-slate-700 hover:bg-white'
+                ? 'bg-white text-blue-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <Plus className="h-3.5 w-3.5" />
-            <span>1. Add Source Items (Draft)</span>
+            <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+              viewStep === 'ENTRY' ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              1
+            </span>
+            <span>Item Drafting</span>
             {stagedItems.length > 0 && (
-              <span
-                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold ${
-                  viewStep === 'ENTRY' ? 'bg-blue-800 text-white' : 'bg-blue-100 text-blue-700'
-                }`}
-              >
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-mono font-bold text-blue-700">
                 {stagedItems.length}
               </span>
             )}
@@ -3162,20 +3163,20 @@ function Level1EnergyForm({
           <button
             type="button"
             onClick={handleNextOrganize}
-            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition shadow-xs ${
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
               viewStep === 'ORGANIZED'
-                ? 'bg-indigo-600 text-white shadow-indigo-500/20'
-                : 'bg-white/80 text-slate-700 hover:bg-white'
+                ? 'bg-white text-indigo-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            <ListOrdered className="h-3.5 w-3.5" />
-            <span>2. Organize All Items (Consolidated)</span>
+            <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+              viewStep === 'ORGANIZED' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+            }`}>
+              2
+            </span>
+            <span>Organized Summary</span>
             {stagedItems.length > 0 && (
-              <span
-                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold ${
-                  viewStep === 'ORGANIZED' ? 'bg-indigo-800 text-white' : 'bg-emerald-100 text-emerald-800'
-                }`}
-              >
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                 ✓ Ready
               </span>
             )}
@@ -3186,19 +3187,22 @@ function Level1EnergyForm({
           <button
             type="button"
             onClick={handleNextOrganize}
-            className="flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition"
+            className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:shadow-indigo-500/20 hover:opacity-95 transition active:scale-95"
           >
-            <span>Next: Organize All ({stagedItems.length})</span>
-            <ArrowRight className="h-3.5 w-3.5" />
+            <span>Next: Organize All Items</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-mono">
+              {stagedItems.length}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </button>
         ) : (
           <button
             type="button"
             onClick={() => setViewStep('ENTRY')}
-            className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
           >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Back to Add / Edit Items</span>
+            <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+            <span>Back to Item Drafting</span>
           </button>
         )}
       </div>
@@ -3209,47 +3213,50 @@ function Level1EnergyForm({
       {viewStep === 'ENTRY' && (
         <FormGrid>
           {/* Live Energy Analytics banner placed on top */}
-          <div className="sm:col-span-2 rounded-xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-blue-50/90 p-3.5 text-xs text-blue-900 shadow-sm">
+          <div className="sm:col-span-2 rounded-2xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-indigo-50/60 to-blue-50/90 p-4 text-xs text-blue-900 shadow-sm">
             <div className="flex items-center justify-between font-bold">
-              <span className="flex items-center gap-1.5 text-blue-800">
+              <span className="flex items-center gap-2 text-blue-800">
                 <Calculator className="h-4 w-4 text-blue-600" /> Active Item Analytics ·{' '}
-                <span className="underline decoration-blue-300">{energySource}</span>
+                <span className="underline decoration-blue-300 font-extrabold">{energySource}</span>
               </span>
-              <span className="rounded-full bg-blue-100/80 px-2 py-0.5 text-[10px] text-blue-700 font-mono font-bold">
+              <span className="rounded-full bg-blue-100/90 px-2.5 py-0.5 text-[10px] text-blue-800 font-mono font-bold border border-blue-200">
                 Factor: {factor} kgCO₂e/{unit}
               </span>
             </div>
-            <div className="mt-2.5 grid grid-cols-3 gap-2.5 text-center">
-              <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-blue-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
                   Est. GHG ({energySource})
                 </div>
-                <div className="text-sm font-bold text-slate-900">{estTco2e.toFixed(2)} tCO₂e</div>
+                <div className="text-base font-extrabold text-slate-900 mt-0.5">{estTco2e.toFixed(2)} tCO₂e</div>
               </div>
-              <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-blue-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
                   Meter Delta
                 </div>
-                <div className="text-sm font-bold text-slate-900">
+                <div className="text-base font-extrabold text-slate-900 mt-0.5">
                   {meterDiff > 0 ? meterDiff.toLocaleString() : '—'}
                 </div>
               </div>
-              <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-blue-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
                   GHG Scope
                 </div>
-                <div className="text-sm font-bold text-slate-900">{emissionDataType}</div>
+                <div className="text-base font-extrabold text-slate-900 mt-0.5">{emissionDataType}</div>
               </div>
             </div>
           </div>
 
           {/* INTERACTIVE SOURCE ITEMS SELECTOR PILLS */}
-          <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white/70 p-3 shadow-xs">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                Select Energy Source Item to Fill / Draft:
-              </span>
-              <span className="text-[10px] text-slate-500 font-medium">
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-xs">
+            <div className="mb-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-blue-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Select Energy Source Item to Fill / Draft:
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
                 Click any source → Fill details &amp; evidence → Click Add (Draft)
               </span>
             </div>
@@ -3917,9 +3924,147 @@ function Level1EnergyForm({
    LEVEL 2: WATER MANAGEMENT FORM
    ============================================================ */
 const L2_ACTIVITIES = ['Withdrawal', 'Consumption', 'Reuse', 'Discharge']
-const L2_SOURCES = ['Groundwater', 'Surface water', 'Third-party supply', 'Rainwater', 'Other']
+const L2_SOURCES = [
+  'Groundwater',
+  'Surface water',
+  'Third-party supply',
+  'Rainwater',
+  'Recycled / Reused water',
+  'Municipal supply',
+  'Other',
+]
 const L2_TREATMENTS = ['Primary', 'Secondary', 'Tertiary', 'STP / ETP Advanced', 'RO / ZLD', 'Untreated']
 const L2_DESTINATIONS = ['Surface water', 'Third party', 'Groundwater recharge', 'Landscaping', 'Zero Liquid Discharge (ZLD)']
+
+export interface StagedWaterItem {
+  id: string
+  waterSource: string
+  waterActivity: string
+  waterQuantity: string
+  unit: string
+  meterSourceId: string
+  openingReading: string
+  closingReading: string
+  waterReusedRecycled: string
+  dischargeDestination: string
+  treatmentLevel: string
+  waterQualityResult: string
+  testDateLab: string
+  supportingEvidence: string
+  remarks: string
+  evidenceId: string
+  evidenceFileName?: string
+  circularityPct: number
+}
+
+const WATER_SOURCE_PRESETS: Record<
+  string,
+  {
+    activity: string
+    unit: string
+    meter: string
+    reused: string
+    destination: string
+    treatment: string
+    quality: string
+    testLab: string
+    evidenceDoc: string
+    icon: LucideIcon
+    defaultQty: string
+  }
+> = {
+  'Groundwater': {
+    activity: 'Withdrawal',
+    unit: 'kL',
+    meter: 'CGWA-BW-01-MTR',
+    reused: '6200',
+    destination: 'Zero Liquid Discharge (ZLD)',
+    treatment: 'RO / ZLD',
+    quality: 'TDS: 420 mg/L, pH: 7.2 (Compliant)',
+    testLab: '2026-09-15 · SGS Environmental Testing',
+    evidenceDoc: 'CGWA Extraction Logbook & Meter Photo',
+    icon: Droplet,
+    defaultQty: '24500',
+  },
+  'Surface water': {
+    activity: 'Withdrawal',
+    unit: 'kL',
+    meter: 'RIVER-PUMP-IN-02',
+    reused: '7570',
+    destination: 'Landscaping',
+    treatment: 'Primary',
+    quality: 'Turbidity: 8 NTU, BOD: 12 mg/L',
+    testLab: '2026-09-10 · Vimta Labs Ltd.',
+    evidenceDoc: 'Irrigation Dept. Raw Water Invoice',
+    icon: Waves,
+    defaultQty: '18000',
+  },
+  'Third-party supply': {
+    activity: 'Withdrawal',
+    unit: 'kL',
+    meter: 'TANKER-GATE-01',
+    reused: '0',
+    destination: 'Surface water',
+    treatment: 'Untreated',
+    quality: 'Potable standard compliant',
+    testLab: '2026-09-05 · Quality Lab Certificate',
+    evidenceDoc: 'Water Tanker Invoices & Delivery Slips',
+    icon: Building2,
+    defaultQty: '4200',
+  },
+  'Rainwater': {
+    activity: 'Reuse',
+    unit: 'kL',
+    meter: 'RWH-COLLECT-01',
+    reused: '3500',
+    destination: 'Groundwater recharge',
+    treatment: 'Tertiary',
+    quality: 'TDS: 65 mg/L, pH: 7.0',
+    testLab: '2026-09-18 · Site EHS Lab',
+    evidenceDoc: 'RWH Recharge Pit Daily Log',
+    icon: CloudRain,
+    defaultQty: '3500',
+  },
+  'Recycled / Reused water': {
+    activity: 'Reuse',
+    unit: 'kL',
+    meter: 'STP-TREATED-REC-01',
+    reused: '8500',
+    destination: 'Zero Liquid Discharge (ZLD)',
+    treatment: 'STP / ETP Advanced',
+    quality: 'BOD: <10 mg/L, COD: <45 mg/L, TSS: <15 mg/L',
+    testLab: '2026-09-22 · SPCB Recognized Lab',
+    evidenceDoc: 'STP Daily Treatment & Flow Log',
+    icon: RefreshCw,
+    defaultQty: '8500',
+  },
+  'Municipal supply': {
+    activity: 'Withdrawal',
+    unit: 'kL',
+    meter: 'MUNC-GRID-FLOW-01',
+    reused: '0',
+    destination: 'Third party',
+    treatment: 'Primary',
+    quality: 'IS 10500 Drinking Water Norms',
+    testLab: '2026-08-30 · Municipal Board Test Memo',
+    evidenceDoc: 'Municipal Water Board Utility Bill',
+    icon: Building2,
+    defaultQty: '1200',
+  },
+  'Other': {
+    activity: 'Withdrawal',
+    unit: 'kL',
+    meter: 'AUX-WTR-MTR-01',
+    reused: '0',
+    destination: 'Landscaping',
+    treatment: 'Primary',
+    quality: 'General site compliance',
+    testLab: '2026-09-01 · Internal EHS Check',
+    evidenceDoc: 'Auxiliary Water Register',
+    icon: Droplet,
+    defaultQty: '500',
+  },
+}
 
 function Level2WaterForm({
   projectId,
@@ -3934,48 +4079,331 @@ function Level2WaterForm({
   const key = `l2-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
 
-  const [waterActivity, setWaterActivity] = useState(initial.waterActivity ?? 'Withdrawal')
-  const [waterSource, setWaterSource] = useState(initial.waterSource ?? 'Surface water')
-  const [waterQuantity, setWaterQuantity] = useState(initial.waterQuantity ?? '24500')
-  const [unit, setUnit] = useState(initial.unit ?? 'kL')
-  const [meterSourceId, setMeterSourceId] = useState(initial.meterSourceId ?? 'FLOW-ZLD-CGWA-01')
-  const [openingReading, setOpeningReading] = useState(initial.openingReading ?? '82400')
-  const [closingReading, setClosingReading] = useState(initial.closingReading ?? '106900')
-  const [waterReusedRecycled, setWaterReusedRecycled] = useState(initial.waterReusedRecycled ?? '13770')
-  const [dischargeDestination, setDischargeDestination] = useState(initial.dischargeDestination ?? 'Zero Liquid Discharge (ZLD)')
-  const [treatmentLevel, setTreatmentLevel] = useState(initial.treatmentLevel ?? 'RO / ZLD')
-  const [waterQualityResult, setWaterQualityResult] = useState(initial.waterQualityResult ?? 'BOD: <10 mg/L, COD: <45 mg/L, TSS: <15 mg/L (100% CPCB compliant)')
-  const [testDateLab, setTestDateLab] = useState(initial.testDateLab ?? '2026-09-15 · SGS Environmental Testing Services')
-  const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'CGWA Meter Log & ZLD Recycle Register')
-  const [remarks, setRemarks] = useState(initial.remarks ?? 'Total water withdrawal 42,500 kL; 13,770 kL recycled (32.4% recovery achieved per BRSR P6).')
-  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
+  // Multi-item staged state
+  const [stagedItems, setStagedItems] = useState<StagedWaterItem[]>(() => {
+    if (Array.isArray(initial.items) && initial.items.length > 0) {
+      return initial.items
+    }
+    if (initial.waterQuantity && Number(initial.waterQuantity) > 0) {
+      const q = Number(initial.waterQuantity) || 0
+      const r = Number(initial.waterReusedRecycled) || 0
+      const circ = q > 0 ? Number(((r / q) * 100).toFixed(1)) : 0
+      return [
+        {
+          id: 'item-water-initial-1',
+          waterSource: initial.waterSource || 'Groundwater',
+          waterActivity: initial.waterActivity || 'Withdrawal',
+          waterQuantity: String(initial.waterQuantity),
+          unit: initial.unit || 'kL',
+          meterSourceId: initial.meterSourceId || 'CGWA-BW-01-MTR',
+          openingReading: initial.openingReading || '82400',
+          closingReading: initial.closingReading || '106900',
+          waterReusedRecycled: initial.waterReusedRecycled || '6200',
+          dischargeDestination: initial.dischargeDestination || 'Zero Liquid Discharge (ZLD)',
+          treatmentLevel: initial.treatmentLevel || 'RO / ZLD',
+          waterQualityResult: initial.waterQualityResult || 'TDS: 420 mg/L, pH: 7.2 (Compliant)',
+          testDateLab: initial.testDateLab || '2026-09-15 · SGS Environmental Testing',
+          supportingEvidence: initial.supportingEvidence || 'CGWA Extraction Logbook & Meter Photo',
+          remarks: initial.remarks || 'Reconciled with CGWA abstraction quota.',
+          evidenceId: initial.evidenceId || '',
+          circularityPct: circ,
+        },
+      ]
+    }
+    // Default seed item so form is immediately usable
+    return [
+      {
+        id: 'item-water-seed-1',
+        waterSource: 'Groundwater',
+        waterActivity: 'Withdrawal',
+        waterQuantity: '24500',
+        unit: 'kL',
+        meterSourceId: 'CGWA-BW-01-MTR',
+        openingReading: '82400',
+        closingReading: '106900',
+        waterReusedRecycled: '6200',
+        dischargeDestination: 'Zero Liquid Discharge (ZLD)',
+        treatmentLevel: 'RO / ZLD',
+        waterQualityResult: 'TDS: 420 mg/L, pH: 7.2 (Compliant)',
+        testDateLab: '2026-09-15 · SGS Environmental Testing',
+        supportingEvidence: 'CGWA Extraction Logbook & Meter Photo',
+        remarks: 'Reconciled with CGWA abstraction quota & flow meter telemetry.',
+        evidenceId: '',
+        circularityPct: 25.3,
+      },
+    ]
+  })
+
+  // View step: 'ENTRY' (Item Drafting) vs 'ORGANIZED' (Consolidated Summary)
+  const [viewStep, setViewStep] = useState<'ENTRY' | 'ORGANIZED'>(
+    initial.viewStep === 'ORGANIZED' ? 'ORGANIZED' : 'ENTRY'
+  )
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+
+  // Active form inputs for selected Water Source item
+  const [waterSource, setWaterSource] = useState('Groundwater')
+  const [waterActivity, setWaterActivity] = useState('Withdrawal')
+  const [waterQuantity, setWaterQuantity] = useState('24500')
+  const [unit, setUnit] = useState('kL')
+  const [meterSourceId, setMeterSourceId] = useState('CGWA-BW-01-MTR')
+  const [openingReading, setOpeningReading] = useState('82400')
+  const [closingReading, setClosingReading] = useState('106900')
+  const [waterReusedRecycled, setWaterReusedRecycled] = useState('6200')
+  const [dischargeDestination, setDischargeDestination] = useState('Zero Liquid Discharge (ZLD)')
+  const [treatmentLevel, setTreatmentLevel] = useState('RO / ZLD')
+  const [waterQualityResult, setWaterQualityResult] = useState('TDS: 420 mg/L, pH: 7.2 (Compliant)')
+  const [testDateLab, setTestDateLab] = useState('2026-09-15 · SGS Environmental Testing')
+  const [supportingEvidence, setSupportingEvidence] = useState('CGWA Extraction Logbook & Meter Photo')
+  const [remarks, setRemarks] = useState(
+    'Total water withdrawal 42,500 kL; 13,770 kL recycled (32.4% recovery achieved per BRSR P6).'
+  )
+  const [evidenceId, setEvidenceId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    formStateRef.current[key] = {
-      waterActivity, waterSource, waterQuantity, unit, meterSourceId, openingReading, closingReading,
-      waterReusedRecycled, dischargeDestination, treatmentLevel, waterQualityResult, testDateLab,
-      supportingEvidence, remarks, evidenceId,
-    }
-  }, [
-    key, waterActivity, waterSource, waterQuantity, unit, meterSourceId, openingReading, closingReading,
-    waterReusedRecycled, dischargeDestination, treatmentLevel, waterQualityResult, testDateLab,
-    supportingEvidence, remarks, evidenceId, formStateRef,
-  ])
-
-  const qty = Number(waterQuantity) || 0
-  const reused = Number(waterReusedRecycled) || 0
-  const circularityPct = qty > 0 ? ((reused / qty) * 100).toFixed(1) : '0'
-
-  const save = async (submitForReview = false) => {
+  // Handle source chip click
+  const handleSelectSource = (src: string) => {
     setError('')
-    if (!waterQuantity || Number(waterQuantity) <= 0) {
-      setError('Water quantity must be > 0')
+    setWaterSource(src)
+    const existing = stagedItems.find((i) => i.waterSource === src)
+    if (existing) {
+      setEditingItemId(existing.id)
+      setWaterActivity(existing.waterActivity)
+      setWaterQuantity(existing.waterQuantity)
+      setUnit(existing.unit)
+      setMeterSourceId(existing.meterSourceId)
+      setOpeningReading(existing.openingReading)
+      setClosingReading(existing.closingReading)
+      setWaterReusedRecycled(existing.waterReusedRecycled)
+      setDischargeDestination(existing.dischargeDestination)
+      setTreatmentLevel(existing.treatmentLevel)
+      setWaterQualityResult(existing.waterQualityResult)
+      setTestDateLab(existing.testDateLab)
+      setSupportingEvidence(existing.supportingEvidence)
+      setRemarks(existing.remarks)
+      setEvidenceId(existing.evidenceId)
+    } else {
+      setEditingItemId(null)
+      const preset = WATER_SOURCE_PRESETS[src] || WATER_SOURCE_PRESETS['Groundwater']
+      setWaterActivity(preset.activity)
+      setWaterQuantity(preset.defaultQty)
+      setUnit(preset.unit)
+      setMeterSourceId(preset.meter)
+      setWaterReusedRecycled(preset.reused)
+      setDischargeDestination(preset.destination)
+      setTreatmentLevel(preset.treatment)
+      setWaterQualityResult(preset.quality)
+      setTestDateLab(preset.testLab)
+      setSupportingEvidence(preset.evidenceDoc)
+      setRemarks(`Measured intake for ${src} per site meters.`)
+      setEvidenceId('')
+    }
+  }
+
+  // Add / Update item in staged items list
+  const handleAddOrUpdateItem = () => {
+    setError('')
+    const qNum = Number(waterQuantity)
+    if (!waterQuantity || isNaN(qNum) || qNum <= 0) {
+      setError(`Please enter a valid water quantity (> 0) for ${waterSource}.`)
       return
     }
+
+    const reusedNum = Number(waterReusedRecycled) || 0
+    const circPct = qNum > 0 ? Number(((reusedNum / qNum) * 100).toFixed(1)) : 0
+
+    const attachedEv = evidence.find((e) => e.id === evidenceId)
+    const itemPayload: StagedWaterItem = {
+      id: editingItemId || `item-wtr-${Date.now()}`,
+      waterSource,
+      waterActivity,
+      waterQuantity,
+      unit,
+      meterSourceId,
+      openingReading,
+      closingReading,
+      waterReusedRecycled,
+      dischargeDestination,
+      treatmentLevel,
+      waterQualityResult,
+      testDateLab,
+      supportingEvidence,
+      remarks,
+      evidenceId,
+      evidenceFileName: attachedEv?.fileName,
+      circularityPct: circPct,
+    }
+
+    let updated: StagedWaterItem[]
+    if (editingItemId) {
+      updated = stagedItems.map((i) => (i.id === editingItemId ? itemPayload : i))
+      toast.success(`Updated ${waterSource} draft item.`)
+    } else {
+      const idx = stagedItems.findIndex((i) => i.waterSource === waterSource)
+      if (idx >= 0) {
+        updated = stagedItems.map((i, iIdx) => (iIdx === idx ? itemPayload : i))
+        toast.info(`Updated existing ${waterSource} draft item.`)
+      } else {
+        updated = [...stagedItems, itemPayload]
+        toast.success(`Added ${waterSource} (${Number(waterQuantity).toLocaleString()} ${unit}) to draft items!`)
+      }
+    }
+
+    setStagedItems(updated)
+    setEditingItemId(null)
+  }
+
+  const handleEditStagedItem = (item: StagedWaterItem) => {
+    setViewStep('ENTRY')
+    setEditingItemId(item.id)
+    setWaterSource(item.waterSource)
+    setWaterActivity(item.waterActivity)
+    setWaterQuantity(item.waterQuantity)
+    setUnit(item.unit)
+    setMeterSourceId(item.meterSourceId)
+    setOpeningReading(item.openingReading)
+    setClosingReading(item.closingReading)
+    setWaterReusedRecycled(item.waterReusedRecycled)
+    setDischargeDestination(item.dischargeDestination)
+    setTreatmentLevel(item.treatmentLevel)
+    setWaterQualityResult(item.waterQualityResult)
+    setTestDateLab(item.testDateLab)
+    setSupportingEvidence(item.supportingEvidence)
+    setRemarks(item.remarks)
+    setEvidenceId(item.evidenceId)
+    toast.info(`Editing ${item.waterSource} draft item`)
+  }
+
+  const handleRemoveStagedItem = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    const target = stagedItems.find((i) => i.id === id)
+    const updated = stagedItems.filter((i) => i.id !== id)
+    setStagedItems(updated)
+    if (editingItemId === id) {
+      setEditingItemId(null)
+    }
+    toast.warning(`Removed ${target?.waterSource || 'item'} from staged drafts.`)
+  }
+
+  const handleNextOrganize = () => {
+    setError('')
+    if (stagedItems.length === 0) {
+      if (!waterQuantity || Number(waterQuantity) <= 0) {
+        setError('Please enter water quantity and click Add (Draft) first.')
+        return
+      }
+      handleAddOrUpdateItem()
+    }
+    setViewStep('ORGANIZED')
+    toast.info('Organized Water Consolidated Summary', {
+      description: 'Review multi-source water metrics and circularity recovery breakdown below.',
+    })
+  }
+
+  // Aggregate stats across staged items
+  const totalWithdrawalQty = stagedItems.reduce((acc, it) => acc + (Number(it.waterQuantity) || 0), 0)
+  const totalReusedQty = stagedItems.reduce((acc, it) => acc + (Number(it.waterReusedRecycled) || 0), 0)
+  const netWithdrawal = Math.max(0, totalWithdrawalQty - totalReusedQty)
+  const overallCircularity =
+    totalWithdrawalQty > 0 ? ((totalReusedQty / totalWithdrawalQty) * 100).toFixed(1) : '0'
+
+  // Sync to formStateRef.current[key]
+  useEffect(() => {
+    const itemsToSave = stagedItems.length > 0 ? stagedItems : []
+    formStateRef.current[key] = {
+      waterSource: itemsToSave.map((i) => i.waterSource).join(', ') || waterSource,
+      waterActivity: itemsToSave[0]?.waterActivity || waterActivity,
+      waterQuantity: String(totalWithdrawalQty || waterQuantity),
+      unit: itemsToSave[0]?.unit || unit,
+      meterSourceId: itemsToSave.map((i) => i.meterSourceId).filter(Boolean).join(', ') || meterSourceId,
+      openingReading,
+      closingReading,
+      waterReusedRecycled: String(totalReusedQty || waterReusedRecycled),
+      dischargeDestination,
+      treatmentLevel,
+      waterQualityResult,
+      testDateLab,
+      supportingEvidence,
+      remarks: remarks || `Consolidated multi-source water report (${itemsToSave.length} sources).`,
+      evidenceId: itemsToSave.find((i) => i.evidenceId)?.evidenceId || evidenceId,
+      items: itemsToSave,
+      totalWithdrawal: totalWithdrawalQty,
+      totalReused: totalReusedQty,
+      circularityPct: overallCircularity,
+      viewStep,
+    }
+  }, [
+    key,
+    stagedItems,
+    viewStep,
+    waterSource,
+    waterActivity,
+    waterQuantity,
+    unit,
+    meterSourceId,
+    openingReading,
+    closingReading,
+    waterReusedRecycled,
+    dischargeDestination,
+    treatmentLevel,
+    waterQualityResult,
+    testDateLab,
+    supportingEvidence,
+    remarks,
+    evidenceId,
+    totalWithdrawalQty,
+    totalReusedQty,
+    overallCircularity,
+    formStateRef,
+  ])
+
+  // Active item calculations
+  const curQty = Number(waterQuantity) || 0
+  const curReused = Number(waterReusedRecycled) || 0
+  const curCircPct = curQty > 0 ? ((curReused / curQty) * 100).toFixed(1) : '0'
+
+  // Final Save / Submit
+  const save = async (submitForReview = false) => {
+    setError('')
+    let effectiveItems = [...stagedItems]
+    if (effectiveItems.length === 0) {
+      if (!waterQuantity || Number(waterQuantity) <= 0) {
+        setError('Please enter water quantity > 0 and add at least one Water Source item.')
+        return
+      }
+      const c = curQty > 0 ? Number(((curReused / curQty) * 100).toFixed(1)) : 0
+      effectiveItems = [
+        {
+          id: `item-wtr-${Date.now()}`,
+          waterSource,
+          waterActivity,
+          waterQuantity,
+          unit,
+          meterSourceId,
+          openingReading,
+          closingReading,
+          waterReusedRecycled,
+          dischargeDestination,
+          treatmentLevel,
+          waterQualityResult,
+          testDateLab,
+          supportingEvidence,
+          remarks,
+          evidenceId,
+          circularityPct: c,
+        },
+      ]
+      setStagedItems(effectiveItems)
+    }
+
     setSubmitting(true)
     try {
+      const payloadData: Record<string, any> = {
+        ...formStateRef.current[key],
+        items: effectiveItems,
+      }
+
       const res = await fetch('/api/data-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3986,13 +4414,16 @@ function Level2WaterForm({
           module: 'WATER',
           projectId,
           reportingPeriodId: periodId,
-          evidenceId: evidenceId || undefined,
-          data: formStateRef.current[key],
+          evidenceId: payloadData.evidenceId || undefined,
+          data: payloadData,
           submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Water record')
+      toast.success(
+        submitForReview ? 'Water submission sent for BU review!' : 'Water draft saved successfully!'
+      )
       onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -4002,210 +4433,991 @@ function Level2WaterForm({
   }
 
   return (
-    <FormGrid>
-      <FormField label="Water Activity" hint="Withdrawal, consumption, reuse, discharge.">
-        <select
-          value={waterActivity}
-          disabled={readOnly}
-          onChange={(e) => setWaterActivity(e.target.value)}
-          className={inputClass}
-        >
-          {L2_ACTIVITIES.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-      </FormField>
+    <div className="space-y-4">
+      {/* FLOW NAVIGATION CONTROLLER: STEP 1 (ITEM DRAFTING) <-> STEP 2 (CONSOLIDATED SUMMARY) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3.5">
+        <div className="inline-flex items-center rounded-xl bg-slate-100/90 p-1 border border-slate-200/80 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              viewStep === 'ENTRY'
+                ? 'bg-white text-cyan-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                viewStep === 'ENTRY' ? 'bg-cyan-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              1
+            </span>
+            <span>Item Drafting</span>
+            {stagedItems.length > 0 && (
+              <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-mono font-bold text-cyan-800">
+                {stagedItems.length}
+              </span>
+            )}
+          </button>
 
-      <FormField label="Water Source" hint="Groundwater, surface water, third party.">
-        <select
-          value={waterSource}
-          disabled={readOnly}
-          onChange={(e) => setWaterSource(e.target.value)}
-          className={inputClass}
-        >
-          {L2_SOURCES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Water Quantity" hint="Actual measured or calculated quantity.">
-        <input
-          type="number"
-          min="0"
-          step="any"
-          value={waterQuantity}
-          disabled={readOnly}
-          onChange={(e) => setWaterQuantity(e.target.value)}
-          placeholder="e.g. 2450"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Unit" hint="kL or configured unit.">
-        <select
-          value={unit}
-          disabled={readOnly}
-          onChange={(e) => setUnit(e.target.value)}
-          className={inputClass}
-        >
-          {['kL', 'm³', 'litres', 'ML'].map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Meter / Source ID" hint="Meter, borewell, intake reference.">
-        <input
-          value={meterSourceId}
-          disabled={readOnly}
-          onChange={(e) => setMeterSourceId(e.target.value)}
-          placeholder="e.g. BW-04-INTAKE"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Water Reused / Recycled" hint="Quantity reused on-site.">
-        <input
-          type="number"
-          value={waterReusedRecycled}
-          disabled={readOnly}
-          onChange={(e) => setWaterReusedRecycled(e.target.value)}
-          placeholder="e.g. 850"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Opening Reading" hint="Where metered.">
-        <input
-          type="number"
-          value={openingReading}
-          disabled={readOnly}
-          onChange={(e) => setOpeningReading(e.target.value)}
-          placeholder="e.g. 88100"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Closing Reading" hint="Where metered.">
-        <input
-          type="number"
-          value={closingReading}
-          disabled={readOnly}
-          onChange={(e) => setClosingReading(e.target.value)}
-          placeholder="e.g. 90550"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Discharge Destination" hint="Where treated water is discharged.">
-        <select
-          value={dischargeDestination}
-          disabled={readOnly}
-          onChange={(e) => setDischargeDestination(e.target.value)}
-          className={inputClass}
-        >
-          {L2_DESTINATIONS.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Treatment Level" hint="STP / ETP / RO / None.">
-        <select
-          value={treatmentLevel}
-          disabled={readOnly}
-          onChange={(e) => setTreatmentLevel(e.target.value)}
-          className={inputClass}
-        >
-          {L2_TREATMENTS.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Water Quality Result" hint="Where monitored (pH, BOD, COD, TDS).">
-        <input
-          value={waterQualityResult}
-          disabled={readOnly}
-          onChange={(e) => setWaterQualityResult(e.target.value)}
-          placeholder="e.g. pH: 7.4, BOD: 12 mg/L, COD: 45 mg/L"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Test Date / Laboratory" hint="Where monitored (NABL Lab).">
-        <input
-          value={testDateLab}
-          disabled={readOnly}
-          onChange={(e) => setTestDateLab(e.target.value)}
-          placeholder="e.g. 2026-06-15 / SGS Environmental Lab"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Supporting Evidence" hint="Bills, meter logs, test reports.">
-        <input
-          value={supportingEvidence}
-          disabled={readOnly}
-          onChange={(e) => setSupportingEvidence(e.target.value)}
-          placeholder="e.g. Borewell extraction register & SPCB test memo"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Remarks" hint="Unusual consumption or measurement gaps.">
-        <input
-          value={remarks}
-          disabled={readOnly}
-          onChange={(e) => setRemarks(e.target.value)}
-          placeholder="e.g. Meter verified; within CGWA permitted extraction limit."
-          className={inputClass}
-        />
-      </FormField>
-
-      {/* Live Preview Card */}
-      <div className="sm:col-span-2 rounded-xl border border-cyan-200/80 bg-cyan-50/60 p-3 text-xs text-cyan-900">
-        <div className="flex items-center justify-between font-bold">
-          <span className="flex items-center gap-1.5">
-            <Droplet className="h-3.5 w-3.5 text-cyan-600" /> Water Circularity Status
-          </span>
-          <span className="text-[10px] text-cyan-700">Activity: {waterActivity}</span>
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              viewStep === 'ORGANIZED'
+                ? 'bg-white text-indigo-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                viewStep === 'ORGANIZED' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              2
+            </span>
+            <span>Organized Summary</span>
+            {stagedItems.length > 0 && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                ✓ Ready
+              </span>
+            )}
+          </button>
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Circularity</div>
-            <div className="text-sm font-bold text-slate-900">{circularityPct}%</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Net Volume</div>
-            <div className="text-sm font-bold text-slate-900">{qty.toLocaleString()} {unit}</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Treatment</div>
-            <div className="text-sm font-bold text-slate-900">{treatmentLevel.split(' ')[0]}</div>
-          </div>
-        </div>
+
+        {viewStep === 'ENTRY' ? (
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:shadow-cyan-500/20 hover:opacity-95 transition active:scale-95"
+          >
+            <span>Next: Organize All Items</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-mono">
+              {stagedItems.length}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+            <span>Back to Item Drafting</span>
+          </button>
+        )}
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
-    </FormGrid>
+      {/* ==============================================================
+          VIEW 1: ITEM DRAFT ENTRY (ADD ONE BY ONE, WITH ADD + NEXT)
+          ============================================================== */}
+      {viewStep === 'ENTRY' && (
+        <FormGrid>
+          {/* Active Water Item Live Analytics Banner */}
+          <div className="sm:col-span-2 rounded-2xl border border-cyan-200/90 bg-gradient-to-r from-cyan-50/90 via-blue-50/60 to-cyan-50/90 p-4 text-xs text-cyan-950 shadow-sm">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-2 text-cyan-900">
+                <Droplet className="h-4 w-4 text-cyan-600" /> Active Item Status ·{' '}
+                <span className="underline decoration-cyan-300 font-extrabold">{waterSource}</span>
+              </span>
+              <span className="rounded-full bg-cyan-100/90 px-2.5 py-0.5 text-[10px] text-cyan-800 font-mono font-bold border border-cyan-200">
+                Activity: {waterActivity} · {treatmentLevel.split(' ')[0]}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-cyan-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Gross Quantity
+                </div>
+                <div className="text-base font-extrabold text-slate-900 mt-0.5">
+                  {curQty.toLocaleString()} {unit}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-cyan-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Reused / Recycled
+                </div>
+                <div className="text-base font-extrabold text-emerald-800 mt-0.5">
+                  {curReused.toLocaleString()} {unit}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-cyan-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Circularity Recovery
+                </div>
+                <div className="text-base font-extrabold text-cyan-900 mt-0.5">{curCircPct}%</div>
+              </div>
+            </div>
+          </div>
+
+          {/* INTERACTIVE SOURCE ITEMS SELECTOR PILLS */}
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-xs">
+            <div className="mb-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-cyan-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Select Water Source Item to Fill / Draft:
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Click any source → Fill details &amp; evidence → Click Add (Draft)
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {L2_SOURCES.map((s) => {
+                const preset = WATER_SOURCE_PRESETS[s] || WATER_SOURCE_PRESETS['Groundwater']
+                const IconComponent = preset.icon
+                const isSelected = waterSource === s
+                const staged = stagedItems.find((i) => i.waterSource === s)
+
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleSelectSource(s)}
+                    className={`group relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-2 border-cyan-600 bg-cyan-50 text-cyan-900 shadow-sm font-bold ring-2 ring-cyan-200'
+                        : staged
+                        ? 'border border-emerald-300 bg-emerald-50/80 text-emerald-900 hover:bg-emerald-100/70'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <IconComponent
+                      className={`h-3.5 w-3.5 ${
+                        isSelected
+                          ? 'text-cyan-600'
+                          : staged
+                          ? 'text-emerald-600'
+                          : 'text-slate-500'
+                      }`}
+                    />
+                    <span>{s}</span>
+                    {staged ? (
+                      <span className="ml-1 rounded-full bg-emerald-200/90 px-1.5 py-0.2 text-[9px] font-mono font-bold text-emerald-800">
+                        ✓ {Number(staged.waterQuantity).toLocaleString()} {staged.unit}
+                      </span>
+                    ) : (
+                      isSelected && (
+                        <span className="ml-1 rounded-full bg-cyan-200/80 px-1.5 py-0.2 text-[9px] font-bold text-cyan-800">
+                          Active
+                        </span>
+                      )
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ITEM FORM INPUTS */}
+          <FormField label="Water Activity" hint="Withdrawal, consumption, reuse, discharge.">
+            <select
+              value={waterActivity}
+              disabled={readOnly}
+              onChange={(e) => setWaterActivity(e.target.value)}
+              className={inputClass}
+            >
+              {L2_ACTIVITIES.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Water Source" hint="Selected water source item for this entry.">
+            <select
+              value={waterSource}
+              disabled={readOnly}
+              onChange={(e) => handleSelectSource(e.target.value)}
+              className={inputClass}
+            >
+              {L2_SOURCES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Water Quantity" hint="Actual measured or billed intake.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={waterQuantity}
+              disabled={readOnly}
+              onChange={(e) => setWaterQuantity(e.target.value)}
+              placeholder="e.g. 24500"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Unit" hint="Measurement unit.">
+            <select
+              value={unit}
+              disabled={readOnly}
+              onChange={(e) => setUnit(e.target.value)}
+              className={inputClass}
+            >
+              {['kL', 'm³', 'litres', 'ML'].map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Meter / Source ID" hint="Meter tag, borewell or intake identifier.">
+            <input
+              value={meterSourceId}
+              disabled={readOnly}
+              onChange={(e) => setMeterSourceId(e.target.value)}
+              placeholder="e.g. CGWA-BW-01-MTR"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Water Reused / Recycled" hint="Treated water recirculated on site.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={waterReusedRecycled}
+              disabled={readOnly}
+              onChange={(e) => setWaterReusedRecycled(e.target.value)}
+              placeholder="e.g. 6200"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Opening Meter Reading" hint="If metered.">
+            <input
+              type="number"
+              value={openingReading}
+              disabled={readOnly}
+              onChange={(e) => setOpeningReading(e.target.value)}
+              placeholder="e.g. 82400"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Closing Meter Reading" hint="If metered.">
+            <input
+              type="number"
+              value={closingReading}
+              disabled={readOnly}
+              onChange={(e) => setClosingReading(e.target.value)}
+              placeholder="e.g. 106900"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Discharge Destination" hint="Where treated water is discharged.">
+            <select
+              value={dischargeDestination}
+              disabled={readOnly}
+              onChange={(e) => setDischargeDestination(e.target.value)}
+              className={inputClass}
+            >
+              {L2_DESTINATIONS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Treatment Level" hint="STP / ETP / RO / ZLD / None.">
+            <select
+              value={treatmentLevel}
+              disabled={readOnly}
+              onChange={(e) => setTreatmentLevel(e.target.value)}
+              className={inputClass}
+            >
+              {L2_TREATMENTS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Water Quality Result" hint="Monitored parameters (pH, TDS, BOD, COD).">
+            <input
+              value={waterQualityResult}
+              disabled={readOnly}
+              onChange={(e) => setWaterQualityResult(e.target.value)}
+              placeholder="e.g. TDS: 420 mg/L, pH: 7.2 (Compliant)"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Test Date / Laboratory" hint="NABL accredited testing facility.">
+            <input
+              value={testDateLab}
+              disabled={readOnly}
+              onChange={(e) => setTestDateLab(e.target.value)}
+              placeholder="e.g. 2026-09-15 · SGS Environmental Testing"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Supporting Evidence" hint="Logbook, bills, meter photo description.">
+            <input
+              value={supportingEvidence}
+              disabled={readOnly}
+              onChange={(e) => setSupportingEvidence(e.target.value)}
+              placeholder="e.g. CGWA Extraction Logbook & Meter Photo"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Remarks" hint="Circularity notes, quota compliance or audit trail." full>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Reconciled with CGWA abstraction quota and daily flow meter readings."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </FormField>
+
+          {/* ITEM EVIDENCE ATTACHMENT SECTION (BEFORE ADD BUTTON) */}
+          <div className="sm:col-span-2">
+            <FormEvidenceAttachSection
+              projectId={projectId}
+              periodId={periodId}
+              moduleKey="WATER"
+              evidence={evidence}
+              onUploaded={onEvidenceUploaded || (async () => {})}
+              selectedEvidenceId={evidenceId || null}
+              onSelectEvidence={(id) => setEvidenceId(id || '')}
+              onReview={onReviewEvidence}
+              readOnly={readOnly}
+            />
+          </div>
+
+          {/* SPECIAL ACTION BUTTONS: ADD (DRAFT) + NEXT (ORGANIZE) */}
+          <div className="sm:col-span-2 rounded-2xl border border-cyan-200/90 bg-gradient-to-r from-cyan-50/90 via-blue-50/50 to-emerald-50/90 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-cyan-600" />
+                  <span>Item Draft Actions · {waterSource}</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Fill details and attach evidence, then click <strong>Add Item (Draft)</strong> to stage it.
+                  When all sources are added, click <strong>Next: Organize All Items</strong>.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddOrUpdateItem}
+                  disabled={readOnly}
+                  className="flex items-center gap-1.5 rounded-full bg-cyan-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-cyan-500/20 hover:bg-cyan-700 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>
+                    {editingItemId ? `Update ${waterSource} Draft` : `Add ${waterSource} (Draft)`}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNextOrganize}
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-700 to-blue-700 px-4 py-2 text-xs font-bold text-white shadow-md shadow-cyan-600/20 hover:opacity-95 transition active:scale-95"
+                >
+                  <span>Next: Organize All Items</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/90 p-2.5 text-xs font-medium text-rose-800">
+                <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-rose-600" /> {error}
+              </div>
+            )}
+          </div>
+
+          {/* STAGED DRAFT ITEMS TABLE / LIST */}
+          {stagedItems.length > 0 && (
+            <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Staged Draft Items ({stagedItems.length} Sources Added)
+                    </h4>
+                    <p className="text-[10px] text-slate-500">
+                      Water source drafts. Click edit to adjust or click Next to organize the full balance.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-cyan-50 px-2.5 py-1 text-[10px] font-bold text-cyan-800 border border-cyan-200">
+                    Total: {totalWithdrawalQty.toLocaleString()} kL ({overallCircularity}% Recycled)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextOrganize}
+                    className="flex items-center gap-1 rounded-full bg-cyan-700 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-cyan-800 transition"
+                  >
+                    <span>Next: Organize</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-100">
+                    <tr>
+                      <th className="py-2 px-2.5">Source &amp; Activity</th>
+                      <th className="py-2 px-2.5">Meter &amp; Treatment</th>
+                      <th className="py-2 px-2.5">Intake Volume</th>
+                      <th className="py-2 px-2.5">Reused / Recycled</th>
+                      <th className="py-2 px-2.5">Evidence</th>
+                      <th className="py-2 px-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {stagedItems.map((item) => {
+                      const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-bold text-slate-900">{item.waterSource}</div>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {item.waterActivity}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-semibold text-slate-800">{item.treatmentLevel}</div>
+                            <div className="text-[10px] font-mono text-slate-500">
+                              {item.meterSourceId || '—'}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5 font-bold text-slate-900">
+                            {Number(item.waterQuantity).toLocaleString()} {item.unit}
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            <span className="font-bold text-emerald-800">
+                              {Number(item.waterReusedRecycled).toLocaleString()} {item.unit}
+                            </span>
+                            <div className="text-[10px] text-cyan-700 font-semibold">
+                              {item.circularityPct}% circular
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            {attachedEv ? (
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="truncate max-w-[120px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                  title={attachedEv.fileName}
+                                >
+                                  {attachedEv.fileName}
+                                </span>
+                                {onReviewEvidence && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onReviewEvidence(attachedEv)}
+                                    className="text-blue-600 hover:text-blue-800 p-0.5"
+                                    title="Review evidence (flips engine preview)"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">None attached</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleEditStagedItem(item)}
+                                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                title="Edit this item"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleRemoveStagedItem(item.id, e)}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                                title="Remove item"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </FormGrid>
+      )}
+
+      {/* ==============================================================
+          VIEW 2: ORGANIZED CONSOLIDATED SUMMARY
+          ============================================================== */}
+      {viewStep === 'ORGANIZED' && (
+        <div className="space-y-4">
+          {/* Header Banner */}
+          <div className="rounded-2xl border border-cyan-200 bg-gradient-to-r from-cyan-50/90 via-blue-50/80 to-cyan-50/90 p-4 text-xs text-cyan-950 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="status-pill status-approved !text-[10px]">
+                    Step 2: Consolidated
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    All Water Sources Organized in One View
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1">
+                  Compiled {stagedItems.length} water source items into a certified multi-source water balance.
+                  Review the summary, attach any final documentation, and click Save Draft or Submit for Review.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewStep('ENTRY')}
+                className="self-start sm:self-auto flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+              >
+                <Plus className="h-3.5 w-3.5 text-cyan-600" />
+                <span>Add / Edit More Sources</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Consolidated Executive Metric Tiles */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-cyan-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total Water Withdrawal
+              </div>
+              <div className="text-base font-extrabold text-slate-900 mt-1">
+                {totalWithdrawalQty.toLocaleString()} kL
+              </div>
+              <div className="text-[10px] text-cyan-700 mt-0.5">Across all intake sources</div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Recycled / Reused Volume
+              </div>
+              <div className="text-base font-extrabold text-emerald-800 mt-1">
+                {totalReusedQty.toLocaleString()} kL
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Zero Liquid Discharge &amp; STP</div>
+            </div>
+
+            <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Circularity Recovery Rate
+              </div>
+              <div className="text-base font-extrabold text-blue-900 mt-1">
+                {overallCircularity}%
+              </div>
+              <div className="text-[10px] text-blue-700 mt-0.5">
+                Net impact: {netWithdrawal.toLocaleString()} kL
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-violet-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Audited Sources
+              </div>
+              <div className="text-base font-extrabold text-violet-950 mt-1">
+                {stagedItems.length} Sources
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {stagedItems.filter((i) => i.evidenceId).length} of {stagedItems.length} with attached evidence
+              </div>
+            </div>
+          </div>
+
+          {/* Consolidated Master Table of All Items */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Consolidated Water Balance Breakdown
+              </h4>
+              <span className="text-[10px] text-slate-500">
+                All sources will be saved into the master draft and submitted together
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Water Source</th>
+                    <th className="py-2.5 px-3">Activity</th>
+                    <th className="py-2.5 px-3">Treatment / Destination</th>
+                    <th className="py-2.5 px-3">Intake Quantity</th>
+                    <th className="py-2.5 px-3">Reused / Recycled</th>
+                    <th className="py-2.5 px-3">Circularity %</th>
+                    <th className="py-2.5 px-3">Attached Evidence</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stagedItems.map((item, idx) => {
+                    const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {item.waterSource}
+                          {item.remarks && (
+                            <div className="text-[10px] font-normal text-slate-500 line-clamp-1">
+                              {item.remarks}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[9px] font-bold text-cyan-800">
+                            {item.waterActivity}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          {item.treatmentLevel}
+                          {item.dischargeDestination && (
+                            <div className="text-[10px] text-slate-400">
+                              → {item.dischargeDestination}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {Number(item.waterQuantity).toLocaleString()} {item.unit}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-800">
+                          {Number(item.waterReusedRecycled).toLocaleString()} {item.unit}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-cyan-900">
+                          {item.circularityPct}%
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {attachedEv ? (
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="truncate max-w-[110px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                title={attachedEv.fileName}
+                              >
+                                {attachedEv.fileName}
+                              </span>
+                              {onReviewEvidence && (
+                                <button
+                                  type="button"
+                                  onClick={() => onReviewEvidence(attachedEv)}
+                                  className="text-blue-600 hover:text-blue-800 p-0.5"
+                                  title="Review evidence (flips engine preview)"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">None attached</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleEditStagedItem(item)}
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot className="bg-slate-50 font-bold text-slate-900 border-t border-slate-200">
+                  <tr>
+                    <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] uppercase tracking-wider text-slate-500">
+                      Consolidated Total:
+                    </td>
+                    <td className="py-2.5 px-3 font-bold">
+                      {totalWithdrawalQty.toLocaleString()} kL Gross
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-emerald-800">
+                      {totalReusedQty.toLocaleString()} kL Recycled
+                    </td>
+                    <td className="py-2.5 px-3 text-cyan-900 font-extrabold">
+                      {overallCircularity}%
+                    </td>
+                    <td colSpan={2} className="py-2.5 px-3 text-right text-[10px] text-slate-500">
+                      {stagedItems.length} water sources combined
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Overall Remarks / Summary Note */}
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-3">
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              Consolidated Submission Remarks &amp; Audit Trail Note
+            </label>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Consolidated multi-source water reporting covering groundwater extraction, surface river intake, municipal pipeline and zero liquid discharge recycling."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </div>
+
+          {/* Primary Save Draft & Submit for Review buttons */}
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
 /* ============================================================
    LEVEL 3: GHG EMISSIONS & AIR QUALITY FORM
    ============================================================ */
+export interface StagedGhgItem {
+  id: string
+  emissionDataType: string
+  emissionSource: string
+  fuelEnergyType: string
+  activityQuantity: string
+  unit: string
+  pollutantType: string
+  testResult: string
+  samplingLocation: string
+  testDate: string
+  laboratoryTestMethod: string
+  emissionFactorRef: string
+  calculationMethod: string
+  supportingEvidence: string
+  remarks: string
+  evidenceId: string
+  evidenceFileName?: string
+  factor: number
+  estTco2e: number
+}
+
+const L3_SOURCES = [
+  'DG Sets & Power Generators',
+  'Boilers & Heating Furnaces',
+  'Construction Equipment Fleet',
+  'Fugitive Refrigerants',
+  'Purchased Grid Electricity (Scope 2)',
+  'Value Chain & Freight Logistics (Scope 3)',
+  'Business Travel & Commute (Scope 3)',
+  'Ambient Air Monitoring',
+  'DG Stack Emissions',
+]
+
+const GHG_SOURCE_PRESETS: Record<
+  string,
+  {
+    scope: string
+    fuel: string
+    unit: string
+    factor: number
+    pollutant: string
+    location: string
+    lab: string
+    ref: string
+    method: string
+    doc: string
+    icon: LucideIcon
+    defaultQty: string
+    defaultResult: string
+  }
+> = {
+  'DG Sets & Power Generators': {
+    scope: 'Scope 1 activity',
+    fuel: 'Diesel (HSD)',
+    unit: 'litres',
+    factor: 2.637,
+    pollutant: 'CO₂e',
+    location: 'DG Yard Bay 01 (MEIL-DG-002)',
+    lab: 'Internal Telematics / SAP Ledger',
+    ref: 'IPCC 2006 / CEA v19',
+    method: 'Activity data × Approved Factor',
+    doc: 'SAP Fuel Procurement Ledger & DG Logbook',
+    icon: Zap,
+    defaultQty: '18650',
+    defaultResult: '186.40 tCO₂e',
+  },
+  'Boilers & Heating Furnaces': {
+    scope: 'Scope 1 activity',
+    fuel: 'Furnace Oil / LPG',
+    unit: 'kg',
+    factor: 3.15,
+    pollutant: 'CO₂e',
+    location: 'Boiler House 02',
+    lab: 'In-house Flow Meter',
+    ref: 'IPCC 2006 Guidelines',
+    method: 'Mass of fuel × Heating Factor',
+    doc: 'Boiler Feed Log & Fuel Calibration Certificate',
+    icon: Flame,
+    defaultQty: '6400',
+    defaultResult: '20.16 tCO₂e',
+  },
+  'Construction Equipment Fleet': {
+    scope: 'Scope 1 activity',
+    fuel: 'Diesel (HSD)',
+    unit: 'litres',
+    factor: 2.637,
+    pollutant: 'CO₂e',
+    location: 'Heavy Machinery Fleet Depot',
+    lab: 'Fleet IoT Telematics Log',
+    ref: 'IPCC 2006 Mobile Combustion',
+    method: 'Fuel Dispensed × Emission Factor',
+    doc: 'Fuel Dispenser Meter Log & Fleet Run Hours',
+    icon: Truck,
+    defaultQty: '8200',
+    defaultResult: '21.62 tCO₂e',
+  },
+  'Fugitive Refrigerants': {
+    scope: 'Scope 1 activity',
+    fuel: 'R-410A / R-134a Gas',
+    unit: 'kg',
+    factor: 2088.0,
+    pollutant: 'CO₂e',
+    location: 'Main Substation & HVAC Chillers',
+    lab: 'OEM Refrigerant Top-up Service Report',
+    ref: 'IPCC AR5 GWP Values',
+    method: 'Refrigerant Leakage (kg) × GWP',
+    doc: 'HVAC Maintenance Service Log & Gas Invoice',
+    icon: Wind,
+    defaultQty: '14',
+    defaultResult: '29.23 tCO₂e',
+  },
+  'Purchased Grid Electricity (Scope 2)': {
+    scope: 'Scope 2 activity',
+    fuel: 'CEA Regional Grid Mix',
+    unit: 'kWh',
+    factor: 0.716,
+    pollutant: 'CO₂e',
+    location: '33kV Site Incomer Substation',
+    lab: 'DISCOM AMR Meter Billing System',
+    ref: 'CEA CO₂ Baseline Database v19',
+    method: 'Billed kWh × Grid Emission Factor',
+    doc: 'Monthly Utility Tariff Invoice',
+    icon: Zap,
+    defaultQty: '384000',
+    defaultResult: '274.94 tCO₂e',
+  },
+  'Value Chain & Freight Logistics (Scope 3)': {
+    scope: 'Scope 3 activity',
+    fuel: 'Heavy Duty Road Freight (Diesel)',
+    unit: 'tonne-km',
+    factor: 0.114,
+    pollutant: 'CO₂e',
+    location: 'Logistics Corridors (Vendor to Site)',
+    lab: 'Supply Chain Transport Manifests',
+    ref: 'GLEC Framework / GHG Protocol Corporate Value Chain',
+    method: 'Cargo Weight × Distance × Mode Factor',
+    doc: 'Logistics Partner Consolidated Freight Invoices',
+    icon: Truck,
+    defaultQty: '425000',
+    defaultResult: '48.45 tCO₂e',
+  },
+  'Business Travel & Commute (Scope 3)': {
+    scope: 'Scope 3 activity',
+    fuel: 'Air & Road Employee Transit',
+    unit: 'passenger-km',
+    factor: 0.125,
+    pollutant: 'CO₂e',
+    location: 'Corporate HQ & Regional Site Hubs',
+    lab: 'Corporate Travel Portal Reconciliations',
+    ref: 'DEFRA / GHG Protocol Scope 3 Guidance',
+    method: 'Travel Distance × Passenger Factor',
+    doc: 'Corporate Travel Portal Booking Register',
+    icon: Users,
+    defaultQty: '145000',
+    defaultResult: '18.13 tCO₂e',
+  },
+  'Ambient Air Monitoring': {
+    scope: 'Air pollutant',
+    fuel: 'Ambient Air',
+    unit: 'µg/m³',
+    factor: 0,
+    pollutant: 'PM10 / PM2.5',
+    location: 'Perimeter Air Monitoring Station 01',
+    lab: 'Vimta Labs Ltd. (NABL / CPCB Recognized)',
+    ref: 'IS 5182 (Part 23) / NAAQS 2009',
+    method: 'High Volume Air Sampler Gravimetric Method',
+    doc: 'NABL Certified Ambient Air Quality Report',
+    icon: CloudFog,
+    defaultQty: '48.2',
+    defaultResult: '48.2 µg/m³ (PM10/PM2.5 Ambient Compliant)',
+  },
+  'DG Stack Emissions': {
+    scope: 'Air pollutant',
+    fuel: 'DG Flue Gas Exhaust',
+    unit: 'mg/Nm³',
+    factor: 0,
+    pollutant: 'NOx',
+    location: 'DG Set 1500 kVA Stack No. 01',
+    lab: 'SGS Environmental Testing (NABL)',
+    ref: 'CPCB Guidelines for DG Set Stack Monitoring',
+    method: 'Isokinetic Sampling Method',
+    doc: 'DG Stack Emission Testing Memo',
+    icon: Factory,
+    defaultQty: '36.5',
+    defaultResult: '36.5 mg/Nm³ (Within CPCB limit 750)',
+  },
+}
+
+function calculateGhgItemEmissions(source: string, scopeType: string, qtyStr: string): { factor: number; estTco2e: number } {
+  const qty = Number(qtyStr) || 0
+  const preset = GHG_SOURCE_PRESETS[source]
+  const factor = preset?.factor ?? (scopeType.includes('1') ? 2.637 : scopeType.includes('3') ? 0.114 : 0.716)
+  const isAir = scopeType.toLowerCase().includes('air')
+  const estTco2e = isAir || factor === 0 ? 0 : (qty * factor) / 1000
+  return { factor, estTco2e: Number(estTco2e.toFixed(3)) }
+}
+
 function Level3GhgForm({
   projectId,
   periodId,
@@ -4219,44 +5431,369 @@ function Level3GhgForm({
   const key = `l3-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
 
-  const [emissionDataType, setEmissionDataType] = useState(initial.emissionDataType ?? 'Scope 1 activity')
-  const [emissionSource, setEmissionSource] = useState(initial.emissionSource ?? 'DG Set 750 kVA & Fleet (MEIL-DG-002)')
-  const [fuelEnergyType, setFuelEnergyType] = useState(initial.fuelEnergyType ?? 'Diesel (HSD)')
-  const [activityQuantity, setActivityQuantity] = useState(initial.activityQuantity ?? '18650')
-  const [unit, setUnit] = useState(initial.unit ?? 'litres')
-  const [pollutantType, setPollutantType] = useState(initial.pollutantType ?? 'CO₂e')
-  const [testResult, setTestResult] = useState(initial.testResult ?? '48.2 µg/m³ (PM10/PM2.5 Ambient)')
-  const [samplingLocation, setSamplingLocation] = useState(initial.samplingLocation ?? 'Perimeter Air Monitoring Station 01')
-  const [testDate, setTestDate] = useState(initial.testDate ?? '2026-09-20')
-  const [laboratoryTestMethod, setLaboratoryTestMethod] = useState(initial.laboratoryTestMethod ?? 'Vimta Labs Ltd. / IS 5182 (Part 23)')
-  const [emissionFactorRef, setEmissionFactorRef] = useState(initial.emissionFactorRef ?? 'IPCC 2006 / CEA v19')
-  const [calculationMethod, setCalculationMethod] = useState(initial.calculationMethod ?? 'Activity data × Approved Factor')
-  const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'SAP Fuel Procurement Ledger & Stack Emissions Report')
-  const [remarks, setRemarks] = useState(initial.remarks ?? 'Scope 1: 186.40 tCO2e, Scope 2: 274.94 tCO2e (Total 461.34 tCO2e; intensity 0.0162 tCO2e/Cr turnover).')
-  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
+  // Multi-item staged state
+  const [stagedItems, setStagedItems] = useState<StagedGhgItem[]>(() => {
+    if (Array.isArray(initial.items) && initial.items.length > 0) {
+      return initial.items
+    }
+    if (initial.activityQuantity && Number(initial.activityQuantity) > 0) {
+      const calc = calculateGhgItemEmissions(
+        initial.emissionSource || 'DG Sets & Power Generators',
+        initial.emissionDataType || 'Scope 1 activity',
+        String(initial.activityQuantity)
+      )
+      return [
+        {
+          id: 'item-ghg-initial-1',
+          emissionDataType: initial.emissionDataType || 'Scope 1 activity',
+          emissionSource: initial.emissionSource || 'DG Sets & Power Generators',
+          fuelEnergyType: initial.fuelEnergyType || 'Diesel (HSD)',
+          activityQuantity: String(initial.activityQuantity),
+          unit: initial.unit || 'litres',
+          pollutantType: initial.pollutantType || 'CO₂e',
+          testResult: initial.testResult || '186.40 tCO₂e',
+          samplingLocation: initial.samplingLocation || 'DG Yard Bay 01 (MEIL-DG-002)',
+          testDate: initial.testDate || '2026-09-20',
+          laboratoryTestMethod: initial.laboratoryTestMethod || 'Vimta Labs Ltd. / IS 5182 (Part 23)',
+          emissionFactorRef: initial.emissionFactorRef || 'IPCC 2006 / CEA v19',
+          calculationMethod: initial.calculationMethod || 'Activity data × Approved Factor',
+          supportingEvidence: initial.supportingEvidence || 'SAP Fuel Procurement Ledger & DG Logbook',
+          remarks: initial.remarks || 'Reconciled with fuel inventory and DG run hours.',
+          evidenceId: initial.evidenceId || '',
+          factor: calc.factor,
+          estTco2e: calc.estTco2e,
+        },
+      ]
+    }
+    // Seed standard initial item so form is ready to use
+    const calc = calculateGhgItemEmissions('DG Sets & Power Generators', 'Scope 1 activity', '18650')
+    return [
+      {
+        id: 'item-ghg-seed-1',
+        emissionDataType: 'Scope 1 activity',
+        emissionSource: 'DG Sets & Power Generators',
+        fuelEnergyType: 'Diesel (HSD)',
+        activityQuantity: '18650',
+        unit: 'litres',
+        pollutantType: 'CO₂e',
+        testResult: '49.18 tCO₂e',
+        samplingLocation: 'DG Yard Bay 01 (MEIL-DG-002)',
+        testDate: '2026-09-20',
+        laboratoryTestMethod: 'Vimta Labs Ltd. / IS 5182 (Part 23)',
+        emissionFactorRef: 'IPCC 2006 / CEA v19',
+        calculationMethod: 'Activity data × Approved Factor',
+        supportingEvidence: 'SAP Fuel Procurement Ledger & Stack Emissions Report',
+        remarks: 'Scope 1 direct diesel combustion for backup generation.',
+        evidenceId: '',
+        factor: calc.factor,
+        estTco2e: calc.estTco2e,
+      },
+    ]
+  })
+
+  // View step: 'ENTRY' (Item Drafting) vs 'ORGANIZED' (Consolidated Summary)
+  const [viewStep, setViewStep] = useState<'ENTRY' | 'ORGANIZED'>(
+    initial.viewStep === 'ORGANIZED' ? 'ORGANIZED' : 'ENTRY'
+  )
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+
+  // Active form inputs for selected GHG item
+  const [emissionDataType, setEmissionDataType] = useState('Scope 1 activity')
+  const [emissionSource, setEmissionSource] = useState('DG Sets & Power Generators')
+  const [fuelEnergyType, setFuelEnergyType] = useState('Diesel (HSD)')
+  const [activityQuantity, setActivityQuantity] = useState('18650')
+  const [unit, setUnit] = useState('litres')
+  const [pollutantType, setPollutantType] = useState('CO₂e')
+  const [testResult, setTestResult] = useState('49.18 tCO₂e')
+  const [samplingLocation, setSamplingLocation] = useState('DG Yard Bay 01 (MEIL-DG-002)')
+  const [testDate, setTestDate] = useState('2026-09-20')
+  const [laboratoryTestMethod, setLaboratoryTestMethod] = useState('Vimta Labs Ltd. / IS 5182 (Part 23)')
+  const [emissionFactorRef, setEmissionFactorRef] = useState('IPCC 2006 / CEA v19')
+  const [calculationMethod, setCalculationMethod] = useState('Activity data × Approved Factor')
+  const [supportingEvidence, setSupportingEvidence] = useState(
+    'SAP Fuel Procurement Ledger & Stack Emissions Report'
+  )
+  const [remarks, setRemarks] = useState(
+    'Scope 1: 186.40 tCO2e, Scope 2: 274.94 tCO2e, Scope 3: 66.58 tCO2e (Consolidated corporate boundary).'
+  )
+  const [evidenceId, setEvidenceId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    formStateRef.current[key] = {
-      emissionDataType, emissionSource, fuelEnergyType, activityQuantity, unit, pollutantType,
-      testResult, samplingLocation, testDate, laboratoryTestMethod, emissionFactorRef,
-      calculationMethod, supportingEvidence, remarks, evidenceId,
-    }
-  }, [
-    key, emissionDataType, emissionSource, fuelEnergyType, activityQuantity, unit, pollutantType,
-    testResult, samplingLocation, testDate, laboratoryTestMethod, emissionFactorRef,
-    calculationMethod, supportingEvidence, remarks, evidenceId, formStateRef,
-  ])
-
-  const save = async (submitForReview = false) => {
+  // Handle source chip click
+  const handleSelectSource = (src: string) => {
     setError('')
-    if (!activityQuantity && !testResult) {
-      setError('Either activity quantity or measured test result must be provided.')
+    setEmissionSource(src)
+    const existing = stagedItems.find((i) => i.emissionSource === src)
+    if (existing) {
+      setEditingItemId(existing.id)
+      setEmissionDataType(existing.emissionDataType)
+      setFuelEnergyType(existing.fuelEnergyType)
+      setActivityQuantity(existing.activityQuantity)
+      setUnit(existing.unit)
+      setPollutantType(existing.pollutantType)
+      setTestResult(existing.testResult)
+      setSamplingLocation(existing.samplingLocation)
+      setTestDate(existing.testDate)
+      setLaboratoryTestMethod(existing.laboratoryTestMethod)
+      setEmissionFactorRef(existing.emissionFactorRef)
+      setCalculationMethod(existing.calculationMethod)
+      setSupportingEvidence(existing.supportingEvidence)
+      setRemarks(existing.remarks)
+      setEvidenceId(existing.evidenceId)
+    } else {
+      setEditingItemId(null)
+      const preset = GHG_SOURCE_PRESETS[src] || GHG_SOURCE_PRESETS['DG Sets & Power Generators']
+      setEmissionDataType(preset.scope)
+      setFuelEnergyType(preset.fuel)
+      setActivityQuantity(preset.defaultQty)
+      setUnit(preset.unit)
+      setPollutantType(preset.pollutant)
+      setTestResult(preset.defaultResult)
+      setSamplingLocation(preset.location)
+      setLaboratoryTestMethod(preset.lab)
+      setEmissionFactorRef(preset.ref)
+      setCalculationMethod(preset.method)
+      setSupportingEvidence(preset.doc)
+      setRemarks(`Emissions calculation for ${src} aligned with corporate reporting protocol.`)
+      setEvidenceId('')
+    }
+  }
+
+  // Handle data type select (Scope 1, Scope 2, Scope 3, Air pollutant)
+  const handleSelectDataType = (newType: string) => {
+    setEmissionDataType(newType)
+    // If selecting Scope 3, suggest Scope 3 freight or commute preset if not already set
+    if (newType.includes('3') && !emissionSource.includes('Scope 3')) {
+      handleSelectSource('Value Chain & Freight Logistics (Scope 3)')
+    } else if (newType.includes('2') && !emissionSource.includes('Scope 2')) {
+      handleSelectSource('Purchased Grid Electricity (Scope 2)')
+    } else if (newType.includes('Air') && !emissionSource.includes('Air') && !emissionSource.includes('Stack')) {
+      handleSelectSource('Ambient Air Monitoring')
+    }
+  }
+
+  // Add / Update item in staged items list
+  const handleAddOrUpdateItem = () => {
+    setError('')
+    const qNum = Number(activityQuantity)
+    if ((!activityQuantity || isNaN(qNum) || qNum <= 0) && !testResult) {
+      setError(`Please enter a valid activity quantity (> 0) or test result for ${emissionSource}.`)
       return
     }
+
+    const { factor: f, estTco2e: t } = calculateGhgItemEmissions(emissionSource, emissionDataType, activityQuantity)
+    const attachedEv = evidence.find((e) => e.id === evidenceId)
+    const itemPayload: StagedGhgItem = {
+      id: editingItemId || `item-ghg-${Date.now()}`,
+      emissionDataType,
+      emissionSource,
+      fuelEnergyType,
+      activityQuantity,
+      unit,
+      pollutantType,
+      testResult,
+      samplingLocation,
+      testDate,
+      laboratoryTestMethod,
+      emissionFactorRef,
+      calculationMethod,
+      supportingEvidence,
+      remarks,
+      evidenceId,
+      evidenceFileName: attachedEv?.fileName,
+      factor: f,
+      estTco2e: t,
+    }
+
+    let updated: StagedGhgItem[]
+    if (editingItemId) {
+      updated = stagedItems.map((i) => (i.id === editingItemId ? itemPayload : i))
+      toast.success(`Updated ${emissionSource} draft item.`)
+    } else {
+      const idx = stagedItems.findIndex((i) => i.emissionSource === emissionSource)
+      if (idx >= 0) {
+        updated = stagedItems.map((i, iIdx) => (iIdx === idx ? itemPayload : i))
+        toast.info(`Updated existing ${emissionSource} draft item.`)
+      } else {
+        updated = [...stagedItems, itemPayload]
+        toast.success(`Added ${emissionSource} (${t > 0 ? t.toFixed(2) + ' tCO₂e' : testResult}) to draft items!`)
+      }
+    }
+
+    setStagedItems(updated)
+    setEditingItemId(null)
+  }
+
+  const handleEditStagedItem = (item: StagedGhgItem) => {
+    setViewStep('ENTRY')
+    setEditingItemId(item.id)
+    setEmissionDataType(item.emissionDataType)
+    setEmissionSource(item.emissionSource)
+    setFuelEnergyType(item.fuelEnergyType)
+    setActivityQuantity(item.activityQuantity)
+    setUnit(item.unit)
+    setPollutantType(item.pollutantType)
+    setTestResult(item.testResult)
+    setSamplingLocation(item.samplingLocation)
+    setTestDate(item.testDate)
+    setLaboratoryTestMethod(item.laboratoryTestMethod)
+    setEmissionFactorRef(item.emissionFactorRef)
+    setCalculationMethod(item.calculationMethod)
+    setSupportingEvidence(item.supportingEvidence)
+    setRemarks(item.remarks)
+    setEvidenceId(item.evidenceId)
+    toast.info(`Editing ${item.emissionSource} draft item`)
+  }
+
+  const handleRemoveStagedItem = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    const target = stagedItems.find((i) => i.id === id)
+    const updated = stagedItems.filter((i) => i.id !== id)
+    setStagedItems(updated)
+    if (editingItemId === id) {
+      setEditingItemId(null)
+    }
+    toast.warning(`Removed ${target?.emissionSource || 'item'} from staged drafts.`)
+  }
+
+  const handleNextOrganize = () => {
+    setError('')
+    if (stagedItems.length === 0) {
+      if (!activityQuantity && !testResult) {
+        setError('Please enter activity quantity or test result and click Add (Draft) first.')
+        return
+      }
+      handleAddOrUpdateItem()
+    }
+    setViewStep('ORGANIZED')
+    toast.info('Organized GHG Consolidated Summary', {
+      description: 'Review Scope 1, Scope 2, Scope 3, and Air Quality breakdown below.',
+    })
+  }
+
+  // Aggregate stats across staged items
+  const totalCombinedTco2e = stagedItems.reduce((acc, it) => acc + it.estTco2e, 0)
+  const s1Total = stagedItems
+    .filter((i) => i.emissionDataType.includes('1'))
+    .reduce((acc, it) => acc + it.estTco2e, 0)
+  const s2Total = stagedItems
+    .filter((i) => i.emissionDataType.includes('2'))
+    .reduce((acc, it) => acc + it.estTco2e, 0)
+  const s3Total = stagedItems
+    .filter((i) => i.emissionDataType.includes('3'))
+    .reduce((acc, it) => acc + it.estTco2e, 0)
+  const airCount = stagedItems.filter((i) => i.emissionDataType.toLowerCase().includes('air')).length
+
+  // Sync to formStateRef.current[key]
+  useEffect(() => {
+    const itemsToSave = stagedItems.length > 0 ? stagedItems : []
+    const scopesList = [
+      itemsToSave.some((i) => i.emissionDataType.includes('1')) && 'Scope 1',
+      itemsToSave.some((i) => i.emissionDataType.includes('2')) && 'Scope 2',
+      itemsToSave.some((i) => i.emissionDataType.includes('3')) && 'Scope 3',
+      itemsToSave.some((i) => i.emissionDataType.toLowerCase().includes('air')) && 'Air Pollutants',
+    ]
+      .filter(Boolean)
+      .join(' + ')
+
+    formStateRef.current[key] = {
+      emissionDataType: scopesList || emissionDataType,
+      emissionSource: itemsToSave.map((i) => i.emissionSource).join(', ') || emissionSource,
+      fuelEnergyType: itemsToSave.map((i) => i.fuelEnergyType).filter(Boolean).join(', ') || fuelEnergyType,
+      activityQuantity: String(itemsToSave.reduce((sum, i) => sum + (Number(i.activityQuantity) || 0), 0) || activityQuantity),
+      unit: itemsToSave[0]?.unit || unit,
+      pollutantType: itemsToSave.map((i) => i.pollutantType).filter(Boolean).join(', ') || pollutantType,
+      testResult: itemsToSave.map((i) => i.testResult).filter(Boolean).join(' | ') || testResult,
+      samplingLocation,
+      testDate,
+      laboratoryTestMethod,
+      emissionFactorRef,
+      calculationMethod,
+      supportingEvidence: itemsToSave.map((i) => i.supportingEvidence).filter(Boolean).join('; ') || supportingEvidence,
+      remarks: remarks || `Consolidated multi-source GHG report (${itemsToSave.length} sources).`,
+      evidenceId: itemsToSave.find((i) => i.evidenceId)?.evidenceId || evidenceId,
+      items: itemsToSave,
+      totalTco2e: totalCombinedTco2e,
+      s1Total,
+      s2Total,
+      s3Total,
+      airCount,
+      viewStep,
+    }
+  }, [
+    key,
+    stagedItems,
+    viewStep,
+    emissionDataType,
+    emissionSource,
+    fuelEnergyType,
+    activityQuantity,
+    unit,
+    pollutantType,
+    testResult,
+    samplingLocation,
+    testDate,
+    laboratoryTestMethod,
+    emissionFactorRef,
+    calculationMethod,
+    supportingEvidence,
+    remarks,
+    evidenceId,
+    totalCombinedTco2e,
+    s1Total,
+    s2Total,
+    s3Total,
+    airCount,
+    formStateRef,
+  ])
+
+  // Active item calculations
+  const curCalc = calculateGhgItemEmissions(emissionSource, emissionDataType, activityQuantity)
+
+  // Final Save / Submit
+  const save = async (submitForReview = false) => {
+    setError('')
+    let effectiveItems = [...stagedItems]
+    if (effectiveItems.length === 0) {
+      if (!activityQuantity && !testResult) {
+        setError('Either activity quantity or measured test result must be provided.')
+        return
+      }
+      const { factor: f, estTco2e: t } = curCalc
+      effectiveItems = [
+        {
+          id: `item-ghg-${Date.now()}`,
+          emissionDataType,
+          emissionSource,
+          fuelEnergyType,
+          activityQuantity,
+          unit,
+          pollutantType,
+          testResult,
+          samplingLocation,
+          testDate,
+          laboratoryTestMethod,
+          emissionFactorRef,
+          calculationMethod,
+          supportingEvidence,
+          remarks,
+          evidenceId,
+          factor: f,
+          estTco2e: t,
+        },
+      ]
+      setStagedItems(effectiveItems)
+    }
+
     setSubmitting(true)
     try {
+      const payloadData: Record<string, any> = {
+        ...formStateRef.current[key],
+        items: effectiveItems,
+      }
+
       const res = await fetch('/api/data-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4267,13 +5804,16 @@ function Level3GhgForm({
           module: 'EMISSIONS',
           projectId,
           reportingPeriodId: periodId,
-          evidenceId: evidenceId || undefined,
-          data: formStateRef.current[key],
+          evidenceId: payloadData.evidenceId || undefined,
+          data: payloadData,
           submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save GHG record')
+      toast.success(
+        submitForReview ? 'GHG submission sent for BU review!' : 'GHG draft saved successfully!'
+      )
       onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -4283,190 +5823,820 @@ function Level3GhgForm({
   }
 
   return (
-    <FormGrid>
-      <FormField label="Emission Data Type" hint="Scope 1, Scope 2 or Air pollutant.">
-        <select
-          value={emissionDataType}
-          disabled={readOnly}
-          onChange={(e) => setEmissionDataType(e.target.value)}
-          className={inputClass}
-        >
-          <option value="Scope 1 activity">Scope 1 activity (Direct)</option>
-          <option value="Scope 2 activity">Scope 2 activity (Indirect electricity)</option>
-          <option value="Air pollutant">Air pollutant (Stack / Ambient)</option>
-        </select>
-      </FormField>
+    <div className="space-y-4">
+      {/* FLOW NAVIGATION CONTROLLER: STEP 1 (ITEM DRAFTING) <-> STEP 2 (CONSOLIDATED SUMMARY) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3.5">
+        <div className="inline-flex items-center rounded-xl bg-slate-100/90 p-1 border border-slate-200/80 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              viewStep === 'ENTRY'
+                ? 'bg-white text-emerald-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                viewStep === 'ENTRY' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              1
+            </span>
+            <span>Item Drafting</span>
+            {stagedItems.length > 0 && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-800">
+                {stagedItems.length}
+              </span>
+            )}
+          </button>
 
-      <FormField label="Emission Source" hint="Generator, fuel, electricity, process.">
-        <input
-          value={emissionSource}
-          disabled={readOnly}
-          onChange={(e) => setEmissionSource(e.target.value)}
-          placeholder="e.g. DG Set 1500 kVA / Heavy Excavator Fleet"
-          className={inputClass}
-        />
-      </FormField>
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              viewStep === 'ORGANIZED'
+                ? 'bg-white text-indigo-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                viewStep === 'ORGANIZED' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              2
+            </span>
+            <span>Organized Summary</span>
+            {stagedItems.length > 0 && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                ✓ Ready
+              </span>
+            )}
+          </button>
+        </div>
 
-      <FormField label="Fuel / Energy Type" hint="High speed diesel, grid, petrol, etc.">
-        <input
-          value={fuelEnergyType}
-          disabled={readOnly}
-          onChange={(e) => setFuelEnergyType(e.target.value)}
-          placeholder="e.g. Diesel (HSD)"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Activity Quantity" hint="Actual consumption or measured activity.">
-        <input
-          type="number"
-          min="0"
-          step="any"
-          value={activityQuantity}
-          disabled={readOnly}
-          onChange={(e) => setActivityQuantity(e.target.value)}
-          placeholder="e.g. 12500"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Unit" hint="litres, kWh, kg, tonnes, m³.">
-        <input
-          value={unit}
-          disabled={readOnly}
-          onChange={(e) => setUnit(e.target.value)}
-          placeholder="litres"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Pollutant Type" hint="CO₂e, NOx, SOx, PM10, PM2.5.">
-        <select
-          value={pollutantType}
-          disabled={readOnly}
-          onChange={(e) => setPollutantType(e.target.value)}
-          className={inputClass}
-        >
-          {['CO₂e', 'PM10 / PM2.5', 'NOx', 'SOx', 'CO', 'VOCs'].map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Test Result" hint="For measured air pollutants (e.g. 48 µg/Nm³).">
-        <input
-          value={testResult}
-          disabled={readOnly}
-          onChange={(e) => setTestResult(e.target.value)}
-          placeholder="e.g. 42.8 µg/Nm³"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Sampling Location" hint="DG Stack, Ambient Station 1.">
-        <input
-          value={samplingLocation}
-          disabled={readOnly}
-          onChange={(e) => setSamplingLocation(e.target.value)}
-          placeholder="e.g. DG Stack #1 / Site Boundary Station"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Test Date" hint="Date of sampling / test.">
-        <input
-          type="date"
-          value={testDate}
-          disabled={readOnly}
-          onChange={(e) => setTestDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Laboratory / Test Method" hint="NABL Accredited Lab / IS Method.">
-        <input
-          value={laboratoryTestMethod}
-          disabled={readOnly}
-          onChange={(e) => setLaboratoryTestMethod(e.target.value)}
-          placeholder="e.g. NABL Accredited Lab / IS 5182"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Emission Factor Reference" hint="Approved calculation factor citation.">
-        <input
-          value={emissionFactorRef}
-          disabled={readOnly}
-          onChange={(e) => setEmissionFactorRef(e.target.value)}
-          placeholder="e.g. CEA CO2 Baseline Database v19"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Calculation Method" hint="Approved organizational methodology.">
-        <input
-          value={calculationMethod}
-          disabled={readOnly}
-          onChange={(e) => setCalculationMethod(e.target.value)}
-          placeholder="e.g. Activity Data × Approved Emission Factor"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Supporting Evidence" hint="Fuel records, electricity bills, lab reports." full>
-        <input
-          value={supportingEvidence}
-          disabled={readOnly}
-          onChange={(e) => setSupportingEvidence(e.target.value)}
-          placeholder="e.g. Monthly fuel dispatch slip & stack emission test certificate"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Remarks" hint="Data gaps, assumptions or exceptions." full>
-        <textarea
-          value={remarks}
-          disabled={readOnly}
-          onChange={(e) => setRemarks(e.target.value)}
-          placeholder="e.g. Emissions calculated using central certified factors."
-          className={inputClass + ' min-h-[50px] resize-y'}
-        />
-      </FormField>
-
-      {/* Attach evidence document directly from the form (after Remarks) */}
-      <div className="sm:col-span-2">
-        <FormEvidenceAttachSection
-          projectId={projectId}
-          periodId={periodId}
-          moduleKey="EMISSIONS"
-          evidence={evidence}
-          onUploaded={onEvidenceUploaded || (async () => {})}
-          selectedEvidenceId={evidenceId || null}
-          onSelectEvidence={(id) => setEvidenceId(id || '')}
-          onReview={onReviewEvidence}
-          readOnly={readOnly}
-        />
+        {viewStep === 'ENTRY' ? (
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:shadow-emerald-500/20 hover:opacity-95 transition active:scale-95"
+          >
+            <span>Next: Organize All Items</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-mono">
+              {stagedItems.length}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+            <span>Back to Item Drafting</span>
+          </button>
+        )}
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
-    </FormGrid>
+      {/* ==============================================================
+          VIEW 1: ITEM DRAFT ENTRY (ADD ONE BY ONE, WITH ADD + NEXT)
+          ============================================================== */}
+      {viewStep === 'ENTRY' && (
+        <FormGrid>
+          {/* Active GHG Item Live Analytics Banner */}
+          <div className="sm:col-span-2 rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-emerald-50/90 p-4 text-xs text-emerald-950 shadow-sm">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-2 text-emerald-900">
+                <Flame className="h-4 w-4 text-emerald-600" /> Active Item Status ·{' '}
+                <span className="underline decoration-emerald-300 font-extrabold">{emissionSource}</span>
+              </span>
+              <span className="rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-[10px] text-emerald-800 font-mono font-bold border border-emerald-200">
+                {emissionDataType} · {pollutantType}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-emerald-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Activity Quantity
+                </div>
+                <div className="text-base font-extrabold text-slate-900 mt-0.5">
+                  {Number(activityQuantity) > 0 ? `${Number(activityQuantity).toLocaleString()} ${unit}` : '—'}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-emerald-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Est. GHG Footprint
+                </div>
+                <div className="text-base font-extrabold text-emerald-800 mt-0.5">
+                  {curCalc.estTco2e > 0 ? `${curCalc.estTco2e.toFixed(2)} tCO₂e` : testResult || 'Measured'}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-emerald-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Emission Scope
+                </div>
+                <div className="text-base font-extrabold text-emerald-900 mt-0.5">
+                  {emissionDataType.includes('1') ? 'Scope 1' : emissionDataType.includes('2') ? 'Scope 2' : emissionDataType.includes('3') ? 'Scope 3' : 'Air Pollutant'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* INTERACTIVE SOURCE ITEMS SELECTOR PILLS */}
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-xs">
+            <div className="mb-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-emerald-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Select GHG / Air Emission Source Item to Fill / Draft:
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Click any source → Fill details &amp; evidence → Click Add (Draft)
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {L3_SOURCES.map((s) => {
+                const preset = GHG_SOURCE_PRESETS[s] || GHG_SOURCE_PRESETS['DG Sets & Power Generators']
+                const IconComponent = preset.icon
+                const isSelected = emissionSource === s
+                const staged = stagedItems.find((i) => i.emissionSource === s)
+
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleSelectSource(s)}
+                    className={`group relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-2 border-emerald-600 bg-emerald-50 text-emerald-900 shadow-sm font-bold ring-2 ring-emerald-200'
+                        : staged
+                        ? 'border border-emerald-300 bg-emerald-50/80 text-emerald-900 hover:bg-emerald-100/70'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <IconComponent
+                      className={`h-3.5 w-3.5 ${
+                        isSelected
+                          ? 'text-emerald-600'
+                          : staged
+                          ? 'text-emerald-600'
+                          : 'text-slate-500'
+                      }`}
+                    />
+                    <span>{s}</span>
+                    {staged ? (
+                      <span className="ml-1 rounded-full bg-emerald-200/90 px-1.5 py-0.2 text-[9px] font-mono font-bold text-emerald-800">
+                        ✓ {staged.estTco2e > 0 ? `${staged.estTco2e.toFixed(1)} t` : 'Logged'}
+                      </span>
+                    ) : (
+                      isSelected && (
+                        <span className="ml-1 rounded-full bg-emerald-200/80 px-1.5 py-0.2 text-[9px] font-bold text-emerald-800">
+                          Active
+                        </span>
+                      )
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ITEM FORM INPUTS - WITH SCOPE 3 EXPLICITLY IN DROPDOWN */}
+          <FormField label="Emission Data Type" hint="Scope 1, Scope 2, Scope 3, or Air pollutant.">
+            <select
+              value={emissionDataType}
+              disabled={readOnly}
+              onChange={(e) => handleSelectDataType(e.target.value)}
+              className={inputClass}
+            >
+              <option value="Scope 1 activity">Scope 1 activity (Direct emissions: fuel, generators, fleet)</option>
+              <option value="Scope 2 activity">Scope 2 activity (Indirect purchased electricity &amp; steam)</option>
+              <option value="Scope 3 activity">Scope 3 activity (Value chain / logistics / upstream &amp; downstream)</option>
+              <option value="Air pollutant">Air pollutant (Stack emissions &amp; ambient air monitoring)</option>
+            </select>
+          </FormField>
+
+          <FormField label="Emission Source" hint="Selected source name or generator/equipment ID.">
+            <input
+              value={emissionSource}
+              disabled={readOnly}
+              onChange={(e) => setEmissionSource(e.target.value)}
+              placeholder="e.g. DG Set 750 kVA / Heavy Fleet"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Fuel / Energy / Activity Type" hint="Diesel, Grid electricity, Freight transport.">
+            <input
+              value={fuelEnergyType}
+              disabled={readOnly}
+              onChange={(e) => setFuelEnergyType(e.target.value)}
+              placeholder="e.g. Diesel (HSD)"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Activity Quantity" hint="Actual measured consumption or transport work.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={activityQuantity}
+              disabled={readOnly}
+              onChange={(e) => setActivityQuantity(e.target.value)}
+              placeholder="e.g. 18650"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Unit" hint="litres, kWh, tonne-km, passenger-km, kg.">
+            <input
+              value={unit}
+              disabled={readOnly}
+              onChange={(e) => setUnit(e.target.value)}
+              placeholder="litres"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Pollutant Type" hint="Target parameter.">
+            <select
+              value={pollutantType}
+              disabled={readOnly}
+              onChange={(e) => setPollutantType(e.target.value)}
+              className={inputClass}
+            >
+              {['CO₂e', 'PM10 / PM2.5', 'NOx', 'SOx', 'CO', 'VOCs'].map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Test Result" hint="For stack or ambient air monitoring (or tCO₂e estimate).">
+            <input
+              value={testResult}
+              disabled={readOnly}
+              onChange={(e) => setTestResult(e.target.value)}
+              placeholder="e.g. 48.2 µg/m³"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Sampling Location" hint="Stack tag or ambient station reference.">
+            <input
+              value={samplingLocation}
+              disabled={readOnly}
+              onChange={(e) => setSamplingLocation(e.target.value)}
+              placeholder="e.g. Perimeter Air Monitoring Station 01"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Test Date" hint="Sampling date or period date.">
+            <input
+              type="date"
+              value={testDate}
+              disabled={readOnly}
+              onChange={(e) => setTestDate(e.target.value)}
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Laboratory / Test Method" hint="NABL accredited facility / ISO method.">
+            <input
+              value={laboratoryTestMethod}
+              disabled={readOnly}
+              onChange={(e) => setLaboratoryTestMethod(e.target.value)}
+              placeholder="e.g. Vimta Labs Ltd. / IS 5182"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Emission Factor Reference" hint="IPCC, CEA, GLEC or DEFRA reference.">
+            <input
+              value={emissionFactorRef}
+              disabled={readOnly}
+              onChange={(e) => setEmissionFactorRef(e.target.value)}
+              placeholder="e.g. IPCC 2006 / CEA v19"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Calculation Method" hint="Calculation equation or certified protocol.">
+            <input
+              value={calculationMethod}
+              disabled={readOnly}
+              onChange={(e) => setCalculationMethod(e.target.value)}
+              placeholder="e.g. Activity data × Approved Factor"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Supporting Evidence" hint="Logbooks, invoices, lab reports description." full>
+            <input
+              value={supportingEvidence}
+              disabled={readOnly}
+              onChange={(e) => setSupportingEvidence(e.target.value)}
+              placeholder="e.g. SAP Fuel Procurement Ledger & Stack Emissions Report"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Remarks" hint="Boundary notes, transport modes, or audit observations." full>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Scope 1 direct DG emissions and Scope 3 transport calculations verified."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </FormField>
+
+          {/* ITEM EVIDENCE ATTACHMENT SECTION */}
+          <div className="sm:col-span-2">
+            <FormEvidenceAttachSection
+              projectId={projectId}
+              periodId={periodId}
+              moduleKey="EMISSIONS"
+              evidence={evidence}
+              onUploaded={onEvidenceUploaded || (async () => {})}
+              selectedEvidenceId={evidenceId || null}
+              onSelectEvidence={(id) => setEvidenceId(id || '')}
+              onReview={onReviewEvidence}
+              readOnly={readOnly}
+            />
+          </div>
+
+          {/* SPECIAL ACTION BUTTONS: ADD (DRAFT) + NEXT (ORGANIZE) */}
+          <div className="sm:col-span-2 rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-blue-50/90 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-emerald-600" />
+                  <span>Item Draft Actions · {emissionSource}</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Fill details and attach evidence, then click <strong>Add Item (Draft)</strong> to stage it.
+                  When all sources are added, click <strong>Next: Organize All Items</strong>.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddOrUpdateItem}
+                  disabled={readOnly}
+                  className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-700 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>
+                    {editingItemId ? `Update ${emissionSource} Draft` : `Add ${emissionSource} (Draft)`}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNextOrganize}
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-700 to-teal-800 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:opacity-95 transition active:scale-95"
+                >
+                  <span>Next: Organize All Items</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/90 p-2.5 text-xs font-medium text-rose-800">
+                <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-rose-600" /> {error}
+              </div>
+            )}
+          </div>
+
+          {/* STAGED DRAFT ITEMS TABLE / LIST */}
+          {stagedItems.length > 0 && (
+            <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Staged Draft Items ({stagedItems.length} Sources Added)
+                    </h4>
+                    <p className="text-[10px] text-slate-500">
+                      Draft emission sources. Click edit to adjust or click Next to organize the full inventory.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800 border border-emerald-200">
+                    Total: {totalCombinedTco2e.toFixed(2)} tCO₂e ({stagedItems.length} Sources)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextOrganize}
+                    className="flex items-center gap-1 rounded-full bg-emerald-700 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 transition"
+                  >
+                    <span>Next: Organize</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-100">
+                    <tr>
+                      <th className="py-2 px-2.5">Source &amp; Scope</th>
+                      <th className="py-2 px-2.5">Fuel / Pollutant &amp; Location</th>
+                      <th className="py-2 px-2.5">Activity Quantity</th>
+                      <th className="py-2 px-2.5">Est. Footprint</th>
+                      <th className="py-2 px-2.5">Evidence</th>
+                      <th className="py-2 px-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {stagedItems.map((item) => {
+                      const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-bold text-slate-900">{item.emissionSource}</div>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                item.emissionDataType.includes('1')
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : item.emissionDataType.includes('2')
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : item.emissionDataType.includes('3')
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {item.emissionDataType}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-semibold text-slate-800">{item.fuelEnergyType || item.pollutantType}</div>
+                            <div className="text-[10px] font-mono text-slate-500">
+                              {item.samplingLocation || '—'}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5 font-bold text-slate-900">
+                            {Number(item.activityQuantity) > 0
+                              ? `${Number(item.activityQuantity).toLocaleString()} ${item.unit}`
+                              : item.testResult || '—'}
+                          </td>
+                          <td className="py-2.5 px-2.5 font-bold text-emerald-900">
+                            {item.estTco2e > 0 ? `${item.estTco2e.toFixed(2)} tCO₂e` : item.testResult}
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            {attachedEv ? (
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="truncate max-w-[120px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                  title={attachedEv.fileName}
+                                >
+                                  {attachedEv.fileName}
+                                </span>
+                                {onReviewEvidence && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onReviewEvidence(attachedEv)}
+                                    className="text-blue-600 hover:text-blue-800 p-0.5"
+                                    title="Review evidence (flips engine preview)"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">None attached</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleEditStagedItem(item)}
+                                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                title="Edit this item"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleRemoveStagedItem(item.id, e)}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                                title="Remove item"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </FormGrid>
+      )}
+
+      {/* ==============================================================
+          VIEW 2: ORGANIZED CONSOLIDATED SUMMARY
+          ============================================================== */}
+      {viewStep === 'ORGANIZED' && (
+        <div className="space-y-4">
+          {/* Header Banner */}
+          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50/90 via-teal-50/80 to-emerald-50/90 p-4 text-xs text-emerald-950 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="status-pill status-approved !text-[10px]">
+                    Step 2: Consolidated
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    All GHG &amp; Air Emission Sources Organized in One View
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1">
+                  Compiled {stagedItems.length} emission source items across Scope 1, Scope 2, Scope 3, and Air Quality monitoring into an integrated inventory.
+                  Review the summary, attach any final documentation, and click Save Draft or Submit for Review.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewStep('ENTRY')}
+                className="self-start sm:self-auto flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+              >
+                <Plus className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Add / Edit More Sources</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Consolidated Executive Metric Tiles */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-amber-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Scope 1 Direct
+              </div>
+              <div className="text-base font-extrabold text-amber-950 mt-1">
+                {s1Total.toFixed(2)} tCO₂e
+              </div>
+              <div className="text-[10px] text-amber-700 mt-0.5">DG, Furnaces &amp; Fleet</div>
+            </div>
+
+            <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Scope 2 Indirect
+              </div>
+              <div className="text-base font-extrabold text-blue-950 mt-1">
+                {s2Total.toFixed(2)} tCO₂e
+              </div>
+              <div className="text-[10px] text-blue-700 mt-0.5">Purchased Grid Electricity</div>
+            </div>
+
+            <div className="rounded-xl border border-purple-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Scope 3 Value Chain
+              </div>
+              <div className="text-base font-extrabold text-purple-950 mt-1">
+                {s3Total.toFixed(2)} tCO₂e
+              </div>
+              <div className="text-[10px] text-purple-700 mt-0.5">Freight Logistics &amp; Travel</div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Consolidated Footprint
+              </div>
+              <div className="text-base font-extrabold text-emerald-900 mt-1">
+                {totalCombinedTco2e.toFixed(2)} tCO₂e
+              </div>
+              <div className="text-[10px] text-emerald-700 mt-0.5">
+                {stagedItems.length} sources ({airCount} air monitoring)
+              </div>
+            </div>
+          </div>
+
+          {/* Consolidated Master Table of All Items */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Consolidated Emission Inventory Breakdown
+              </h4>
+              <span className="text-[10px] text-slate-500">
+                All emission streams will be saved into the master draft and submitted together
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Emission Source</th>
+                    <th className="py-2.5 px-3">Scope / Type</th>
+                    <th className="py-2.5 px-3">Fuel / Pollutant</th>
+                    <th className="py-2.5 px-3">Activity Quantity</th>
+                    <th className="py-2.5 px-3">Emission Factor</th>
+                    <th className="py-2.5 px-3">Est. tCO₂e / Result</th>
+                    <th className="py-2.5 px-3">Attached Evidence</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stagedItems.map((item, idx) => {
+                    const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {item.emissionSource}
+                          {item.remarks && (
+                            <div className="text-[10px] font-normal text-slate-500 line-clamp-1">
+                              {item.remarks}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                              item.emissionDataType.includes('1')
+                                ? 'bg-amber-100 text-amber-800'
+                                : item.emissionDataType.includes('2')
+                                ? 'bg-blue-100 text-blue-800'
+                                : item.emissionDataType.includes('3')
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
+                            {item.emissionDataType}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          {item.fuelEnergyType || item.pollutantType}
+                          {item.samplingLocation && (
+                            <div className="text-[10px] text-slate-400">
+                              {item.samplingLocation}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {Number(item.activityQuantity) > 0
+                            ? `${Number(item.activityQuantity).toLocaleString()} ${item.unit}`
+                            : item.testResult || '—'}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
+                          {item.factor > 0 ? `${item.factor} kg/${item.unit}` : 'Standard lab test'}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-950">
+                          {item.estTco2e > 0 ? `${item.estTco2e.toFixed(2)} t` : item.testResult}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {attachedEv ? (
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="truncate max-w-[110px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                title={attachedEv.fileName}
+                              >
+                                {attachedEv.fileName}
+                              </span>
+                              {onReviewEvidence && (
+                                <button
+                                  type="button"
+                                  onClick={() => onReviewEvidence(attachedEv)}
+                                  className="text-blue-600 hover:text-blue-800 p-0.5"
+                                  title="Review evidence (flips engine preview)"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">None attached</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleEditStagedItem(item)}
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot className="bg-slate-50 font-bold text-slate-900 border-t border-slate-200">
+                  <tr>
+                    <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] uppercase tracking-wider text-slate-500">
+                      Consolidated GHG Total:
+                    </td>
+                    <td colSpan={2} className="py-2.5 px-3 text-slate-700 text-xs">
+                      S1: {s1Total.toFixed(2)} t | S2: {s2Total.toFixed(2)} t | S3: {s3Total.toFixed(2)} t
+                    </td>
+                    <td className="py-2.5 px-3 text-emerald-950 font-extrabold text-sm">
+                      {totalCombinedTco2e.toFixed(2)} tCO₂e
+                    </td>
+                    <td colSpan={2} className="py-2.5 px-3 text-right text-[10px] text-slate-500">
+                      {stagedItems.length} emission streams combined
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Overall Remarks / Summary Note */}
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-3">
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              Consolidated Submission Remarks &amp; Audit Trail Note
+            </label>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Consolidated Scope 1, Scope 2, Scope 3 and ambient stack emissions inventory reconciled with central MRV protocols."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </div>
+
+          {/* Primary Save Draft & Submit for Review buttons */}
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
 /* ============================================================
    LEVEL 4: WASTE MANAGEMENT FORM
    ============================================================ */
+export interface StagedWasteItem {
+  id: string
+  wasteCategory: string
+  wasteTypeDescription: string
+  quantityGenerated: string
+  unit: string
+  quantityReused: string
+  quantityRecycled: string
+  quantityRecovered: string
+  quantityDisposed: string
+  disposalMethod: string
+  wasteHandler: string
+  authorizationReference: string
+  transferManifestNumber: string
+  supportingEvidence: string
+  remarks: string
+  evidenceId: string
+  evidenceFileName?: string
+  circularRecoveryPct: number
+}
+
 const L4_CATEGORIES = [
   'Construction & demolition',
-  'Plastic',
-  'E-waste',
-  'Battery',
-  'Hazardous',
-  'Non-hazardous',
+  'Scrap metal & Structural steel',
+  'Plastic waste',
+  'Hazardous & chemical waste',
+  'E-waste & Batteries',
+  'Biomedical waste',
+  'Municipal solid waste',
   'Other',
 ]
+
 const L4_METHODS = [
   'Landfill (TSDF)',
   'Incineration / Co-processing',
@@ -4474,6 +6644,155 @@ const L4_METHODS = [
   'Composting',
   'Other',
 ]
+
+const WASTE_CATEGORY_PRESETS: Record<
+  string,
+  {
+    desc: string
+    unit: string
+    method: string
+    handler: string
+    authRef: string
+    manifest: string
+    doc: string
+    icon: LucideIcon
+    defaultGen: string
+    defaultReused: string
+    defaultRecycled: string
+    defaultRecovered: string
+    defaultDisposed: string
+  }
+> = {
+  'Construction & demolition': {
+    desc: 'Concrete rubble, brickbats, excavated soil & tile scrap',
+    unit: 'metric tonnes',
+    method: 'Authorised recycling facility',
+    handler: 'Green Earth Recycling & Aggregates Pvt. Ltd.',
+    authRef: 'SPCB/CDW/AUTH/2026/102',
+    manifest: 'CDW-MANIFEST-2026-0102',
+    doc: 'Weighbridge Slips & C&D Processing Plant Receipt',
+    icon: Building2,
+    defaultGen: '17.20',
+    defaultReused: '10.50',
+    defaultRecycled: '5.20',
+    defaultRecovered: '0.00',
+    defaultDisposed: '1.50',
+  },
+  'Scrap metal & Structural steel': {
+    desc: 'TMT rebar cut pieces, structural beams, MS offcuts & turnings',
+    unit: 'metric tonnes',
+    method: 'Authorised recycling facility',
+    handler: 'Steel Re-rolling & Melting Units SPCB Approved',
+    authRef: 'SPCB/IND/REC/2026/405',
+    manifest: 'SCRAP-GATE-PASS-2026-405',
+    doc: 'Scrap Sale Delivery Challan & Invoices',
+    icon: Box,
+    defaultGen: '8.40',
+    defaultReused: '2.10',
+    defaultRecycled: '6.30',
+    defaultRecovered: '0.00',
+    defaultDisposed: '0.00',
+  },
+  'Plastic waste': {
+    desc: 'Packaging HDPE/LDPE sheets, cement bags, PVC conduit offcuts',
+    unit: 'metric tonnes',
+    method: 'Incineration / Co-processing',
+    handler: 'EPR Authorized Cement Co-processing Facility',
+    authRef: 'CPCB/EPR/PLASTIC/2026/89',
+    manifest: 'PLASTIC-EPR-CHALLAN-2026-089',
+    doc: 'EPR Plastic Certificate & Cement Kiln Receipt',
+    icon: Package,
+    defaultGen: '3.60',
+    defaultReused: '0.00',
+    defaultRecycled: '2.80',
+    defaultRecovered: '0.00',
+    defaultDisposed: '0.80',
+  },
+  'Hazardous & chemical waste': {
+    desc: 'Used DG lubricating oil, contaminated cotton rags, empty paint drums',
+    unit: 'metric tonnes',
+    method: 'Landfill (TSDF)',
+    handler: 'State TSDF Facility Operator (SPCB Authorized)',
+    authRef: 'SPCB/HAZ/AUTH/2026/841',
+    manifest: 'PCB-HAZ-MANIFEST-FORM10-0841',
+    doc: 'Form 10 Hazardous Waste Manifest & Weighbridge Slips',
+    icon: AlertTriangle,
+    defaultGen: '1.85',
+    defaultReused: '0.00',
+    defaultRecycled: '0.65',
+    defaultRecovered: '0.00',
+    defaultDisposed: '1.20',
+  },
+  'E-waste & Batteries': {
+    desc: 'Used lead-acid batteries, obsolete sensors, UPS circuits & cabling',
+    unit: 'metric tonnes',
+    method: 'Authorised recycling facility',
+    handler: 'SPCB / CPCB Registered E-Waste Recycler',
+    authRef: 'CPCB/E-WASTE/REG/2026/14',
+    manifest: 'EWASTE-FORM6-MANIFEST-2026-14',
+    doc: 'E-Waste Passbook & Green Recycling Certificate',
+    icon: Zap,
+    defaultGen: '0.95',
+    defaultReused: '0.00',
+    defaultRecycled: '0.95',
+    defaultRecovered: '0.00',
+    defaultDisposed: '0.00',
+  },
+  'Biomedical waste': {
+    desc: 'First-aid post medical dressings, used sharps, diagnostic strips',
+    unit: 'metric tonnes',
+    method: 'Incineration / Co-processing',
+    handler: 'Common Bio-medical Waste Facility (CBWTF)',
+    authRef: 'SPCB/BMW/AUTH/2026/55',
+    manifest: 'BMW-BARCODE-MANIFEST-2026-55',
+    doc: 'Biomedical Waste Barcoded Manifest & Treatment Log',
+    icon: ShieldCheck,
+    defaultGen: '0.18',
+    defaultReused: '0.00',
+    defaultRecycled: '0.00',
+    defaultRecovered: '0.00',
+    defaultDisposed: '0.18',
+  },
+  'Municipal solid waste': {
+    desc: 'Canteen food organic waste, office paper, dry sweepings',
+    unit: 'metric tonnes',
+    method: 'Composting',
+    handler: 'On-site Organic Waste Composter & Municipal Facility',
+    authRef: 'SWM/LOCAL/COMP/2026/02',
+    manifest: 'SWM-DISPATCH-2026-02',
+    doc: 'Compost Logbook & Municipal Waste Receipts',
+    icon: Trash2,
+    defaultGen: '4.50',
+    defaultReused: '1.20',
+    defaultRecycled: '2.10',
+    defaultRecovered: '0.00',
+    defaultDisposed: '1.20',
+  },
+  'Other': {
+    desc: 'Rubber conveyor trimmings, insulation wool scrap',
+    unit: 'metric tonnes',
+    method: 'Other',
+    handler: 'Approved Environmental Vendor',
+    authRef: 'SPCB/GEN/AUTH/2026/99',
+    manifest: 'GEN-WASTE-2026-99',
+    doc: 'Vendor Disposal Memo',
+    icon: Recycle,
+    defaultGen: '0.50',
+    defaultReused: '0.00',
+    defaultRecycled: '0.50',
+    defaultRecovered: '0.00',
+    defaultDisposed: '0.00',
+  },
+}
+
+function calculateWasteCircularity(genStr: string, reusedStr: string, recycledStr: string, recoveredStr: string): number {
+  const gen = Number(genStr) || 0
+  const reused = Number(reusedStr) || 0
+  const recycled = Number(recycledStr) || 0
+  const recovered = Number(recoveredStr) || 0
+  const diverted = reused + recycled + recovered
+  return gen > 0 ? Number(Math.min(100, (diverted / gen) * 100).toFixed(1)) : 0
+}
 
 function Level4WasteForm({
   projectId,
@@ -4488,52 +6807,352 @@ function Level4WasteForm({
   const key = `l4-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
 
-  const [wasteCategory, setWasteCategory] = useState(initial.wasteCategory ?? 'Construction & demolition')
-  const [wasteTypeDescription, setWasteTypeDescription] = useState(initial.wasteTypeDescription ?? 'Non-hazardous construction scrap, plastic & DG oil sludge')
-  const [quantityGenerated, setQuantityGenerated] = useState(initial.quantityGenerated ?? '17.20')
-  const [unit, setUnit] = useState(initial.unit ?? 'metric tonnes')
-  const [quantityReused, setQuantityReused] = useState(initial.quantityReused ?? '10.50')
-  const [quantityRecycled, setQuantityRecycled] = useState(initial.quantityRecycled ?? '12.20')
-  const [quantityRecovered, setQuantityRecovered] = useState(initial.quantityRecovered ?? '0.90')
-  const [quantityDisposed, setQuantityDisposed] = useState(initial.quantityDisposed ?? '4.10')
-  const [disposalMethod, setDisposalMethod] = useState(initial.disposalMethod ?? 'Authorised recycling facility')
-  const [wasteHandler, setWasteHandler] = useState(initial.wasteHandler ?? 'Green Earth Recycling & Disposal Pvt. Ltd. (SPCB Approved)')
-  const [authorizationReference, setAuthorizationReference] = useState(initial.authorizationReference ?? 'SPCB/HAZ/AUTH/2026/841')
-  const [transferManifestNumber, setTransferManifestNumber] = useState(initial.transferManifestNumber ?? 'PCB-HAZ-MANIFEST-2026-0841')
-  const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'Form 10 Hazardous Waste Manifest & Weighbridge Slips')
-  const [remarks, setRemarks] = useState(initial.remarks ?? 'Total waste 17.20 T; 13.10 T recovered/recycled (76.2% circular recovery); 4.10 T safely disposed per CPCB regulations.')
-  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
+  // Multi-item staged state
+  const [stagedItems, setStagedItems] = useState<StagedWasteItem[]>(() => {
+    if (Array.isArray(initial.items) && initial.items.length > 0) {
+      return initial.items
+    }
+    if (initial.quantityGenerated && Number(initial.quantityGenerated) > 0) {
+      const circ = calculateWasteCircularity(
+        String(initial.quantityGenerated),
+        String(initial.quantityReused || '0'),
+        String(initial.quantityRecycled || '0'),
+        String(initial.quantityRecovered || '0')
+      )
+      return [
+        {
+          id: 'item-waste-initial-1',
+          wasteCategory: initial.wasteCategory || 'Construction & demolition',
+          wasteTypeDescription: initial.wasteTypeDescription || 'Concrete rubble, brickbats, excavated soil & tile scrap',
+          quantityGenerated: String(initial.quantityGenerated),
+          unit: initial.unit || 'metric tonnes',
+          quantityReused: initial.quantityReused || '10.50',
+          quantityRecycled: initial.quantityRecycled || '5.20',
+          quantityRecovered: initial.quantityRecovered || '0.00',
+          quantityDisposed: initial.quantityDisposed || '1.50',
+          disposalMethod: initial.disposalMethod || 'Authorised recycling facility',
+          wasteHandler: initial.wasteHandler || 'Green Earth Recycling & Aggregates Pvt. Ltd.',
+          authorizationReference: initial.authorizationReference || 'SPCB/CDW/AUTH/2026/102',
+          transferManifestNumber: initial.transferManifestNumber || 'CDW-MANIFEST-2026-0102',
+          supportingEvidence: initial.supportingEvidence || 'Weighbridge Slips & C&D Processing Plant Receipt',
+          remarks: initial.remarks || 'Construction scrap processed at authorized recycling plant.',
+          evidenceId: initial.evidenceId || '',
+          circularRecoveryPct: circ,
+        },
+      ]
+    }
+    // Seed standard initial item so form is immediately usable
+    const circ = calculateWasteCircularity('17.20', '10.50', '5.20', '0.00')
+    return [
+      {
+        id: 'item-waste-seed-1',
+        wasteCategory: 'Construction & demolition',
+        wasteTypeDescription: 'Concrete rubble, brickbats, excavated soil & tile scrap',
+        quantityGenerated: '17.20',
+        unit: 'metric tonnes',
+        quantityReused: '10.50',
+        quantityRecycled: '5.20',
+        quantityRecovered: '0.00',
+        quantityDisposed: '1.50',
+        disposalMethod: 'Authorised recycling facility',
+        wasteHandler: 'Green Earth Recycling & Aggregates Pvt. Ltd.',
+        authorizationReference: 'SPCB/CDW/AUTH/2026/102',
+        transferManifestNumber: 'CDW-MANIFEST-2026-0102',
+        supportingEvidence: 'Weighbridge Slips & C&D Processing Plant Receipt',
+        remarks: '15.70 MT diverted to sub-base recycling; 1.50 MT inert landfill.',
+        evidenceId: '',
+        circularRecoveryPct: circ,
+      },
+    ]
+  })
+
+  // View step: 'ENTRY' (Item Drafting) vs 'ORGANIZED' (Consolidated Summary)
+  const [viewStep, setViewStep] = useState<'ENTRY' | 'ORGANIZED'>(
+    initial.viewStep === 'ORGANIZED' ? 'ORGANIZED' : 'ENTRY'
+  )
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+
+  // Active form inputs for selected Waste Category item
+  const [wasteCategory, setWasteCategory] = useState('Construction & demolition')
+  const [wasteTypeDescription, setWasteTypeDescription] = useState(
+    'Concrete rubble, brickbats, excavated soil & tile scrap'
+  )
+  const [quantityGenerated, setQuantityGenerated] = useState('17.20')
+  const [unit, setUnit] = useState('metric tonnes')
+  const [quantityReused, setQuantityReused] = useState('10.50')
+  const [quantityRecycled, setQuantityRecycled] = useState('5.20')
+  const [quantityRecovered, setQuantityRecovered] = useState('0.00')
+  const [quantityDisposed, setQuantityDisposed] = useState('1.50')
+  const [disposalMethod, setDisposalMethod] = useState('Authorised recycling facility')
+  const [wasteHandler, setWasteHandler] = useState('Green Earth Recycling & Aggregates Pvt. Ltd.')
+  const [authorizationReference, setAuthorizationReference] = useState('SPCB/CDW/AUTH/2026/102')
+  const [transferManifestNumber, setTransferManifestNumber] = useState('CDW-MANIFEST-2026-0102')
+  const [supportingEvidence, setSupportingEvidence] = useState(
+    'Weighbridge Slips & C&D Processing Plant Receipt'
+  )
+  const [remarks, setRemarks] = useState(
+    'Total waste 36.68 T; 29.80 T diverted/recycled (81.2% circular recovery); 6.88 T safely disposed per CPCB regulations.'
+  )
+  const [evidenceId, setEvidenceId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    formStateRef.current[key] = {
-      wasteCategory, wasteTypeDescription, quantityGenerated, unit, quantityReused,
-      quantityRecycled, quantityRecovered, quantityDisposed, disposalMethod, wasteHandler,
-      authorizationReference, transferManifestNumber, supportingEvidence, remarks,
-    }
-  }, [
-    key, wasteCategory, wasteTypeDescription, quantityGenerated, unit, quantityReused,
-    quantityRecycled, quantityRecovered, quantityDisposed, disposalMethod, wasteHandler,
-    authorizationReference, transferManifestNumber, supportingEvidence, remarks, formStateRef,
-  ])
-
-  const gen = Number(quantityGenerated) || 0
-  const reused = Number(quantityReused) || 0
-  const recycled = Number(quantityRecycled) || 0
-  const recovered = Number(quantityRecovered) || 0
-  const disposed = Number(quantityDisposed) || 0
-  const totalDiverted = reused + recycled + recovered
-  const divPct = gen > 0 ? ((totalDiverted / gen) * 100).toFixed(1) : '0'
-
-  const save = async (submitForReview = false) => {
+  // Handle category chip click
+  const handleSelectCategory = (cat: string) => {
     setError('')
-    if (quantityGenerated === '' || Number(quantityGenerated) < 0) {
-      setError('Quantity generated must be ≥ 0')
+    setWasteCategory(cat)
+    const existing = stagedItems.find((i) => i.wasteCategory === cat)
+    if (existing) {
+      setEditingItemId(existing.id)
+      setWasteTypeDescription(existing.wasteTypeDescription)
+      setQuantityGenerated(existing.quantityGenerated)
+      setUnit(existing.unit)
+      setQuantityReused(existing.quantityReused)
+      setQuantityRecycled(existing.quantityRecycled)
+      setQuantityRecovered(existing.quantityRecovered)
+      setQuantityDisposed(existing.quantityDisposed)
+      setDisposalMethod(existing.disposalMethod)
+      setWasteHandler(existing.wasteHandler)
+      setAuthorizationReference(existing.authorizationReference)
+      setTransferManifestNumber(existing.transferManifestNumber)
+      setSupportingEvidence(existing.supportingEvidence)
+      setRemarks(existing.remarks)
+      setEvidenceId(existing.evidenceId)
+    } else {
+      setEditingItemId(null)
+      const preset = WASTE_CATEGORY_PRESETS[cat] || WASTE_CATEGORY_PRESETS['Construction & demolition']
+      setWasteTypeDescription(preset.desc)
+      setQuantityGenerated(preset.defaultGen)
+      setUnit(preset.unit)
+      setQuantityReused(preset.defaultReused)
+      setQuantityRecycled(preset.defaultRecycled)
+      setQuantityRecovered(preset.defaultRecovered)
+      setQuantityDisposed(preset.defaultDisposed)
+      setDisposalMethod(preset.method)
+      setWasteHandler(preset.handler)
+      setAuthorizationReference(preset.authRef)
+      setTransferManifestNumber(preset.manifest)
+      setSupportingEvidence(preset.doc)
+      setRemarks(`Measured generation and handling for ${cat} per site manifests.`)
+      setEvidenceId('')
+    }
+  }
+
+  // Add / Update item in staged items list
+  const handleAddOrUpdateItem = () => {
+    setError('')
+    const genNum = Number(quantityGenerated)
+    if (!quantityGenerated || isNaN(genNum) || genNum < 0) {
+      setError(`Please enter a valid quantity generated (≥ 0) for ${wasteCategory}.`)
       return
     }
+
+    const circ = calculateWasteCircularity(
+      quantityGenerated,
+      quantityReused,
+      quantityRecycled,
+      quantityRecovered
+    )
+    const attachedEv = evidence.find((e) => e.id === evidenceId)
+    const itemPayload: StagedWasteItem = {
+      id: editingItemId || `item-wst-${Date.now()}`,
+      wasteCategory,
+      wasteTypeDescription,
+      quantityGenerated,
+      unit,
+      quantityReused,
+      quantityRecycled,
+      quantityRecovered,
+      quantityDisposed,
+      disposalMethod,
+      wasteHandler,
+      authorizationReference,
+      transferManifestNumber,
+      supportingEvidence,
+      remarks,
+      evidenceId,
+      evidenceFileName: attachedEv?.fileName,
+      circularRecoveryPct: circ,
+    }
+
+    let updated: StagedWasteItem[]
+    if (editingItemId) {
+      updated = stagedItems.map((i) => (i.id === editingItemId ? itemPayload : i))
+      toast.success(`Updated ${wasteCategory} draft item.`)
+    } else {
+      const idx = stagedItems.findIndex((i) => i.wasteCategory === wasteCategory)
+      if (idx >= 0) {
+        updated = stagedItems.map((i, iIdx) => (iIdx === idx ? itemPayload : i))
+        toast.info(`Updated existing ${wasteCategory} draft item.`)
+      } else {
+        updated = [...stagedItems, itemPayload]
+        toast.success(`Added ${wasteCategory} (${Number(quantityGenerated).toLocaleString()} ${unit}) to draft items!`)
+      }
+    }
+
+    setStagedItems(updated)
+    setEditingItemId(null)
+  }
+
+  const handleEditStagedItem = (item: StagedWasteItem) => {
+    setViewStep('ENTRY')
+    setEditingItemId(item.id)
+    setWasteCategory(item.wasteCategory)
+    setWasteTypeDescription(item.wasteTypeDescription)
+    setQuantityGenerated(item.quantityGenerated)
+    setUnit(item.unit)
+    setQuantityReused(item.quantityReused)
+    setQuantityRecycled(item.quantityRecycled)
+    setQuantityRecovered(item.quantityRecovered)
+    setQuantityDisposed(item.quantityDisposed)
+    setDisposalMethod(item.disposalMethod)
+    setWasteHandler(item.wasteHandler)
+    setAuthorizationReference(item.authorizationReference)
+    setTransferManifestNumber(item.transferManifestNumber)
+    setSupportingEvidence(item.supportingEvidence)
+    setRemarks(item.remarks)
+    setEvidenceId(item.evidenceId)
+    toast.info(`Editing ${item.wasteCategory} draft item`)
+  }
+
+  const handleRemoveStagedItem = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    const target = stagedItems.find((i) => i.id === id)
+    const updated = stagedItems.filter((i) => i.id !== id)
+    setStagedItems(updated)
+    if (editingItemId === id) {
+      setEditingItemId(null)
+    }
+    toast.warning(`Removed ${target?.wasteCategory || 'item'} from staged drafts.`)
+  }
+
+  const handleNextOrganize = () => {
+    setError('')
+    if (stagedItems.length === 0) {
+      if (!quantityGenerated || Number(quantityGenerated) < 0) {
+        setError('Please enter quantity generated and click Add (Draft) first.')
+        return
+      }
+      handleAddOrUpdateItem()
+    }
+    setViewStep('ORGANIZED')
+    toast.info('Organized Waste Consolidated Summary', {
+      description: 'Review total generation, diversion rate, and disposal breakdown below.',
+    })
+  }
+
+  // Aggregate stats across staged items
+  const totalGen = stagedItems.reduce((acc, it) => acc + (Number(it.quantityGenerated) || 0), 0)
+  const totalReused = stagedItems.reduce((acc, it) => acc + (Number(it.quantityReused) || 0), 0)
+  const totalRecycled = stagedItems.reduce((acc, it) => acc + (Number(it.quantityRecycled) || 0), 0)
+  const totalRecovered = stagedItems.reduce((acc, it) => acc + (Number(it.quantityRecovered) || 0), 0)
+  const totalDisposed = stagedItems.reduce((acc, it) => acc + (Number(it.quantityDisposed) || 0), 0)
+  const totalDiverted = totalReused + totalRecycled + totalRecovered
+  const overallDiversionRate = totalGen > 0 ? ((totalDiverted / totalGen) * 100).toFixed(1) : '0'
+
+  // Sync to formStateRef.current[key]
+  useEffect(() => {
+    const itemsToSave = stagedItems.length > 0 ? stagedItems : []
+    formStateRef.current[key] = {
+      wasteCategory: itemsToSave.map((i) => i.wasteCategory).join(', ') || wasteCategory,
+      wasteTypeDescription: itemsToSave.map((i) => i.wasteTypeDescription).join('; ') || wasteTypeDescription,
+      quantityGenerated: String(totalGen || quantityGenerated),
+      unit: itemsToSave[0]?.unit || unit,
+      quantityReused: String(totalReused || quantityReused),
+      quantityRecycled: String(totalRecycled || quantityRecycled),
+      quantityRecovered: String(totalRecovered || quantityRecovered),
+      quantityDisposed: String(totalDisposed || quantityDisposed),
+      disposalMethod: itemsToSave.map((i) => i.disposalMethod).filter(Boolean).join(', ') || disposalMethod,
+      wasteHandler: itemsToSave.map((i) => i.wasteHandler).filter(Boolean).join(', ') || wasteHandler,
+      authorizationReference: itemsToSave.map((i) => i.authorizationReference).filter(Boolean).join(', ') || authorizationReference,
+      transferManifestNumber: itemsToSave.map((i) => i.transferManifestNumber).filter(Boolean).join(', ') || transferManifestNumber,
+      supportingEvidence: itemsToSave.map((i) => i.supportingEvidence).filter(Boolean).join('; ') || supportingEvidence,
+      remarks: remarks || `Consolidated multi-category waste management report (${itemsToSave.length} streams).`,
+      evidenceId: itemsToSave.find((i) => i.evidenceId)?.evidenceId || evidenceId,
+      items: itemsToSave,
+      totalGen,
+      totalDiverted,
+      totalDisposed,
+      diversionRate: overallDiversionRate,
+      viewStep,
+    }
+  }, [
+    key,
+    stagedItems,
+    viewStep,
+    wasteCategory,
+    wasteTypeDescription,
+    quantityGenerated,
+    unit,
+    quantityReused,
+    quantityRecycled,
+    quantityRecovered,
+    quantityDisposed,
+    disposalMethod,
+    wasteHandler,
+    authorizationReference,
+    transferManifestNumber,
+    supportingEvidence,
+    remarks,
+    evidenceId,
+    totalGen,
+    totalDiverted,
+    totalDisposed,
+    overallDiversionRate,
+    formStateRef,
+  ])
+
+  // Active item calculations
+  const curGen = Number(quantityGenerated) || 0
+  const curReused = Number(quantityReused) || 0
+  const curRecycled = Number(quantityRecycled) || 0
+  const curRecovered = Number(quantityRecovered) || 0
+  const curDisposed = Number(quantityDisposed) || 0
+  const curDiverted = curReused + curRecycled + curRecovered
+  const curDivPct = curGen > 0 ? ((curDiverted / curGen) * 100).toFixed(1) : '0'
+
+  // Final Save / Submit
+  const save = async (submitForReview = false) => {
+    setError('')
+    let effectiveItems = [...stagedItems]
+    if (effectiveItems.length === 0) {
+      if (quantityGenerated === '' || Number(quantityGenerated) < 0) {
+        setError('Quantity generated must be ≥ 0 and add at least one Waste Category item.')
+        return
+      }
+      const c = calculateWasteCircularity(quantityGenerated, quantityReused, quantityRecycled, quantityRecovered)
+      effectiveItems = [
+        {
+          id: `item-wst-${Date.now()}`,
+          wasteCategory,
+          wasteTypeDescription,
+          quantityGenerated,
+          unit,
+          quantityReused,
+          quantityRecycled,
+          quantityRecovered,
+          quantityDisposed,
+          disposalMethod,
+          wasteHandler,
+          authorizationReference,
+          transferManifestNumber,
+          supportingEvidence,
+          remarks,
+          evidenceId,
+          circularRecoveryPct: c,
+        },
+      ]
+      setStagedItems(effectiveItems)
+    }
+
     setSubmitting(true)
     try {
+      const payloadData: Record<string, any> = {
+        ...formStateRef.current[key],
+        items: effectiveItems,
+      }
+
       const res = await fetch('/api/data-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4544,13 +7163,16 @@ function Level4WasteForm({
           module: 'WASTE',
           projectId,
           reportingPeriodId: periodId,
-          evidenceId: evidenceId || undefined,
-          data: formStateRef.current[key],
+          evidenceId: payloadData.evidenceId || undefined,
+          data: payloadData,
           submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Waste record')
+      toast.success(
+        submitForReview ? 'Waste submission sent for BU review!' : 'Waste draft saved successfully!'
+      )
       onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -4560,210 +7182,788 @@ function Level4WasteForm({
   }
 
   return (
-    <FormGrid>
-      <FormField label="Waste Category" hint="C&D, plastic, e-waste, hazardous.">
-        <select
-          value={wasteCategory}
-          disabled={readOnly}
-          onChange={(e) => setWasteCategory(e.target.value)}
-          className={inputClass}
-        >
-          {L4_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </FormField>
+    <div className="space-y-4">
+      {/* FLOW NAVIGATION CONTROLLER: STEP 1 (ITEM DRAFTING) <-> STEP 2 (CONSOLIDATED SUMMARY) */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3.5">
+        <div className="inline-flex items-center rounded-xl bg-slate-100/90 p-1 border border-slate-200/80 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              viewStep === 'ENTRY'
+                ? 'bg-white text-amber-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                viewStep === 'ENTRY' ? 'bg-amber-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              1
+            </span>
+            <span>Item Drafting</span>
+            {stagedItems.length > 0 && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800">
+                {stagedItems.length}
+              </span>
+            )}
+          </button>
 
-      <FormField label="Waste Type / Description" hint="Concrete, scrap metal, packaging, etc.">
-        <input
-          value={wasteTypeDescription}
-          disabled={readOnly}
-          onChange={(e) => setWasteTypeDescription(e.target.value)}
-          placeholder="e.g. Concrete rubble & rebar cutoff scrap"
-          className={inputClass}
-        />
-      </FormField>
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
+              viewStep === 'ORGANIZED'
+                ? 'bg-white text-indigo-900 shadow-xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span
+              className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold ${
+                viewStep === 'ORGANIZED' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              2
+            </span>
+            <span>Organized Summary</span>
+            {stagedItems.length > 0 && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                ✓ Ready
+              </span>
+            )}
+          </button>
+        </div>
 
-      <FormField label="Quantity Generated" hint="Actual quantity generated.">
-        <input
-          type="number"
-          min="0"
-          step="any"
-          value={quantityGenerated}
-          disabled={readOnly}
-          onChange={(e) => setQuantityGenerated(e.target.value)}
-          placeholder="e.g. 14.5"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Unit" hint="metric tonnes or kg.">
-        <select
-          value={unit}
-          disabled={readOnly}
-          onChange={(e) => setUnit(e.target.value)}
-          className={inputClass}
-        >
-          {['metric tonnes', 'kg'].map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Quantity Reused" hint="Where applicable (on-site).">
-        <input
-          type="number"
-          value={quantityReused}
-          disabled={readOnly}
-          onChange={(e) => setQuantityReused(e.target.value)}
-          placeholder="e.g. 8.2"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Quantity Recycled" hint="Where applicable (by vendor).">
-        <input
-          type="number"
-          value={quantityRecycled}
-          disabled={readOnly}
-          onChange={(e) => setQuantityRecycled(e.target.value)}
-          placeholder="e.g. 5.8"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Quantity Recovered" hint="Co-processing / energy recovery.">
-        <input
-          type="number"
-          value={quantityRecovered}
-          disabled={readOnly}
-          onChange={(e) => setQuantityRecovered(e.target.value)}
-          placeholder="0"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Quantity Disposed" hint="Sent to TSDF / landfill.">
-        <input
-          type="number"
-          value={quantityDisposed}
-          disabled={readOnly}
-          onChange={(e) => setQuantityDisposed(e.target.value)}
-          placeholder="e.g. 0.5"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Disposal Method" hint="Landfill, incineration, recycling.">
-        <select
-          value={disposalMethod}
-          disabled={readOnly}
-          onChange={(e) => setDisposalMethod(e.target.value)}
-          className={inputClass}
-        >
-          {L4_METHODS.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Waste Handler" hint="Authorized vendor / agency.">
-        <input
-          value={wasteHandler}
-          disabled={readOnly}
-          onChange={(e) => setWasteHandler(e.target.value)}
-          placeholder="e.g. M/s EcoRecycle India Pvt Ltd"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Authorization Reference" hint="SPCB authorization reference ID.">
-        <input
-          value={authorizationReference}
-          disabled={readOnly}
-          onChange={(e) => setAuthorizationReference(e.target.value)}
-          placeholder="e.g. SPCB/HW/AUTH/2025/1102"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Transfer / Manifest Number" hint="Form 10 / Manifest # (Hazardous mandatory).">
-        <input
-          value={transferManifestNumber}
-          disabled={readOnly}
-          onChange={(e) => setTransferManifestNumber(e.target.value)}
-          placeholder="e.g. MANIFEST-2026-06-08"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Supporting Evidence" hint="Waste register, receipts, manifests.">
-        <input
-          value={supportingEvidence}
-          disabled={readOnly}
-          onChange={(e) => setSupportingEvidence(e.target.value)}
-          placeholder="e.g. Weighbridge slip #8821 & Form 10 copy"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Remarks" hint="Stock adjustments or exceptions.">
-        <input
-          value={remarks}
-          disabled={readOnly}
-          onChange={(e) => setRemarks(e.target.value)}
-          placeholder="e.g. Reconciled against site demolition log."
-          className={inputClass}
-        />
-      </FormField>
-
-      {/* Attach evidence document directly from the form (after Remarks) */}
-      <div className="sm:col-span-2">
-        <FormEvidenceAttachSection
-          projectId={projectId}
-          periodId={periodId}
-          moduleKey="WASTE"
-          evidence={evidence}
-          onUploaded={onEvidenceUploaded || (async () => {})}
-          selectedEvidenceId={evidenceId || null}
-          onSelectEvidence={(id) => setEvidenceId(id || '')}
-          onReview={onReviewEvidence}
-          readOnly={readOnly}
-        />
+        {viewStep === 'ENTRY' ? (
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:shadow-amber-500/20 hover:opacity-95 transition active:scale-95"
+          >
+            <span>Next: Organize All Items</span>
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-mono">
+              {stagedItems.length}
+            </span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+            <span>Back to Item Drafting</span>
+          </button>
+        )}
       </div>
 
-      {/* Live Preview Card */}
-      <div className="sm:col-span-2 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-3 text-xs text-emerald-900">
-        <div className="flex items-center justify-between font-bold">
-          <span className="flex items-center gap-1.5">
-            <Recycle className="h-3.5 w-3.5 text-emerald-600" /> Waste Balance &amp; Diversion
-          </span>
-          <span className="text-[10px] text-emerald-700">Diversion Rate: {divPct}%</span>
-        </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Generated</div>
-            <div className="text-sm font-bold text-slate-900">{gen} {unit}</div>
+      {/* ==============================================================
+          VIEW 1: ITEM DRAFT ENTRY (ADD ONE BY ONE, WITH ADD + NEXT)
+          ============================================================== */}
+      {viewStep === 'ENTRY' && (
+        <FormGrid>
+          {/* Active Waste Item Live Analytics Banner */}
+          <div className="sm:col-span-2 rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/90 via-orange-50/60 to-emerald-50/90 p-4 text-xs text-amber-950 shadow-sm">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-2 text-amber-900">
+                <Recycle className="h-4 w-4 text-amber-600" /> Active Item Status ·{' '}
+                <span className="underline decoration-amber-300 font-extrabold">{wasteCategory}</span>
+              </span>
+              <span className="rounded-full bg-amber-100/90 px-2.5 py-0.5 text-[10px] text-amber-800 font-mono font-bold border border-amber-200">
+                Method: {disposalMethod.split(' ')[0]}
+              </span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-amber-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Generated
+                </div>
+                <div className="text-base font-extrabold text-slate-900 mt-0.5">
+                  {curGen.toFixed(2)} {unit}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-amber-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Circular Diverted
+                </div>
+                <div className="text-base font-extrabold text-emerald-800 mt-0.5">
+                  {curDiverted.toFixed(2)} {unit}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-amber-100">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                  Diversion Recovery
+                </div>
+                <div className="text-base font-extrabold text-amber-900 mt-0.5">{curDivPct}%</div>
+              </div>
+            </div>
           </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Diverted</div>
-            <div className="text-sm font-bold text-slate-900">{totalDiverted.toFixed(2)} {unit}</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Disposed</div>
-            <div className="text-sm font-bold text-slate-900">{disposed} {unit}</div>
-          </div>
-        </div>
-      </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
-    </FormGrid>
+          {/* INTERACTIVE CATEGORY ITEMS SELECTOR PILLS */}
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/60 p-4 shadow-xs">
+            <div className="mb-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-amber-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Select Waste Category Item to Fill / Draft:
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium">
+                Click any category → Fill details &amp; evidence → Click Add (Draft)
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {L4_CATEGORIES.map((cat) => {
+                const preset = WASTE_CATEGORY_PRESETS[cat] || WASTE_CATEGORY_PRESETS['Construction & demolition']
+                const IconComponent = preset.icon
+                const isSelected = wasteCategory === cat
+                const staged = stagedItems.find((i) => i.wasteCategory === cat)
+
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleSelectCategory(cat)}
+                    className={`group relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-2 border-amber-600 bg-amber-50 text-amber-900 shadow-sm font-bold ring-2 ring-amber-200'
+                        : staged
+                        ? 'border border-emerald-300 bg-emerald-50/80 text-emerald-900 hover:bg-emerald-100/70'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:border-amber-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <IconComponent
+                      className={`h-3.5 w-3.5 ${
+                        isSelected
+                          ? 'text-amber-600'
+                          : staged
+                          ? 'text-emerald-600'
+                          : 'text-slate-500'
+                      }`}
+                    />
+                    <span>{cat}</span>
+                    {staged ? (
+                      <span className="ml-1 rounded-full bg-emerald-200/90 px-1.5 py-0.2 text-[9px] font-mono font-bold text-emerald-800">
+                        ✓ {Number(staged.quantityGenerated).toFixed(1)} {staged.unit === 'metric tonnes' ? 'MT' : staged.unit}
+                      </span>
+                    ) : (
+                      isSelected && (
+                        <span className="ml-1 rounded-full bg-amber-200/80 px-1.5 py-0.2 text-[9px] font-bold text-amber-800">
+                          Active
+                        </span>
+                      )
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* ITEM FORM INPUTS */}
+          <FormField label="Waste Category" hint="Selected waste stream category.">
+            <select
+              value={wasteCategory}
+              disabled={readOnly}
+              onChange={(e) => handleSelectCategory(e.target.value)}
+              className={inputClass}
+            >
+              {L4_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Waste Type / Description" hint="Concrete rubble, TMT scrap, used oils, etc.">
+            <input
+              value={wasteTypeDescription}
+              disabled={readOnly}
+              onChange={(e) => setWasteTypeDescription(e.target.value)}
+              placeholder="e.g. Concrete rubble, brickbats & excavation soil"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Quantity Generated" hint="Total waste generated this period.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={quantityGenerated}
+              disabled={readOnly}
+              onChange={(e) => setQuantityGenerated(e.target.value)}
+              placeholder="e.g. 17.20"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Unit" hint="metric tonnes or kg.">
+            <select
+              value={unit}
+              disabled={readOnly}
+              onChange={(e) => setUnit(e.target.value)}
+              className={inputClass}
+            >
+              {['metric tonnes', 'kg'].map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Quantity Reused" hint="Reused directly on-site without reprocessing.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={quantityReused}
+              disabled={readOnly}
+              onChange={(e) => setQuantityReused(e.target.value)}
+              placeholder="e.g. 10.50"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Quantity Recycled" hint="Recycled off-site by authorized re-processors.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={quantityRecycled}
+              disabled={readOnly}
+              onChange={(e) => setQuantityRecycled(e.target.value)}
+              placeholder="e.g. 5.20"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Quantity Recovered" hint="Energy recovery or co-processing in cement kilns.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={quantityRecovered}
+              disabled={readOnly}
+              onChange={(e) => setQuantityRecovered(e.target.value)}
+              placeholder="0"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Quantity Disposed" hint="Sent to TSDF hazardous landfill or secured landfill.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={quantityDisposed}
+              disabled={readOnly}
+              onChange={(e) => setQuantityDisposed(e.target.value)}
+              placeholder="e.g. 1.50"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Disposal / Treatment Method" hint="Authorised recycling, TSDF, composting.">
+            <select
+              value={disposalMethod}
+              disabled={readOnly}
+              onChange={(e) => setDisposalMethod(e.target.value)}
+              className={inputClass}
+            >
+              {L4_METHODS.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Waste Handler" hint="SPCB registered disposal / recycling vendor.">
+            <input
+              value={wasteHandler}
+              disabled={readOnly}
+              onChange={(e) => setWasteHandler(e.target.value)}
+              placeholder="e.g. Green Earth Recycling & Aggregates Pvt. Ltd."
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Authorization Reference" hint="State Pollution Control Board authorization ID.">
+            <input
+              value={authorizationReference}
+              disabled={readOnly}
+              onChange={(e) => setAuthorizationReference(e.target.value)}
+              placeholder="e.g. SPCB/CDW/AUTH/2026/102"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Transfer Manifest Number" hint="Form 10 or gate pass manifest number.">
+            <input
+              value={transferManifestNumber}
+              disabled={readOnly}
+              onChange={(e) => setTransferManifestNumber(e.target.value)}
+              placeholder="e.g. CDW-MANIFEST-2026-0102"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Supporting Evidence" hint="Weighbridge slips, manifests, EPR documents." full>
+            <input
+              value={supportingEvidence}
+              disabled={readOnly}
+              onChange={(e) => setSupportingEvidence(e.target.value)}
+              placeholder="e.g. Weighbridge Slips & C&D Processing Plant Receipt"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Remarks" hint="Traceability, recycling rate, or audit observations." full>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. C&D waste recycled into aggregate sub-base; steel scrap dispatched to certified rolling mill."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </FormField>
+
+          {/* ITEM EVIDENCE ATTACHMENT SECTION */}
+          <div className="sm:col-span-2">
+            <FormEvidenceAttachSection
+              projectId={projectId}
+              periodId={periodId}
+              moduleKey="WASTE"
+              evidence={evidence}
+              onUploaded={onEvidenceUploaded || (async () => {})}
+              selectedEvidenceId={evidenceId || null}
+              onSelectEvidence={(id) => setEvidenceId(id || '')}
+              onReview={onReviewEvidence}
+              readOnly={readOnly}
+            />
+          </div>
+
+          {/* SPECIAL ACTION BUTTONS: ADD (DRAFT) + NEXT (ORGANIZE) */}
+          <div className="sm:col-span-2 rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-emerald-50/90 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  <span>Item Draft Actions · {wasteCategory}</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Fill details and attach evidence, then click <strong>Add Item (Draft)</strong> to stage it.
+                  When all categories are added, click <strong>Next: Organize All Items</strong>.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAddOrUpdateItem}
+                  disabled={readOnly}
+                  className="flex items-center gap-1.5 rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-amber-500/20 hover:bg-amber-700 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>
+                    {editingItemId ? `Update ${wasteCategory} Draft` : `Add ${wasteCategory} (Draft)`}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleNextOrganize}
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-700 to-orange-700 px-4 py-2 text-xs font-bold text-white shadow-md shadow-amber-600/20 hover:opacity-95 transition active:scale-95"
+                >
+                  <span>Next: Organize All Items</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/90 p-2.5 text-xs font-medium text-rose-800">
+                <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-rose-600" /> {error}
+              </div>
+            )}
+          </div>
+
+          {/* STAGED DRAFT ITEMS TABLE / LIST */}
+          {stagedItems.length > 0 && (
+            <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Staged Draft Items ({stagedItems.length} Categories Added)
+                    </h4>
+                    <p className="text-[10px] text-slate-500">
+                      Draft waste streams. Click edit to adjust or click Next to organize the full waste inventory.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800 border border-amber-200">
+                    Total: {totalGen.toFixed(2)} MT ({overallDiversionRate}% Circular Recovery)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextOrganize}
+                    className="flex items-center gap-1 rounded-full bg-amber-700 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-amber-800 transition"
+                  >
+                    <span>Next: Organize</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-100">
+                    <tr>
+                      <th className="py-2 px-2.5">Category &amp; Description</th>
+                      <th className="py-2 px-2.5">Method &amp; Handler</th>
+                      <th className="py-2 px-2.5">Generated Quantity</th>
+                      <th className="py-2 px-2.5">Circular Diverted</th>
+                      <th className="py-2 px-2.5">Evidence</th>
+                      <th className="py-2 px-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {stagedItems.map((item) => {
+                      const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                      const itemDiverted =
+                        (Number(item.quantityReused) || 0) +
+                        (Number(item.quantityRecycled) || 0) +
+                        (Number(item.quantityRecovered) || 0)
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-bold text-slate-900">{item.wasteCategory}</div>
+                            <span className="text-[10px] text-slate-500 line-clamp-1">
+                              {item.wasteTypeDescription}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-semibold text-slate-800">{item.disposalMethod}</div>
+                            <div className="text-[10px] text-slate-500 line-clamp-1">
+                              {item.wasteHandler}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5 font-bold text-slate-900">
+                            {Number(item.quantityGenerated).toFixed(2)} {item.unit}
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            <span className="font-bold text-emerald-800">
+                              {itemDiverted.toFixed(2)} {item.unit}
+                            </span>
+                            <div className="text-[10px] text-amber-700 font-semibold">
+                              {item.circularRecoveryPct}% circular
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            {attachedEv ? (
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="truncate max-w-[120px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                  title={attachedEv.fileName}
+                                >
+                                  {attachedEv.fileName}
+                                </span>
+                                {onReviewEvidence && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onReviewEvidence(attachedEv)}
+                                    className="text-blue-600 hover:text-blue-800 p-0.5"
+                                    title="Review evidence (flips engine preview)"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">None attached</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleEditStagedItem(item)}
+                                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                title="Edit this item"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleRemoveStagedItem(item.id, e)}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                                title="Remove item"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </FormGrid>
+      )}
+
+      {/* ==============================================================
+          VIEW 2: ORGANIZED CONSOLIDATED SUMMARY
+          ============================================================== */}
+      {viewStep === 'ORGANIZED' && (
+        <div className="space-y-4">
+          {/* Header Banner */}
+          <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50/90 via-orange-50/80 to-emerald-50/90 p-4 text-xs text-amber-950 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="status-pill status-approved !text-[10px]">
+                    Step 2: Consolidated
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    All Waste Categories Organized in One View
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1">
+                  Compiled {stagedItems.length} waste categories into a unified waste balance &amp; diversion audit.
+                  Review the summary, attach any final documentation, and click Save Draft or Submit for Review.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewStep('ENTRY')}
+                className="self-start sm:self-auto flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+              >
+                <Plus className="h-3.5 w-3.5 text-amber-600" />
+                <span>Add / Edit More Categories</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Consolidated Executive Metric Tiles */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-amber-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total Waste Generated
+              </div>
+              <div className="text-base font-extrabold text-slate-900 mt-1">
+                {totalGen.toFixed(2)} MT
+              </div>
+              <div className="text-[10px] text-amber-700 mt-0.5">Across all waste streams</div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total Circular Diverted
+              </div>
+              <div className="text-base font-extrabold text-emerald-800 mt-1">
+                {totalDiverted.toFixed(2)} MT
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Reused + Recycled + Co-processed</div>
+            </div>
+
+            <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Circular Recovery Rate
+              </div>
+              <div className="text-base font-extrabold text-blue-900 mt-1">
+                {overallDiversionRate}%
+              </div>
+              <div className="text-[10px] text-blue-700 mt-0.5">CPCB Circular Economy Target: &gt;75%</div>
+            </div>
+
+            <div className="rounded-xl border border-rose-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Safely Disposed / TSDF
+              </div>
+              <div className="text-base font-extrabold text-rose-950 mt-1">
+                {totalDisposed.toFixed(2)} MT
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Secured landfill &amp; TSDF</div>
+            </div>
+          </div>
+
+          {/* Consolidated Master Table of All Items */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Consolidated Waste Management Breakdown
+              </h4>
+              <span className="text-[10px] text-slate-500">
+                All streams will be saved into the master draft and submitted together
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Category &amp; Stream</th>
+                    <th className="py-2.5 px-3">Generated</th>
+                    <th className="py-2.5 px-3">Reused / Recycled</th>
+                    <th className="py-2.5 px-3">Disposed</th>
+                    <th className="py-2.5 px-3">Method &amp; Handler</th>
+                    <th className="py-2.5 px-3">Recovery Rate</th>
+                    <th className="py-2.5 px-3">Attached Evidence</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stagedItems.map((item, idx) => {
+                    const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                    const itemDiverted =
+                      (Number(item.quantityReused) || 0) +
+                      (Number(item.quantityRecycled) || 0) +
+                      (Number(item.quantityRecovered) || 0)
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {item.wasteCategory}
+                          <div className="text-[10px] font-normal text-slate-500 line-clamp-1">
+                            {item.wasteTypeDescription}
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {Number(item.quantityGenerated).toFixed(2)} {item.unit === 'metric tonnes' ? 'MT' : item.unit}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-800">
+                          {itemDiverted.toFixed(2)} {item.unit === 'metric tonnes' ? 'MT' : item.unit}
+                        </td>
+                        <td className="py-2.5 px-3 text-rose-800 font-semibold">
+                          {Number(item.quantityDisposed).toFixed(2)} {item.unit === 'metric tonnes' ? 'MT' : item.unit}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          {item.disposalMethod}
+                          {item.transferManifestNumber && (
+                            <div className="text-[10px] font-mono text-slate-400">
+                              #{item.transferManifestNumber}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-amber-900">
+                          {item.circularRecoveryPct}%
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {attachedEv ? (
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="truncate max-w-[110px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                title={attachedEv.fileName}
+                              >
+                                {attachedEv.fileName}
+                              </span>
+                              {onReviewEvidence && (
+                                <button
+                                  type="button"
+                                  onClick={() => onReviewEvidence(attachedEv)}
+                                  className="text-blue-600 hover:text-blue-800 p-0.5"
+                                  title="Review evidence (flips engine preview)"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">None attached</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleEditStagedItem(item)}
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot className="bg-slate-50 font-bold text-slate-900 border-t border-slate-200">
+                  <tr>
+                    <td colSpan={2} className="py-2.5 px-3 text-right text-[11px] uppercase tracking-wider text-slate-500">
+                      Consolidated Total:
+                    </td>
+                    <td className="py-2.5 px-3 font-bold">
+                      {totalGen.toFixed(2)} MT Gen
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-emerald-800">
+                      {totalDiverted.toFixed(2)} MT Diverted
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-rose-800">
+                      {totalDisposed.toFixed(2)} MT Disposed
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-amber-900 font-extrabold text-sm">
+                      {overallDiversionRate}%
+                    </td>
+                    <td colSpan={2} className="py-2.5 px-3 text-right text-[10px] text-slate-500">
+                      {stagedItems.length} categories combined
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Overall Remarks / Summary Note */}
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-3">
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              Consolidated Submission Remarks &amp; Audit Trail Note
+            </label>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Consolidated multi-category waste management report covering construction debris, scrap steel recycling, hazardous TSDF manifest, and municipal organic composting."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </div>
+
+          {/* Primary Save Draft & Submit for Review buttons */}
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -6154,9 +9354,27 @@ function describeLevelRecord(r: any): string {
       }
       return [r.data.emissionDataType, r.data.energySource || 'Grid Electricity', `${r.data.consumptionQuantity || 0} ${r.data.unit || 'kWh'}`].filter(Boolean).join(' · ')
     }
-    if (r.level === 2) return `${r.data.waterActivity || 'Withdrawal'} (${r.data.waterSource || 'Groundwater'}) · ${r.data.waterQuantity || 0} ${r.data.unit || 'kL'}`
-    if (r.level === 3) return `${r.data.emissionDataType || 'Scope 1'} · ${r.data.emissionSource || 'DG'} (${r.data.activityQuantity || 0} ${r.data.unit || 'L'})`
-    if (r.level === 4) return `${r.data.wasteCategory || 'C&D'} · ${r.data.quantityGenerated || 0} ${r.data.unit || 'MT'}`
+    if (r.level === 2) {
+      if (Array.isArray(r.data.items) && r.data.items.length > 0) {
+        const srcList = r.data.items.map((i: any) => i.waterSource).slice(0, 3).join(', ')
+        return `Multi-Source Water (${r.data.items.length} items: ${srcList}${r.data.items.length > 3 ? '...' : ''}) · ${r.data.waterQuantity || 0} kL (${r.data.circularityPct || 0}% circular)`
+      }
+      return `${r.data.waterActivity || 'Withdrawal'} (${r.data.waterSource || 'Groundwater'}) · ${r.data.waterQuantity || 0} ${r.data.unit || 'kL'}`
+    }
+    if (r.level === 3) {
+      if (Array.isArray(r.data.items) && r.data.items.length > 0) {
+        const srcList = r.data.items.map((i: any) => i.emissionSource).slice(0, 3).join(', ')
+        return `Multi-Source GHG (${r.data.items.length} items: ${srcList}${r.data.items.length > 3 ? '...' : ''}) · ${Number(r.data.totalTco2e || 0).toFixed(2)} tCO₂e`
+      }
+      return `${r.data.emissionDataType || 'Scope 1'} · ${r.data.emissionSource || 'DG'} (${r.data.activityQuantity || 0} ${r.data.unit || 'L'})`
+    }
+    if (r.level === 4) {
+      if (Array.isArray(r.data.items) && r.data.items.length > 0) {
+        const catList = r.data.items.map((i: any) => i.wasteCategory).slice(0, 3).join(', ')
+        return `Multi-Category Waste (${r.data.items.length} streams: ${catList}${r.data.items.length > 3 ? '...' : ''}) · ${r.data.quantityGenerated || 0} MT (${r.data.diversionRate || 0}% diverted)`
+      }
+      return `${r.data.wasteCategory || 'C&D'} · ${r.data.quantityGenerated || 0} ${r.data.unit || 'MT'}`
+    }
     if (r.level === 5) return `${r.data.incidentType || 'Incident'} · ${r.data.totalPersonHoursWorked || 0} hrs`
     if (r.level === 6) return `${r.data.trainingProgramme || 'Training'} · ${r.data.participants || 0} participants`
     if (r.level === 7) return `${r.data.permitConsentType || 'Permit'} #${r.data.permitNumber || 'N/A'}`

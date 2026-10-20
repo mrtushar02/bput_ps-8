@@ -193,109 +193,221 @@ export async function POST(req: NextRequest) {
 
       case 2: {
         // Water Management
-        const qty = Number(data.waterQuantity)
-        if (!qty || qty <= 0) {
-          issues.push({
-            ruleCode: 'WTR-QTY-POSITIVE',
-            severity: 'ERROR',
-            message: 'Water quantity must be greater than 0',
-            field: 'waterQuantity',
-            suggestedAction: 'Enter the measured water quantity in kL.',
-          })
-        }
-        if (data.openingReading !== undefined && data.closingReading !== undefined) {
-          const open = Number(data.openingReading)
-          const close = Number(data.closingReading)
-          if (!isNaN(open) && !isNaN(close) && close < open) {
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          let totalWithdrawal = 0
+          let totalReused = 0
+          const sourceList: string[] = []
+          for (const it of data.items) {
+            const wQty = Number(it.waterQuantity) || 0
+            const wReused = Number(it.waterReusedRecycled) || 0
+            totalWithdrawal += wQty
+            totalReused += wReused
+            sourceList.push(`${it.waterSource} (${wQty} ${it.unit || 'kL'})`)
+          }
+          const net = Math.max(0, totalWithdrawal - totalReused)
+          const circPct = totalWithdrawal > 0 ? ((totalReused / totalWithdrawal) * 100).toFixed(1) : '0'
+
+          calculation = {
+            calculatedValue: Number(net.toFixed(2)),
+            resultUnit: 'kL Net Withdrawal',
+            scope: 'WATER_CIRCULARITY',
+            factorId: `MULTI-WATER-${data.items.length}-SOURCES`,
+            methodologyNote: `Multi-source water circularity: ${totalReused.toLocaleString()} kL recycled (${circPct}% circular recovery) across ${data.items.length} sources (${sourceList.slice(0, 3).join(', ')}${sourceList.length > 3 ? '...' : ''}).`,
+            sourceValue: totalWithdrawal,
+            sourceUnit: data.unit || 'kL',
+            normalizedValue: Number(totalWithdrawal.toFixed(2)),
+            normalizedUnit: 'kL Gross',
+          }
+        } else {
+          const qty = Number(data.waterQuantity)
+          if (!qty || qty <= 0) {
             issues.push({
-              ruleCode: 'WTR-MTR-SEQUENCE',
+              ruleCode: 'WTR-QTY-POSITIVE',
               severity: 'ERROR',
-              message: 'Closing water reading cannot be lower than opening reading',
-              field: 'closingReading',
+              message: 'Water quantity must be greater than 0',
+              field: 'waterQuantity',
+              suggestedAction: 'Enter the measured water quantity in kL.',
             })
           }
-        }
-        const reused = Number(data.waterReusedRecycled) || 0
-        const act = String(data.waterActivity || '').toLowerCase()
-        const net = act.includes('withdrawal') ? Math.max(0, qty - reused) : qty
-        calculation = {
-          calculatedValue: Number(net.toFixed(2)),
-          resultUnit: 'kL Net Impact',
-          scope: 'WATER_CIRCULARITY',
-          methodologyNote: `Water activity: ${data.waterActivity}. Reused quantity: ${reused} kL.`,
-          sourceValue: qty,
-          sourceUnit: data.unit || 'kL',
+          if (data.openingReading !== undefined && data.closingReading !== undefined) {
+            const open = Number(data.openingReading)
+            const close = Number(data.closingReading)
+            if (!isNaN(open) && !isNaN(close) && close < open) {
+              issues.push({
+                ruleCode: 'WTR-MTR-SEQUENCE',
+                severity: 'ERROR',
+                message: 'Closing water reading cannot be lower than opening reading',
+                field: 'closingReading',
+              })
+            }
+          }
+          const reused = Number(data.waterReusedRecycled) || 0
+          const act = String(data.waterActivity || '').toLowerCase()
+          const net = act.includes('withdrawal') ? Math.max(0, qty - reused) : qty
+          calculation = {
+            calculatedValue: Number(net.toFixed(2)),
+            resultUnit: 'kL Net Impact',
+            scope: 'WATER_CIRCULARITY',
+            methodologyNote: `Water activity: ${data.waterActivity}. Reused quantity: ${reused} kL.`,
+            sourceValue: qty,
+            sourceUnit: data.unit || 'kL',
+          }
         }
         break
       }
 
       case 3: {
         // GHG & Air Quality
-        const actQty = Number(data.activityQuantity) || 0
-        if (!actQty && !data.testResult) {
-          issues.push({
-            ruleCode: 'GHG-MEASURE-REQUIRED',
-            severity: 'ERROR',
-            message: 'Either activity quantity or measured test result must be provided',
-            field: 'activityQuantity',
-          })
-        }
-        const isScope1 = String(data.emissionDataType || '').includes('Scope 1')
-        const tco2e = actQty > 0 ? (actQty * (isScope1 ? 2.637 : 0.716)) / 1000 : 0
-        calculation = {
-          calculatedValue: Number(tco2e.toFixed(3)),
-          resultUnit: data.testResult ? 'Test Result Logged' : 'tCO2e',
-          scope: isScope1 ? 'SCOPE_1' : 'SCOPE_2',
-          methodologyNote: data.calculationMethod || 'Central ESG emission factors model',
-          sourceValue: actQty,
-          sourceUnit: data.unit || 'litres',
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          let totalTco2e = 0
+          let s1Tco2e = 0
+          let s2Tco2e = 0
+          let s3Tco2e = 0
+          let totalActQty = 0
+          const srcList: string[] = []
+
+          for (const it of data.items) {
+            const iQty = Number(it.activityQuantity) || 0
+            totalActQty += iQty
+            const dt = String(it.emissionDataType || '')
+            const isS1 = dt.includes('1') || dt.includes('Direct')
+            const isS3 = dt.includes('3') || dt.includes('Value Chain')
+            const isAir = dt.toLowerCase().includes('air')
+
+            let itTco2e = 0
+            if (isS1) {
+              itTco2e = (iQty * 2.637) / 1000
+              s1Tco2e += itTco2e
+            } else if (isS3) {
+              itTco2e = (iQty * 1.85) / 1000 // Supply chain / logistics standard factor
+              s3Tco2e += itTco2e
+            } else if (!isAir) {
+              itTco2e = (iQty * 0.716) / 1000 // Scope 2 grid factor
+              s2Tco2e += itTco2e
+            }
+            totalTco2e += itTco2e
+            srcList.push(`${it.emissionSource || 'Source'} (${itTco2e > 0 ? itTco2e.toFixed(2) + ' tCO2e' : it.testResult || 'Measured'})`)
+          }
+
+          const hasS1 = s1Tco2e > 0
+          const hasS2 = s2Tco2e > 0
+          const hasS3 = s3Tco2e > 0
+          const scopes = [hasS1 && 'Scope 1', hasS2 && 'Scope 2', hasS3 && 'Scope 3'].filter(Boolean).join(' + ') || 'Scope 1 & 2'
+
+          calculation = {
+            calculatedValue: Number(totalTco2e.toFixed(3)),
+            resultUnit: 'tCO2e Consolidated',
+            scope: scopes.toUpperCase().replace(/\s+/g, '_'),
+            factorId: `MULTI-GHG-${data.items.length}-SOURCES`,
+            methodologyNote: `Consolidated GHG multi-source: Scope 1: ${s1Tco2e.toFixed(2)} tCO2e, Scope 2: ${s2Tco2e.toFixed(2)} tCO2e, Scope 3: ${s3Tco2e.toFixed(2)} tCO2e across ${data.items.length} emission sources.`,
+            sourceValue: totalActQty,
+            sourceUnit: data.unit || 'units',
+            normalizedValue: Number(totalTco2e.toFixed(2)),
+            normalizedUnit: 'tCO2e',
+          }
+        } else {
+          const actQty = Number(data.activityQuantity) || 0
+          if (!actQty && !data.testResult) {
+            issues.push({
+              ruleCode: 'GHG-MEASURE-REQUIRED',
+              severity: 'ERROR',
+              message: 'Either activity quantity or measured test result must be provided',
+              field: 'activityQuantity',
+            })
+          }
+          const dt = String(data.emissionDataType || '')
+          const isScope1 = dt.includes('Scope 1')
+          const isScope3 = dt.includes('Scope 3')
+          const factor = isScope1 ? 2.637 : isScope3 ? 1.85 : 0.716
+          const tco2e = actQty > 0 ? (actQty * factor) / 1000 : 0
+          const targetScope = isScope1 ? 'SCOPE_1' : isScope3 ? 'SCOPE_3' : 'SCOPE_2'
+
+          calculation = {
+            calculatedValue: Number(tco2e.toFixed(3)),
+            resultUnit: data.testResult ? 'Test Result Logged' : 'tCO2e',
+            scope: targetScope,
+            methodologyNote: data.calculationMethod || `Central ESG emission factors model (${factor} kgCO2e/unit)`,
+            sourceValue: actQty,
+            sourceUnit: data.unit || 'litres',
+          }
         }
         break
       }
 
       case 4: {
         // Waste Management
-        const gen = Number(data.quantityGenerated)
-        if (gen === undefined || isNaN(gen) || gen < 0) {
-          issues.push({
-            ruleCode: 'WST-GEN-NONNEGATIVE',
-            severity: 'ERROR',
-            message: 'Quantity generated must be ≥ 0',
-            field: 'quantityGenerated',
-          })
-        }
-        const isHazardous = String(data.wasteCategory || '').toLowerCase().includes('hazard')
-        if (isHazardous && !data.transferManifestNumber) {
-          issues.push({
-            ruleCode: 'WST-HAZ-MANIFEST',
-            severity: 'ERROR',
-            message: 'Hazardous waste manifests (Form 10 / Manifest #) are mandatory under SPCB regulations',
-            field: 'transferManifestNumber',
-            suggestedAction: 'Enter the Form 10 manifest or transport authorization reference.',
-          })
-        }
-        const reused = Number(data.quantityReused) || 0
-        const recycled = Number(data.quantityRecycled) || 0
-        const recovered = Number(data.quantityRecovered) || 0
-        const disposed = Number(data.quantityDisposed) || 0
-        const sumOut = reused + recycled + recovered + disposed
-        if (gen > 0 && Math.abs(sumOut - gen) > 0.05 * gen && !data.remarks) {
-          issues.push({
-            ruleCode: 'WST-RECON-DIFF',
-            severity: 'WARNING',
-            message: `Disposed/diverted total (${sumOut.toFixed(2)}) differs from generated (${gen.toFixed(2)}) by >5%`,
-            field: 'remarks',
-            suggestedAction: 'Explain stock accumulation or interim yard storage in Remarks.',
-          })
-        }
-        const divRate = gen > 0 ? Math.min(100, ((reused + recycled + recovered) / gen) * 100) : 0
-        calculation = {
-          calculatedValue: Number(divRate.toFixed(2)),
-          resultUnit: '% Diversion from Disposal',
-          scope: 'WASTE_CIRCULARITY',
-          methodologyNote: `Diversion: (Reused ${reused} + Recycled ${recycled} + Recovered ${recovered}) / Gen ${gen}`,
-          sourceValue: gen,
-          sourceUnit: data.unit || 'MT',
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          let totalGen = 0
+          let totalReused = 0
+          let totalRecycled = 0
+          let totalRecovered = 0
+          let totalDisposed = 0
+
+          for (const it of data.items) {
+            totalGen += Number(it.quantityGenerated) || 0
+            totalReused += Number(it.quantityReused) || 0
+            totalRecycled += Number(it.quantityRecycled) || 0
+            totalRecovered += Number(it.quantityRecovered) || 0
+            totalDisposed += Number(it.quantityDisposed) || 0
+          }
+
+          const totalDiverted = totalReused + totalRecycled + totalRecovered
+          const divRate = totalGen > 0 ? Math.min(100, (totalDiverted / totalGen) * 100) : 0
+
+          calculation = {
+            calculatedValue: Number(divRate.toFixed(2)),
+            resultUnit: '% Circular Diversion',
+            scope: 'WASTE_CIRCULARITY',
+            factorId: `MULTI-WASTE-${data.items.length}-CATEGORIES`,
+            methodologyNote: `Multi-category waste: ${totalGen.toFixed(2)} MT generated, ${totalDiverted.toFixed(2)} MT circular diverted (${divRate.toFixed(1)}% recovery), ${totalDisposed.toFixed(2)} MT disposed across ${data.items.length} streams.`,
+            sourceValue: Number(totalGen.toFixed(2)),
+            sourceUnit: 'MT',
+            normalizedValue: Number(totalDiverted.toFixed(2)),
+            normalizedUnit: 'MT Diverted',
+          }
+        } else {
+          const gen = Number(data.quantityGenerated)
+          if (gen === undefined || isNaN(gen) || gen < 0) {
+            issues.push({
+              ruleCode: 'WST-GEN-NONNEGATIVE',
+              severity: 'ERROR',
+              message: 'Quantity generated must be ≥ 0',
+              field: 'quantityGenerated',
+            })
+          }
+          const isHazardous = String(data.wasteCategory || '').toLowerCase().includes('hazard')
+          if (isHazardous && !data.transferManifestNumber) {
+            issues.push({
+              ruleCode: 'WST-HAZ-MANIFEST',
+              severity: 'ERROR',
+              message: 'Hazardous waste manifests (Form 10 / Manifest #) are mandatory under SPCB regulations',
+              field: 'transferManifestNumber',
+              suggestedAction: 'Enter the Form 10 manifest or transport authorization reference.',
+            })
+          }
+          const reused = Number(data.quantityReused) || 0
+          const recycled = Number(data.quantityRecycled) || 0
+          const recovered = Number(data.quantityRecovered) || 0
+          const disposed = Number(data.quantityDisposed) || 0
+          const sumOut = reused + recycled + recovered + disposed
+          if (gen > 0 && Math.abs(sumOut - gen) > 0.05 * gen && !data.remarks) {
+            issues.push({
+              ruleCode: 'WST-RECON-DIFF',
+              severity: 'WARNING',
+              message: `Disposed/diverted total (${sumOut.toFixed(2)}) differs from generated (${gen.toFixed(2)}) by >5%`,
+              field: 'remarks',
+              suggestedAction: 'Explain stock accumulation or interim yard storage in Remarks.',
+            })
+          }
+          const divRate = gen > 0 ? Math.min(100, ((reused + recycled + recovered) / gen) * 100) : 0
+          calculation = {
+            calculatedValue: Number(divRate.toFixed(2)),
+            resultUnit: '% Diversion from Disposal',
+            scope: 'WASTE_CIRCULARITY',
+            methodologyNote: `Diversion: (Reused ${reused} + Recycled ${recycled} + Recovered ${recovered}) / Gen ${gen}`,
+            sourceValue: gen,
+            sourceUnit: data.unit || 'MT',
+          }
         }
         break
       }
