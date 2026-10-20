@@ -861,24 +861,28 @@ function BusinessUnitSelectorBar({
   activeBu,
   onSelectBu,
   projects,
+  selectedProjectId,
+  onSelectProject,
 }: {
   businessUnits: string[]
   activeBu: string
   onSelectBu: (bu: string) => void
   projects: FlattenedProject[]
+  selectedProjectId?: string | null
+  onSelectProject?: (id: string) => void
 }) {
   const getBuConfig = (name: string): { icon: LucideIcon; color: string; badgeTone: string } => {
     const l = name.toLowerCase()
     if (l.includes('power') || l.includes('gen')) {
-      return { icon: Zap, color: 'text-amber-500 border-amber-300/80 bg-amber-500/10', badgeTone: 'bg-amber-100 text-amber-800' }
+      return { icon: Zap, color: 'text-amber-600 border-amber-300 bg-amber-500/15', badgeTone: 'bg-amber-100 text-amber-900 border border-amber-300/80 font-bold' }
     }
     if (l.includes('water') || l.includes('infra')) {
-      return { icon: Droplets, color: 'text-cyan-600 border-cyan-300/80 bg-cyan-500/10', badgeTone: 'bg-cyan-100 text-cyan-800' }
+      return { icon: Droplets, color: 'text-cyan-700 border-cyan-300 bg-cyan-500/15', badgeTone: 'bg-cyan-100 text-cyan-900 border border-cyan-300/80 font-bold' }
     }
     if (l.includes('trans') || l.includes('distrib') || l.includes('td')) {
-      return { icon: ActivityIcon, color: 'text-violet-600 border-violet-300/80 bg-violet-500/10', badgeTone: 'bg-violet-100 text-violet-800' }
+      return { icon: ActivityIcon, color: 'text-violet-700 border-violet-300 bg-violet-500/15', badgeTone: 'bg-violet-100 text-violet-900 border border-violet-300/80 font-bold' }
     }
-    return { icon: Building2, color: 'text-sky-600 border-sky-300/80 bg-sky-500/10', badgeTone: 'bg-sky-100 text-sky-800' }
+    return { icon: Building2, color: 'text-sky-700 border-sky-300 bg-sky-500/15', badgeTone: 'bg-sky-100 text-sky-900 border border-sky-300/80 font-bold' }
   }
 
   const items: BuChoiceItem[] = useMemo(() => {
@@ -888,8 +892,8 @@ function BusinessUnitSelectorBar({
         name: 'All Business Units',
         icon: Layers,
         count: projects.length,
-        color: 'text-sky-600 border-sky-300/80 bg-sky-500/10',
-        badgeTone: 'bg-sky-100 text-sky-800',
+        color: 'text-sky-700 border-sky-300 bg-sky-500/15',
+        badgeTone: 'bg-sky-100 text-sky-900 border border-sky-300/80 font-bold',
       },
     ]
 
@@ -909,38 +913,47 @@ function BusinessUnitSelectorBar({
     return list
   }, [businessUnits, projects])
 
+  // Filter assigned projects for the active BU
+  const assignedProjects = useMemo(() => {
+    return activeBu === 'all'
+      ? projects
+      : projects.filter(p => p.buName === activeBu)
+  }, [projects, activeBu])
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: EASE, delay: 0.08 }}
-      className="glass-ios-liquid glass-shimmer rounded-[24px] p-4 md:p-5 relative"
+      className="glass-ios-liquid glass-shimmer rounded-[26px] p-5 md:p-6 relative border border-white/90 shadow-[0_20px_50px_-10px_rgba(2,132,199,0.16)]"
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3.5">
-        <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-sm">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md ring-2 ring-white/80">
             <Building2 className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-[15px] font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <h2 className="text-[16px] font-black text-slate-950 tracking-tight flex items-center gap-2">
               Select Business Unit (BU)
-              <span className="text-[10.5px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+              <span className="text-[11px] font-extrabold text-sky-800 bg-sky-100/90 px-2.5 py-0.5 rounded-full border border-sky-300 shadow-2xs">
                 MEIL Operational Divisions
               </span>
             </h2>
-            <p className="text-[11.5px] text-slate-500">
+            <p className="text-[12px] text-slate-600 font-medium">
               Filter and explore projects under specific infrastructure and energy verticals
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-[11px] text-slate-500">
-          <Shield className="h-3.5 w-3.5 text-emerald-600" />
+        <div className="flex items-center gap-2 text-[11.5px] font-bold text-slate-700 bg-white/70 px-3 py-1.5 rounded-xl border border-slate-200/80 shadow-2xs">
+          <Shield className="h-4 w-4 text-emerald-600" />
           <span>BRSR Scope 1, 2 &amp; 3 Certified Hierarchy</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+      {/* BU Selection Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {items.map(item => {
           const isSelected = activeBu === item.id
           const Icon = item.icon
@@ -948,26 +961,26 @@ function BusinessUnitSelectorBar({
             <button
               key={item.id}
               onClick={() => onSelectBu(item.id)}
-              className={`relative text-left p-3.5 rounded-2xl transition-all flex flex-col justify-between border ${
+              className={`relative text-left p-4 rounded-2xl transition-all duration-200 flex flex-col justify-between border ${
                 isSelected
-                  ? 'bg-gradient-to-br from-white via-sky-50/70 to-blue-50/50 border-sky-400 shadow-md ring-2 ring-sky-400/40'
-                  : 'bg-white/70 hover:bg-white/95 border-slate-200/70 hover:border-sky-200 hover:shadow-xs'
+                  ? 'bg-gradient-to-br from-white via-sky-50/90 to-blue-50/80 border-sky-500 shadow-lg ring-2 ring-sky-400/50'
+                  : 'bg-white/80 hover:bg-white border-slate-200/80 hover:border-sky-300 hover:shadow-xs'
               }`}
             >
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <span className={`h-8 w-8 rounded-xl flex items-center justify-center ${item.color}`}>
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <span className={`h-8 w-8 rounded-xl flex items-center justify-center ${item.color} shadow-2xs`}>
                   <Icon className="h-4 w-4" />
                 </span>
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black tabular-nums ${item.badgeTone}`}>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10.5px] font-black tabular-nums ${item.badgeTone}`}>
                   {item.count} {item.count === 1 ? 'Project' : 'Projects'}
                 </span>
               </div>
               <div>
-                <div className="text-[13px] font-bold text-slate-900 leading-snug line-clamp-1">{item.name}</div>
-                <div className="text-[10.5px] text-slate-500 mt-0.5 flex items-center gap-1 font-medium">
+                <div className="text-[13.5px] font-extrabold text-slate-950 leading-snug line-clamp-1">{item.name}</div>
+                <div className="text-[11px] text-slate-600 mt-1 flex items-center gap-1 font-bold">
                   {isSelected ? (
-                    <span className="text-sky-700 font-bold flex items-center gap-0.5">
-                      <Check className="h-3 w-3" /> Active Selection
+                    <span className="text-sky-700 font-extrabold flex items-center gap-1">
+                      <Check className="h-3.5 w-3.5 text-sky-600" /> Active Selection
                     </span>
                   ) : (
                     <span>Click to switch BU</span>
@@ -977,12 +990,75 @@ function BusinessUnitSelectorBar({
               {isSelected && (
                 <motion.div
                   layoutId="active-bu-indicator"
-                  className="absolute -bottom-1 left-4 right-4 h-1 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full"
+                  className="absolute -bottom-1 left-4 right-4 h-1.5 bg-gradient-to-r from-sky-500 to-blue-600 rounded-full shadow-xs"
                 />
               )}
             </button>
           )
         })}
+      </div>
+
+      {/* Dynamic Assigned Projects Ribbon for Active BU */}
+      <div className="mt-5 pt-4 border-t border-slate-200/90">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="h-6 w-6 rounded-lg bg-sky-100 border border-sky-300 text-sky-700 flex items-center justify-center font-bold">
+              <FolderOpen className="h-3.5 w-3.5" />
+            </span>
+            <h3 className="text-[13.5px] font-black text-slate-950 tracking-tight flex items-center gap-2">
+              Assigned Projects · {activeBu === 'all' ? 'All Divisions' : activeBu}
+              <span className="text-[10px] font-extrabold text-sky-800 bg-sky-100/90 px-2.5 py-0.5 rounded-full border border-sky-300">
+                {assignedProjects.length} Assigned
+              </span>
+            </h3>
+          </div>
+          <span className="text-[11.5px] font-bold text-slate-600">
+            Selected project loads all ESG metrics &amp; updates below
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {assignedProjects.map(p => {
+            const isSelected = p.id === selectedProjectId
+            return (
+              <button
+                key={p.id}
+                onClick={() => onSelectProject?.(p.id)}
+                className={`group relative text-left p-3.5 rounded-2xl transition-all duration-200 flex flex-col justify-between border ${
+                  isSelected
+                    ? 'bg-gradient-to-br from-white via-sky-50/95 to-blue-50/90 border-sky-500 shadow-md ring-2 ring-sky-400/50'
+                    : 'bg-white/80 hover:bg-white border-slate-200/80 hover:border-sky-300 hover:shadow-xs'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-1.5 mb-2">
+                  <span className="font-mono text-[11px] font-black text-sky-950 bg-sky-100/90 px-2 py-0.5 rounded-md border border-sky-300">
+                    {p.projectCode}
+                  </span>
+                  <span className={`status-pill text-[9.5px] font-extrabold ${statusClass(p.status)}`}>
+                    {p.status.toLowerCase()}
+                  </span>
+                </div>
+                <div>
+                  <div className="text-[13.5px] font-black text-slate-950 leading-snug line-clamp-1">{p.projectName}</div>
+                  <div className="text-[11px] text-slate-600 font-bold mt-0.5 flex items-center gap-1 truncate">
+                    <MapPin className="h-3 w-3 text-sky-600 shrink-0" />
+                    <span className="truncate">{p.location || 'Location not specified'}</span>
+                  </div>
+                </div>
+                <div className="mt-2.5 pt-2 border-t border-slate-200/70 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500 font-semibold truncate">{p.buName}</span>
+                  {isSelected ? (
+                    <span className="text-sky-700 font-black flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-sky-600" /> Active
+                    </span>
+                  ) : (
+                    <span className="text-slate-500 group-hover:text-sky-700 font-bold">Select Project →</span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </div>
     </motion.section>
   )
@@ -1592,44 +1668,119 @@ function ProjectDetailsPanel({
 }) {
   const [tab, setTab] = useState<'overview' | 'images' | 'telemetry' | 'progress' | 'activity' | 'team' | 'documents'>('overview')
   const [showEditModal, setShowEditModal] = useState(false)
+  const [profileOverrideVersion, setProfileOverrideVersion] = useState(0)
+
+  // 15 Comprehensive Project Detail Fields
   const [editName, setEditName] = useState('')
+  const [editCode, setEditCode] = useState('')
+  const [editBu, setEditBu] = useState('')
   const [editLocation, setEditLocation] = useState('')
   const [editStatus, setEditStatus] = useState('')
-  const [editNotes, setEditNotes] = useState('')
+  const [editCapacity, setEditCapacity] = useState('')
+  const [editCod, setEditCod] = useState('')
+  const [editProjectHead, setEditProjectHead] = useState('')
+  const [editLeadContact, setEditLeadContact] = useState('')
+  const [editClient, setEditClient] = useState('')
+  const [editLandArea, setEditLandArea] = useState('')
+  const [editEcNumber, setEditEcNumber] = useState('')
+  const [editCtoNumber, setEditCtoNumber] = useState('')
+  const [editCtoExpiry, setEditCtoExpiry] = useState('')
+  const [editOverviewText, setEditOverviewText] = useState('')
+
   const [lightboxImg, setLightboxImg] = useState<ProjectSiteImage | null>(null)
   const [imageCategoryFilter, setImageCategoryFilter] = useState('All')
 
-  // Sync edit fields when project changes
+  // Load custom project profile overrides from localStorage
+  const profileOverrides = useMemo(() => {
+    if (!project) return {}
+    try {
+      const raw = localStorage.getItem('meil_custom_project_profiles')
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        return parsed[project.id] || parsed[project.projectCode] || {}
+      }
+    } catch {}
+    return {}
+  }, [project?.id, project?.projectCode, profileOverrideVersion])
+
+  const baseProfile = useMemo(() => getProjectProfile(project), [project])
+  const profile = useMemo(() => ({
+    ...baseProfile,
+    ...profileOverrides,
+  }), [baseProfile, profileOverrides])
+
+  // Sync edit fields when project or profile changes
   useEffect(() => {
     if (project) {
       setEditName(project.projectName)
+      setEditCode(project.projectCode)
+      setEditBu(project.buName)
       setEditLocation(project.location || '')
       setEditStatus(project.status)
-      setEditNotes('')
+      setEditCapacity(profile.capacity || '')
+      setEditCod(profile.cod || '')
+      setEditProjectHead(profile.projectHead || '')
+      setEditLeadContact(profile.leadContact || '')
+      setEditClient(profile.client || '')
+      setEditLandArea(profile.landArea || '')
+      setEditEcNumber(profile.ecNumber || '')
+      setEditCtoNumber(profile.ctoNumber || '')
+      setEditCtoExpiry(profile.ctoExpiry || '')
+      setEditOverviewText(profile.overviewText || '')
     }
-  }, [project?.id])
+  }, [project?.id, project?.projectName, project?.projectCode, project?.buName, project?.location, project?.status, profile])
 
   const handleSaveEdit = useCallback(() => {
     if (project) {
-      const updated: FlattenedProject = {
+      const updatedProject: FlattenedProject = {
         ...project,
         projectName: editName.trim() || project.projectName,
+        projectCode: editCode.trim() || project.projectCode,
+        buName: editBu.trim() || project.buName,
         location: editLocation.trim() || project.location,
         status: editStatus || project.status,
       }
-      onUpdateProject?.(updated)
-      toast.success(`Project "${updated.projectName}" updated successfully`)
+
+      const updatedProfileOverrides: Partial<ProjectProfileDetails> = {
+        capacity: editCapacity.trim() || profile.capacity,
+        cod: editCod.trim() || profile.cod,
+        projectHead: editProjectHead.trim() || profile.projectHead,
+        leadContact: editLeadContact.trim() || profile.leadContact,
+        client: editClient.trim() || profile.client,
+        landArea: editLandArea.trim() || profile.landArea,
+        ecNumber: editEcNumber.trim() || profile.ecNumber,
+        ctoNumber: editCtoNumber.trim() || profile.ctoNumber,
+        ctoExpiry: editCtoExpiry.trim() || profile.ctoExpiry,
+        overviewText: editOverviewText.trim() || profile.overviewText,
+      }
+
+      try {
+        const raw = localStorage.getItem('meil_custom_project_profiles')
+        const allProfiles = raw ? JSON.parse(raw) : {}
+        allProfiles[project.id] = { ...(allProfiles[project.id] || {}), ...updatedProfileOverrides }
+        allProfiles[project.projectCode] = { ...(allProfiles[project.projectCode] || {}), ...updatedProfileOverrides }
+        allProfiles[updatedProject.projectCode] = { ...(allProfiles[project.id] || {}), ...updatedProfileOverrides }
+        localStorage.setItem('meil_custom_project_profiles', JSON.stringify(allProfiles))
+      } catch {}
+
+      setProfileOverrideVersion(v => v + 1)
+      onUpdateProject?.(updatedProject)
+      toast.success(`Project "${updatedProject.projectName}" details updated successfully`)
     }
     setShowEditModal(false)
-  }, [project, editName, editLocation, editStatus, onUpdateProject])
+  }, [
+    project, profile, editName, editCode, editBu, editLocation, editStatus,
+    editCapacity, editCod, editProjectHead, editLeadContact, editClient,
+    editLandArea, editEcNumber, editCtoNumber, editCtoExpiry, editOverviewText,
+    onUpdateProject
+  ])
 
-  // Hooks must run unconditionally — compute before the early return below.
+  // Hooks must run unconditionally — compute before early return below.
   const filteredImages = useMemo(() => {
     if (!project) return []
-    const p = getProjectProfile(project)
-    if (imageCategoryFilter === 'All') return p.images
-    return p.images.filter(img => img.category === imageCategoryFilter)
-  }, [project, imageCategoryFilter])
+    if (imageCategoryFilter === 'All') return profile.images
+    return profile.images.filter(img => img.category === imageCategoryFilter)
+  }, [project, profile.images, imageCategoryFilter])
 
   if (!project) {
     return (
@@ -1641,31 +1792,30 @@ function ProjectDetailsPanel({
     )
   }
 
-  const profile = getProjectProfile(project)
   const modules = moduleCompletion(subs, kpis)
 
   return (
-    <div className="glass-ios-liquid glass-shimmer rounded-[26px] overflow-hidden flex flex-col h-full relative">
+    <div className="glass-ios-liquid glass-shimmer rounded-[26px] overflow-hidden flex flex-col h-full relative border border-white/90 shadow-[0_20px_50px_-10px_rgba(2,132,199,0.16)]">
       {/* Header */}
-      <header className="flex items-center justify-between px-5 pt-5 pb-3.5 border-b border-slate-200/70">
-        <h2 className="text-[17px] font-extrabold text-slate-900 flex items-center gap-2 tracking-tight">
-          <FileText className="h-4.5 w-4.5 text-sky-600" />
-          Project Details
+      <header className="flex items-center justify-between px-5 pt-5 pb-3.5 border-b border-slate-200/80 bg-white/40">
+        <h2 className="text-[17px] font-black text-slate-950 flex items-center gap-2.5 tracking-tight">
+          <FileText className="h-5 w-5 text-sky-600" />
+          Project Details &amp; Profile
         </h2>
         <div className="flex items-center gap-2">
           {onOpenPreview && (
             <button
               onClick={onOpenPreview}
-              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold text-white bg-sky-600 hover:bg-sky-700 transition shadow-xs"
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black text-white bg-sky-600 hover:bg-sky-700 transition shadow-xs"
               title="Open full interactive preview dossier"
             >
-              <Eye className="h-3.5 w-3.5" /> Preview
+              <Eye className="h-3.5 w-3.5" /> Preview Dossier
             </button>
           )}
           {onToggleExpand && (
             <button
               onClick={onToggleExpand}
-              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold text-slate-700 bg-white/85 border border-slate-200 hover:bg-sky-50 hover:text-sky-700 transition-all shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-black text-slate-700 bg-white/90 border border-slate-200/90 hover:bg-sky-50 hover:text-sky-800 transition-all shadow-2xs"
               title={isExpanded ? 'Collapse to side panel' : 'Expand to wide view'}
             >
               {isExpanded ? (
@@ -1682,21 +1832,21 @@ function ProjectDetailsPanel({
           <button
             onClick={() => project && setShowEditModal(true)}
             disabled={!project}
-            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[11px] font-bold text-slate-700 bg-white/85 border border-slate-200 hover:bg-sky-50 hover:text-sky-700 transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-[11.5px] font-black text-sky-900 bg-sky-100/90 border border-sky-300 hover:bg-sky-200 transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Pencil className="h-3.5 w-3.5 text-sky-600" /> Edit
+            <Pencil className="h-3.5 w-3.5 text-sky-700" /> Edit Project Details
           </button>
         </div>
       </header>
 
-      {/* Edit Project Modal */}
+      {/* Upgraded 15-Field Edit Project Modal */}
       <AnimatePresence>
         {showEditModal && project && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 overflow-y-auto"
             onClick={(e) => { if (e.target === e.currentTarget) setShowEditModal(false) }}
           >
             <motion.div
@@ -1704,68 +1854,208 @@ function ProjectDetailsPanel({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 16 }}
               transition={{ duration: 0.2 }}
-              className="bg-white rounded-[24px] shadow-2xl w-full max-w-lg p-6 border border-slate-200"
+              className="bg-white/95 backdrop-blur-2xl rounded-[28px] shadow-2xl w-full max-w-2xl p-6 md:p-7 border border-white/90 max-h-[90vh] flex flex-col"
             >
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-[18px] font-extrabold text-slate-900">Edit Project</h3>
-                <button onClick={() => setShowEditModal(false)} className="rounded-xl p-2 hover:bg-slate-100 transition-colors">
-                  <X className="h-4 w-4 text-slate-600" />
+              <div className="flex items-center justify-between pb-4 border-b border-slate-200/80 mb-5">
+                <div>
+                  <h3 className="text-[19px] font-black text-slate-950 flex items-center gap-2">
+                    <Pencil className="h-5 w-5 text-sky-600" />
+                    Edit Project Specifications
+                  </h3>
+                  <p className="text-[12px] text-slate-600 font-medium mt-0.5">
+                    Update identification, statutory clearances, site capacity, and ESG scope
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="rounded-xl p-2 hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+                >
+                  <X className="h-5 w-5" />
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Project Name</label>
-                  <input
-                    value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
-                  />
+              <div className="space-y-5 overflow-y-auto pr-1 scroll-elegant flex-1">
+                {/* 1. Identity & Division */}
+                <div className="rounded-2xl bg-slate-50/80 p-4 border border-slate-200/80 space-y-3.5">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-sky-800 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" /> Project Identity &amp; Division
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Project Name</label>
+                      <input
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Project Code</label>
+                      <input
+                        value={editCode}
+                        onChange={e => setEditCode(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Business Unit (Division)</label>
+                      <input
+                        value={editBu}
+                        onChange={e => setEditBu(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Operational Status</label>
+                      <select
+                        value={editStatus}
+                        onChange={e => setEditStatus(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      >
+                        {STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Geographic Location / Site Address</label>
+                    <input
+                      value={editLocation}
+                      onChange={e => setEditLocation(e.target.value)}
+                      placeholder="e.g. Gajwel, Siddipet District, Telangana, India"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Location</label>
-                  <input
-                    value={editLocation}
-                    onChange={e => setEditLocation(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
-                  />
+
+                {/* 2. Engineering & Operational Parameters */}
+                <div className="rounded-2xl bg-slate-50/80 p-4 border border-slate-200/80 space-y-3.5">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" /> Engineering Scale &amp; Facility Timeline
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Capacity / Grid Scale</label>
+                      <input
+                        value={editCapacity}
+                        onChange={e => setEditCapacity(e.target.value)}
+                        placeholder="e.g. 250 MWp DC / 200 MW AC"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">COD Date (Commissioning)</label>
+                      <input
+                        value={editCod}
+                        onChange={e => setEditCod(e.target.value)}
+                        placeholder="e.g. 18 Dec 2023"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Land Area / Footprint</label>
+                      <input
+                        value={editLandArea}
+                        onChange={e => setEditLandArea(e.target.value)}
+                        placeholder="e.g. 1,120 Acres"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Status</label>
-                  <select
-                    value={editStatus}
-                    onChange={e => setEditStatus(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60"
-                  >
-                    {STATUS_OPTIONS.filter(o => o.value !== 'all').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
+
+                {/* 3. Leadership & Statutory Clearances */}
+                <div className="rounded-2xl bg-slate-50/80 p-4 border border-slate-200/80 space-y-3.5">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                    <Shield className="h-3.5 w-3.5" /> Leadership, Client &amp; Statutory Permits
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Project Director / Head</label>
+                      <input
+                        value={editProjectHead}
+                        onChange={e => setEditProjectHead(e.target.value)}
+                        placeholder="e.g. Er. K. Venkataramana"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Lead Contact Email</label>
+                      <input
+                        value={editLeadContact}
+                        onChange={e => setEditLeadContact(e.target.value)}
+                        placeholder="e.g. project.head@meilgroup.com"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Client / Offtaker</label>
+                      <input
+                        value={editClient}
+                        onChange={e => setEditClient(e.target.value)}
+                        placeholder="e.g. NTPC Limited & TSREDCO"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Consent to Operate (CTO No.)</label>
+                      <input
+                        value={editCtoNumber}
+                        onChange={e => setEditCtoNumber(e.target.value)}
+                        placeholder="e.g. TSPCB/NZB/CTO/2026-9042"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">CTO Expiry Date</label>
+                      <input
+                        value={editCtoExpiry}
+                        onChange={e => setEditCtoExpiry(e.target.value)}
+                        placeholder="e.g. 31 Dec 2028"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-extrabold text-slate-700 mb-1 block">Environmental Clearance (EC No.)</label>
+                      <input
+                        value={editEcNumber}
+                        onChange={e => setEditEcNumber(e.target.value)}
+                        placeholder="e.g. SEIAA/TS/EC/SOL/2021/892"
+                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 mb-1.5 block">Notes / Comments</label>
+
+                {/* 4. Scope & ESG Alignment */}
+                <div className="rounded-2xl bg-slate-50/80 p-4 border border-slate-200/80 space-y-2">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                    <span>Project Scope &amp; Environmental Description</span>
+                    <span className="text-sky-700 font-extrabold text-[10.5px]">SEBI BRSR Core Principal 6</span>
+                  </div>
                   <textarea
-                    value={editNotes}
-                    onChange={e => setEditNotes(e.target.value)}
-                    rows={3}
-                    placeholder="Add notes about this project..."
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400/60 resize-none"
+                    value={editOverviewText}
+                    onChange={e => setEditOverviewText(e.target.value)}
+                    rows={4}
+                    placeholder="Provide operational details, environmental management plans, and BRSR alignment..."
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-[13px] font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500 shadow-2xs resize-none"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-slate-200/80">
                 <button
                   onClick={() => setShowEditModal(false)}
-                  className="rounded-xl px-4 py-2 text-[12px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  className="rounded-xl px-4 py-2.5 text-[12.5px] font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveEdit}
-                  className="rounded-xl px-5 py-2 text-[12px] font-bold text-white bg-sky-600 hover:bg-sky-700 transition-colors inline-flex items-center gap-1.5 shadow-sm"
+                  className="rounded-xl px-5 py-2.5 text-[12.5px] font-black text-white bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 transition-all inline-flex items-center gap-2 shadow-md shadow-sky-600/20 active:scale-98"
                 >
-                  <Save className="h-3.5 w-3.5" /> Save Changes
+                  <Save className="h-4 w-4" /> Save All Project Details
                 </button>
               </div>
             </motion.div>
@@ -1902,12 +2192,30 @@ function ProjectDetailsPanel({
             >
               {tab === 'overview' && (
                 <div className="space-y-4">
+                  {/* METADATA GRID HEADER */}
+                  <div className="flex items-center justify-between pb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="h-6 w-6 rounded-lg bg-sky-100 border border-sky-300 text-sky-700 flex items-center justify-center font-bold">
+                        <Gauge className="h-3.5 w-3.5" />
+                      </span>
+                      <h4 className="text-[13.5px] font-black text-slate-950 tracking-tight">
+                        Core Facility Specifications &amp; Clearances
+                      </h4>
+                    </div>
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] font-black text-sky-800 bg-sky-100/90 border border-sky-300 hover:bg-sky-200 transition-all shadow-2xs"
+                    >
+                      <Pencil className="h-3 w-3 text-sky-700" /> Update Details
+                    </button>
+                  </div>
+
                   {/* METADATA GRID */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                     <DetailRow
                       icon={Hash}
                       label="Project Code"
-                      value={<span className="font-mono text-sky-800 font-bold">{project.projectCode}</span>}
+                      value={<span className="font-mono text-sky-950 font-black">{project.projectCode}</span>}
                     />
                     <DetailRow
                       icon={Building2}
@@ -1931,7 +2239,7 @@ function ProjectDetailsPanel({
                     />
                     <DetailRow
                       icon={UserCheck}
-                      label="Project Lead"
+                      label="Project Director"
                       value={profile.projectHead.split(',')[0]}
                     />
                     <DetailRow
@@ -1941,18 +2249,36 @@ function ProjectDetailsPanel({
                     />
                     <DetailRow
                       icon={Shield}
-                      label="CTO Permit"
-                      value={<span className="font-mono text-[11px] text-emerald-800 font-bold">{profile.ctoNumber}</span>}
+                      label="CTO Permit Ref"
+                      value={<span className="font-mono text-[11px] text-emerald-900 font-black">{profile.ctoNumber}</span>}
                     />
+                    {profile.ecNumber && (
+                      <DetailRow
+                        icon={FileCheck2}
+                        label="EC Clearance Ref"
+                        value={<span className="font-mono text-[11px] text-sky-900 font-black">{profile.ecNumber}</span>}
+                      />
+                    )}
+                    {profile.landArea && (
+                      <DetailRow
+                        icon={MapPin}
+                        label="Land Footprint"
+                        value={profile.landArea}
+                      />
+                    )}
                   </div>
 
                   {/* SCOPE DESCRIPTION */}
-                  <div className="rounded-2xl bg-white/75 p-3.5 border border-white/95 shadow-2xs">
-                    <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1 flex items-center justify-between">
-                      <span>Project Scope &amp; ESG Alignment</span>
-                      <span className="text-sky-700 text-[10px]">SEBI BRSR Core Principal 6</span>
+                  <div className="rounded-2xl bg-white/90 p-4 border border-slate-200/90 shadow-2xs backdrop-blur-md">
+                    <div className="text-[11px] uppercase tracking-wider text-slate-700 font-black mb-1.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-slate-900">
+                        <FileText className="h-3.5 w-3.5 text-sky-600" /> Project Scope &amp; ESG Alignment
+                      </span>
+                      <span className="text-sky-800 font-extrabold text-[10.5px] bg-sky-100/90 px-2 py-0.5 rounded-full border border-sky-300">
+                        SEBI BRSR Core Principal 6
+                      </span>
                     </div>
-                    <p className="text-[12.5px] text-slate-700 leading-relaxed font-medium">
+                    <p className="text-[13px] text-slate-800 leading-relaxed font-semibold">
                       {profile.overviewText}
                     </p>
                   </div>
@@ -2287,12 +2613,12 @@ function ProjectDetailsPanel({
 
 function DetailRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: React.ElementType }) {
   return (
-    <div className="min-w-0 rounded-xl bg-white/75 p-3 border border-white/95 shadow-2xs hover:bg-white/95 hover:shadow-xs transition-all">
-      <div className="flex items-center gap-1.5 mb-1">
-        {Icon && <Icon className="h-3 w-3 text-sky-600 shrink-0" />}
-        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold truncate">{label}</span>
+    <div className="min-w-0 rounded-2xl bg-white/90 p-3.5 border border-slate-200/90 shadow-2xs hover:bg-white hover:border-sky-300 hover:shadow-xs transition-all backdrop-blur-md">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        {Icon && <Icon className="h-3.5 w-3.5 text-sky-600 shrink-0" />}
+        <span className="text-[10px] uppercase tracking-wider text-slate-600 font-extrabold truncate">{label}</span>
       </div>
-      <div className="text-[13px] font-bold text-slate-900 truncate">{value}</div>
+      <div className="text-[13.5px] font-black text-slate-950 truncate leading-snug">{value}</div>
     </div>
   )
 }
@@ -2582,7 +2908,7 @@ function EmptyState({ message }: { message: string }) {
  * Main component — 3 hard-locked rows with BU Choice & Preview
  * ============================================================ */
 export function MyProjectModule() {
-  const { setActiveModule } = useApp()
+  const { setActiveModule, selectedProjectId: appProjectId, setSelectedProjectId: setAppProjectId } = useApp()
 
   const [overview, setOverview] = useState<OverviewData | null>(null)
   const [tree, setTree] = useState<OrgTree | null>(null)
@@ -2593,7 +2919,6 @@ export function MyProjectModule() {
   const [projectSubs, setProjectSubs] = useState<SubmissionItem[]>([])
   const [projectEvidence, setProjectEvidence] = useState<EvidenceItem[]>([])
 
-  const { selectedProjectId: appProjectId } = useApp()
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [previewProjectId, setPreviewProjectId] = useState<string | null>(null)
 
@@ -2793,80 +3118,29 @@ export function MyProjectModule() {
           {selectedProject && (
             <button
               onClick={() => setPreviewProjectId(selectedProject.id)}
-              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-700 transition shadow-xs"
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 transition shadow-xs"
             >
               <Eye className="h-3.5 w-3.5" /> Preview Dossier
             </button>
           )}
-          <button
-            onClick={() => setActiveModule('submissions' as ModuleKey)}
-            className="glass-subtle flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-white/80"
-          >
-            <Send className="h-3.5 w-3.5 text-sky-600" /> Submit
-          </button>
         </div>
       </motion.div>
 
       {/* ====================================================== */}
-      {/* ROW 1: 4 EQUAL KPI CARDS                               */}
-      {/* ====================================================== */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-        <KpiCardRow1
-          icon={Briefcase}
-          tone="bg-sky-50 text-sky-600 border border-sky-200/80"
-          label="Total Assigned Projects"
-          value={allProjects.length}
-          subText={`${uniqueBUCount} Business Unit${uniqueBUCount === 1 ? '' : 's'}`}
-          rightContent={<Layers className="h-4 w-4 text-sky-400" />}
-          delay={0.05}
-        />
-
-        <KpiCardRow1
-          icon={FileCheck2}
-          tone="bg-emerald-50 text-emerald-600 border border-emerald-200/80"
-          label="Data Completion"
-          value={<>{k.completion.toFixed(0)}<span className="text-[15px] font-bold ml-0.5">%</span></>}
-          subText="Portfolio reporting coverage"
-          rightContent={
-            <div className="flex flex-col items-end gap-1">
-              <CircularRing pct={k.completion} size={44} stroke={4} labelSize={10} color={k.completion >= 70 ? '#10B981' : k.completion >= 40 ? '#F59E0B' : '#0EA5E9'} />
-              <span className={`status-pill text-[8.5px] ${trendTone}`}>
-                {approvedSubs}/{totalSubs} subs
-              </span>
-            </div>
-          }
-          delay={0.1}
-        />
-
-        <KpiCardRow1
-          icon={FileText}
-          tone="bg-amber-50 text-amber-600 border border-amber-200/80"
-          label="Pending Submissions"
-          value={pendingSubs}
-          subText={`Across ${filteredProjects.length || allProjects.length} Project${(filteredProjects.length || allProjects.length) === 1 ? '' : 's'}`}
-          rightContent={<RefreshCw className="h-4 w-4 text-amber-400" />}
-          delay={0.15}
-        />
-
-        <KpiCardRow1
-          icon={Shield}
-          tone="bg-emerald-50 text-emerald-600 border border-emerald-200/80"
-          label="Approved Submissions"
-          value={approvedSubs}
-          subText={currentPeriodLabel}
-          rightContent={<CheckCircle2 className="h-4 w-4 text-emerald-400" />}
-          delay={0.2}
-        />
-      </div>
-
-      {/* ====================================================== */}
-      {/* BUSINESS UNIT CHOOSER BAR (Choose BU -> Filter & Select) */}
+      {/* BUSINESS UNIT CHOOSER & ASSIGNED PROJECTS SELECTOR     */}
       {/* ====================================================== */}
       <BusinessUnitSelectorBar
         businessUnits={uniqueBUs}
         activeBu={buFilter}
         onSelectBu={handleSelectBusinessUnit}
         projects={allProjects}
+        selectedProjectId={selectedProjectId}
+        onSelectProject={(id) => {
+          setSelectedProjectId(id)
+          try {
+            setAppProjectId(id)
+          } catch {}
+        }}
       />
 
       {/* ====================================================== */}
