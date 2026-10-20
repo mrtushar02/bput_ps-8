@@ -22,6 +22,7 @@ import {
   FileCheck2, Sparkles, TrendingUp, HelpCircle, Layers, Check, ExternalLink,
   Upload, RotateCcw, Download, Eye, FileSpreadsheet, Image as ImageIcon,
   Maximize2, Minimize2, ZoomIn, ZoomOut, X, FileQuestion,
+  Plus, Trash2, Edit3, ArrowRight, ArrowLeft, Sun, Fuel, ListOrdered,
   type LucideIcon,
 } from 'lucide-react'
 import { useApp } from '@/lib/auth-context'
@@ -397,6 +398,12 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
   const [reviewEvidence, setReviewEvidence] = useState<EvidenceItem | null>(null)
   const [isFlipped, setIsFlipped] = useState(false)
 
+  // Shared: opens the right-side engine panel's document review flip side
+  const handleReviewEvidence = useCallback((ev: EvidenceItem) => {
+    setReviewEvidence(ev)
+    setIsFlipped(true)
+  }, [])
+
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || null
   const selectedPeriod = periods.find((p) => p.id === selectedPeriodId) || null
 
@@ -749,6 +756,8 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
                     readOnly={readOnly}
                     formStateRef={formStateRef}
                     onSaved={handleSaved}
+                    onEvidenceUploaded={refreshEvidence}
+                    onReviewEvidence={handleReviewEvidence}
                   />
                 )}
                 {activeLevelKey === 'level2' && (
@@ -759,6 +768,8 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
                     readOnly={readOnly}
                     formStateRef={formStateRef}
                     onSaved={handleSaved}
+                    onEvidenceUploaded={refreshEvidence}
+                    onReviewEvidence={handleReviewEvidence}
                   />
                 )}
                 {activeLevelKey === 'level3' && (
@@ -769,6 +780,8 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
                     readOnly={readOnly}
                     formStateRef={formStateRef}
                     onSaved={handleSaved}
+                    onEvidenceUploaded={refreshEvidence}
+                    onReviewEvidence={handleReviewEvidence}
                   />
                 )}
                 {activeLevelKey === 'level4' && (
@@ -779,6 +792,8 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
                     readOnly={readOnly}
                     formStateRef={formStateRef}
                     onSaved={handleSaved}
+                    onEvidenceUploaded={refreshEvidence}
+                    onReviewEvidence={handleReviewEvidence}
                   />
                 )}
                 {activeLevelKey === 'level5' && (
@@ -809,6 +824,8 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
                     readOnly={readOnly}
                     formStateRef={formStateRef}
                     onSaved={handleSaved}
+                    onEvidenceUploaded={refreshEvidence}
+                    onReviewEvidence={handleReviewEvidence}
                   />
                 )}
                 {activeLevelKey === 'level8' && (
@@ -829,6 +846,8 @@ export function DataEntryModule({ subModule: subModuleProp }: { subModule: strin
                     readOnly={readOnly}
                     formStateRef={formStateRef}
                     onSaved={handleSaved}
+                    onEvidenceUploaded={refreshEvidence}
+                    onReviewEvidence={handleReviewEvidence}
                   />
                 )}
               </motion.div>
@@ -1398,11 +1417,15 @@ function FlippableEngineEvidencePanel({
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)',
+              // Inline (not classes): .glass-shimmer's `position: relative` in
+              // globals.css would otherwise override Tailwind's `absolute`,
+              // pushing the flipped face below the front face in document flow.
+              position: 'absolute',
+              inset: 0,
+              overflowY: 'auto',
             }}
-            className={`glass glass-shimmer min-h-[720px] rounded-[22px] p-5 shadow-xl border border-blue-200/70 bg-gradient-to-b from-white/95 to-blue-50/70 transition-opacity duration-300 flex flex-col justify-between ${
-              !isFlipped
-                ? 'absolute inset-0 pointer-events-none invisible opacity-0'
-                : 'relative z-10 opacity-100'
+            className={`z-10 glass glass-shimmer min-h-[720px] rounded-[22px] p-5 shadow-xl border border-blue-200/70 bg-gradient-to-b from-white/95 to-blue-50/70 transition-opacity duration-300 scroll-elegant flex flex-col ${
+              !isFlipped ? 'pointer-events-none invisible opacity-0' : 'opacity-100'
             }`}
           >
             <EvidenceReviewBackface
@@ -1882,17 +1905,17 @@ function EvidenceReviewBackface({
                 </div>
               </div>
             ) : (
-              <div className="relative h-full w-full min-h-[200px] flex flex-col">
+              <div className="relative h-full w-full min-h-[320px] flex flex-col">
                 <object
                   data={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0`}
                   type="application/pdf"
-                  className="w-full h-full min-h-[190px] rounded-lg border border-slate-100"
+                  className="w-full flex-1 min-h-[320px] rounded-lg border border-slate-100"
                   onError={() => setIframeError(true)}
                 >
                   <iframe
                     src={`${fileUrl}#toolbar=0`}
                     title={evidence.fileName}
-                    className="w-full h-full min-h-[190px] rounded-lg border border-slate-100"
+                    className="w-full flex-1 min-h-[320px] rounded-lg border border-slate-100"
                     onError={() => setIframeError(true)}
                   />
                 </object>
@@ -2152,6 +2175,266 @@ function EvidencePicker({
 }
 
 /* ============================================================
+   IN-FORM EVIDENCE ATTACH SECTION (AFTER REMARKS)
+   Upload + attach stored evidence documents directly inside the
+   level form, right before saving — mirrors the Engine Preview
+   panel's repository so both stay in sync.
+   ============================================================ */
+interface FormEvidenceAttachSectionProps {
+  projectId: string
+  periodId: string
+  moduleKey: string
+  evidence: EvidenceItem[]
+  onUploaded: () => Promise<void>
+  selectedEvidenceId: string | null
+  onSelectEvidence: (id: string | null) => void
+  onReview?: (ev: EvidenceItem) => void
+  readOnly: boolean
+}
+
+function FormEvidenceAttachSection({
+  projectId,
+  periodId,
+  moduleKey,
+  evidence,
+  onUploaded,
+  selectedEvidenceId,
+  onSelectEvidence,
+  onReview,
+  readOnly,
+}: FormEvidenceAttachSectionProps) {
+  const [uploading, setUploading] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleUploadFile = async (file: File) => {
+    if (!file || readOnly) return
+    setUploading(true)
+    const toastId = toast.loading(`Uploading ${file.name}...`)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('documentType', 'INVOICE')
+      fd.append('module', moduleKey)
+      if (projectId) fd.append('projectId', projectId)
+      if (periodId) fd.append('periodId', periodId)
+
+      const res = await fetch('/api/evidence', { method: 'POST', body: fd })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err?.error || 'Failed to upload evidence document')
+      }
+      const uploaded = await res.json()
+      toast.success(`${file.name} uploaded & verified!`, {
+        id: toastId,
+        description: 'Stored in Evidence Vault (SHA-256 hash created) and attached below.',
+      })
+      await onUploaded()
+      if (uploaded?.id) onSelectEvidence(uploaded.id)
+    } catch (e: any) {
+      toast.error('Upload failed', {
+        id: toastId,
+        description: e?.message || 'Please check your connection and try again.',
+      })
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const attached = evidence.find((ev) => ev.id === selectedEvidenceId) || null
+
+  return (
+    <div className="rounded-xl border border-violet-200/80 bg-gradient-to-b from-violet-50/70 to-white/80 p-3 shadow-sm">
+      {/* Header */}
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <div className="flex h-5 w-5 items-center justify-center rounded-md bg-violet-100 text-violet-600">
+            <Link2 className="h-3 w-3" />
+          </div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
+            Attach Evidence Document
+          </span>
+        </div>
+        <span className={`status-pill ${attached ? 'status-approved' : 'status-draft'}`}>
+          {attached ? 'Attached' : 'Optional'}
+        </span>
+      </div>
+
+      {/* Currently attached document */}
+      {attached && (
+        <div className="mb-2 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+            <span className="truncate text-[11px] font-bold text-emerald-900" title={attached.fileName}>
+              {attached.fileName}
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => onSelectEvidence(null)}
+            className="shrink-0 rounded-full border border-emerald-300 bg-white px-2 py-0.5 text-[9px] font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-40"
+          >
+            Detach
+          </button>
+        </div>
+      )}
+
+      {/* Upload dropzone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragActive(true)
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragActive(false)
+          const file = e.dataTransfer.files?.[0]
+          if (file) handleUploadFile(file)
+        }}
+        onClick={() => !readOnly && !uploading && fileInputRef.current?.click()}
+        className={`group flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-3 text-center transition-all ${
+          readOnly
+            ? 'cursor-not-allowed border-slate-200 bg-slate-50/60 opacity-60'
+            : dragActive
+            ? 'cursor-pointer border-violet-500 bg-violet-50/80 scale-[1.01]'
+            : 'cursor-pointer border-slate-200/90 bg-white/80 hover:border-violet-400 hover:bg-violet-50/40'
+        }`}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.doc,.docx"
+          disabled={readOnly}
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) handleUploadFile(file)
+          }}
+        />
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-50 text-violet-600 transition-transform group-hover:scale-110">
+          {uploading ? (
+            <Clock className="h-3.5 w-3.5 animate-spin text-violet-600" />
+          ) : (
+            <Upload className="h-3.5 w-3.5 text-violet-600" />
+          )}
+        </div>
+        <div className="mt-1 text-[11px] font-bold text-slate-800">
+          {uploading ? 'Processing & hashing file…' : 'Upload bill / log / certificate for this record'}
+        </div>
+        <div className="text-[9px] text-slate-500">
+          PDF, PNG, JPG, XLSX, CSV (Max 25MB · SHA-256 tamper-evident)
+        </div>
+      </div>
+
+      {/* Stored evidence cards — attach / review / download */}
+      {evidence.length > 0 && (
+        <div className="mt-2.5">
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Or pick from Evidence Vault ({evidence.length})
+          </div>
+          <div className="max-h-44 space-y-1.5 overflow-y-auto scroll-elegant pr-0.5">
+            {evidence.map((ev) => {
+              const isSelected = selectedEvidenceId === ev.id
+              return (
+                <div
+                  key={ev.id}
+                  className={`flex items-center justify-between rounded-xl border p-2 text-xs transition-all ${
+                    isSelected
+                      ? 'border-violet-300 bg-violet-50/90 shadow-xs'
+                      : 'border-slate-200/80 bg-white/90 hover:bg-violet-50/30'
+                  }`}
+                >
+                  <div className="flex min-w-0 items-center gap-2 pr-2">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                      {ev.fileName.match(/\.pdf$/i) ? (
+                        <FileText className="h-3.5 w-3.5 text-rose-500" />
+                      ) : ev.fileName.match(/\.(png|jpg|jpeg|webp)$/i) ? (
+                        <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
+                      ) : (
+                        <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] font-semibold text-slate-800" title={ev.fileName}>
+                        {ev.fileName}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
+                        <span className="font-mono">{ev.documentType}</span>
+                        {ev.fileSize ? (
+                          <>
+                            <span>•</span>
+                            <span>{(ev.fileSize / 1024).toFixed(0)} KB</span>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      disabled={readOnly}
+                      onClick={() => onSelectEvidence(isSelected ? null : ev.id)}
+                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                        isSelected
+                          ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          : 'bg-violet-600 text-white hover:bg-violet-700'
+                      }`}
+                      title={isSelected ? 'Detach this evidence from the record' : 'Attach this evidence to the record'}
+                    >
+                      {isSelected ? (
+                        <>
+                          <Check className="h-3 w-3" />
+                          <span>Attached</span>
+                        </>
+                      ) : (
+                        <>
+                          <Link2 className="h-3 w-3" />
+                          <span>Attach</span>
+                        </>
+                      )}
+                    </button>
+
+                    {onReview && (
+                      <button
+                        type="button"
+                        onClick={() => onReview(ev)}
+                        className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
+                        title="Review document (flips Engine Preview card)"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </button>
+                    )}
+
+                    <a
+                      href={`/api/evidence/${encodeURIComponent(ev.id)}/file?download=true`}
+                      download={ev.fileName}
+                      className="flex h-6 w-6 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition"
+                      title="Download document"
+                    >
+                      <Download className="h-3 w-3" />
+                    </a>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {evidence.length === 0 && (
+        <p className="mt-1.5 text-[10px] text-slate-500">
+          No documents in the vault for this project yet — upload the source document above after filling the form.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/* ============================================================
    FORM BUILDING BLOCKS
    ============================================================ */
 interface LevelFormProps {
@@ -2161,6 +2444,8 @@ interface LevelFormProps {
   readOnly: boolean
   formStateRef: React.MutableRefObject<Record<string, Record<string, any>>>
   onSaved: (r: SavedRecord, submitted?: boolean) => void
+  onEvidenceUploaded?: () => Promise<void>
+  onReviewEvidence?: (ev: EvidenceItem) => void
 }
 
 const inputClass =
@@ -2248,7 +2533,7 @@ function FormSaveActions({
 }
 
 /* ============================================================
-   LEVEL 1: ENERGY CONSUMPTION FORM
+   LEVEL 1: ENERGY CONSUMPTION FORM (MULTI-ITEM DRAFT & ORGANIZE FLOW)
    ============================================================ */
 const L1_ENERGY_SOURCES = [
   'Grid electricity',
@@ -2279,6 +2564,143 @@ const L1_DOCUMENTS = [
   'Other',
 ]
 
+export interface StagedEnergyItem {
+  id: string
+  energySource: string
+  emissionDataType: string
+  energyActivity: string
+  consumptionQuantity: string
+  unit: string
+  meterEquipmentId: string
+  openingMeterReading: string
+  closingMeterReading: string
+  energyPurchased: string
+  energyGenerated: string
+  renewableEnergyQuantity: string
+  reportingPeriod: string
+  sourceDocument: string
+  remarks: string
+  evidenceId: string
+  evidenceFileName?: string
+  factor: number
+  estTco2e: number
+  estGj: number
+}
+
+const SOURCE_PRESETS: Record<
+  string,
+  {
+    scope: string
+    activity: string
+    unit: string
+    factor: number
+    gjRate: number
+    icon: LucideIcon
+    doc: string
+    meter: string
+    defaultQty?: string
+  }
+> = {
+  'Grid electricity': {
+    scope: 'Scope 2',
+    activity: 'Lighting',
+    unit: 'kWh',
+    factor: 0.716,
+    gjRate: 0.0036,
+    icon: Zap,
+    doc: 'Electricity bill',
+    meter: 'MEIL-MTR-GRID-400KV',
+    defaultQty: '384000',
+  },
+  'Renewable electricity': {
+    scope: 'Scope 2',
+    activity: 'Office',
+    unit: 'kWh',
+    factor: 0.04,
+    gjRate: 0.0036,
+    icon: Sun,
+    doc: 'Meter log',
+    meter: 'MEIL-SOLAR-PV-01',
+    defaultQty: '510000',
+  },
+  'Diesel': {
+    scope: 'Scope 1',
+    activity: 'Generator',
+    unit: 'litres',
+    factor: 2.637,
+    gjRate: 0.0383,
+    icon: Fuel,
+    doc: 'Fuel register',
+    meter: 'MEIL-DG-500KVA-01',
+    defaultQty: '12400',
+  },
+  'Petrol': {
+    scope: 'Scope 1',
+    activity: 'Vehicles',
+    unit: 'litres',
+    factor: 2.296,
+    gjRate: 0.0348,
+    icon: Fuel,
+    doc: 'Invoice & Delivery Challan',
+    meter: 'MEIL-FLT-PETROL-01',
+    defaultQty: '1850',
+  },
+  'Gas': {
+    scope: 'Scope 1',
+    activity: 'Heating / Boiler',
+    unit: 'm³',
+    factor: 2.02,
+    gjRate: 0.038,
+    icon: Flame,
+    doc: 'Invoice & Delivery Challan',
+    meter: 'MEIL-GAS-LINE-01',
+    defaultQty: '4200',
+  },
+  'LPG': {
+    scope: 'Scope 1',
+    activity: 'Heating / Boiler',
+    unit: 'kg',
+    factor: 2.98,
+    gjRate: 0.046,
+    icon: Flame,
+    doc: 'Invoice & Delivery Challan',
+    meter: 'MEIL-LPG-CYL-01',
+    defaultQty: '960',
+  },
+  'Coal': {
+    scope: 'Scope 1',
+    activity: 'Heating / Boiler',
+    unit: 'tonnes',
+    factor: 1.9,
+    gjRate: 0.0227,
+    icon: Flame,
+    doc: 'Invoice & Delivery Challan',
+    meter: 'MEIL-BOILER-COAL-01',
+    defaultQty: '25',
+  },
+  'Other': {
+    scope: 'Scope 2',
+    activity: 'Other',
+    unit: 'kWh',
+    factor: 0.716,
+    gjRate: 0.0036,
+    icon: Zap,
+    doc: 'Other',
+    meter: 'MEIL-MTR-MISC-01',
+    defaultQty: '1000',
+  },
+}
+
+function calculateItemEmissions(source: string, quantityStr: string) {
+  const qty = Number(quantityStr) || 0
+  const preset = SOURCE_PRESETS[source] || SOURCE_PRESETS['Grid electricity']
+  const factor = preset.factor
+  const gjRate = preset.gjRate
+  const estTco2e = qty > 0 ? (qty * factor) / 1000 : 0
+  const estGj = qty > 0 ? qty * gjRate : 0
+  return { factor, gjRate, estTco2e, estGj }
+}
+
 function Level1EnergyForm({
   projectId,
   periodId,
@@ -2286,62 +2708,400 @@ function Level1EnergyForm({
   readOnly,
   formStateRef,
   onSaved,
+  onEvidenceUploaded,
+  onReviewEvidence,
 }: LevelFormProps) {
   const key = `l1-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
 
-  const [energySource, setEnergySource] = useState(initial.energySource ?? 'Grid electricity')
-  const [energyActivity, setEnergyActivity] = useState(initial.energyActivity ?? 'Lighting')
-  const [consumptionQuantity, setConsumptionQuantity] = useState(initial.consumptionQuantity ?? '384000')
-  const [unit, setUnit] = useState(initial.unit ?? 'kWh')
-  const [meterEquipmentId, setMeterEquipmentId] = useState(initial.meterEquipmentId ?? 'MEIL-MTR-GRID-400KV')
-  const [openingMeterReading, setOpeningMeterReading] = useState(initial.openingMeterReading ?? '124500')
-  const [closingMeterReading, setClosingMeterReading] = useState(initial.closingMeterReading ?? '508500')
-  const [energyPurchased, setEnergyPurchased] = useState(initial.energyPurchased ?? '384000')
-  const [energyGenerated, setEnergyGenerated] = useState(initial.energyGenerated ?? '510000')
-  const [renewableEnergyQuantity, setRenewableEnergyQuantity] = useState(initial.renewableEnergyQuantity ?? '510000')
-  const [reportingPeriod, setReportingPeriod] = useState(initial.reportingPeriod ?? 'FY 2026-27 (Annual)')
-  const [sourceDocument, setSourceDocument] = useState(initial.sourceDocument ?? 'Electricity bill')
-  const [remarks, setRemarks] = useState(initial.remarks ?? 'Reconciled with TGSPDCL utility invoice & captive solar generation log (Total 3,931.60 GJ; 46.7% renewable).')
-  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
+  // Multi-source staged draft items collection
+  const [stagedItems, setStagedItems] = useState<StagedEnergyItem[]>(() => {
+    if (Array.isArray(initial.items) && initial.items.length > 0) {
+      return initial.items
+    }
+    if (initial.energySource && initial.consumptionQuantity && Number(initial.consumptionQuantity) > 0) {
+      const calc = calculateItemEmissions(initial.energySource, initial.consumptionQuantity)
+      return [
+        {
+          id: `item-${Date.now()}-0`,
+          energySource: initial.energySource,
+          emissionDataType: initial.emissionDataType || 'Scope 2',
+          energyActivity: initial.energyActivity || 'Lighting',
+          consumptionQuantity: String(initial.consumptionQuantity),
+          unit: initial.unit || 'kWh',
+          meterEquipmentId: initial.meterEquipmentId || 'MEIL-MTR-GRID-400KV',
+          openingMeterReading: initial.openingMeterReading || '124500',
+          closingMeterReading: initial.closingMeterReading || '508500',
+          energyPurchased: initial.energyPurchased || '384000',
+          energyGenerated: initial.energyGenerated || '510000',
+          renewableEnergyQuantity: initial.renewableEnergyQuantity || '510000',
+          reportingPeriod: initial.reportingPeriod || 'FY 2026-27 (Annual)',
+          sourceDocument: initial.sourceDocument || 'Electricity bill',
+          remarks: initial.remarks || 'Reconciled with utility invoice.',
+          evidenceId: initial.evidenceId || '',
+          factor: calc.factor,
+          estTco2e: calc.estTco2e,
+          estGj: calc.estGj,
+        },
+      ]
+    }
+    // Seed standard initial item so form is ready to use
+    const calc = calculateItemEmissions('Grid electricity', '384000')
+    return [
+      {
+        id: 'item-initial-grid',
+        energySource: 'Grid electricity',
+        emissionDataType: 'Scope 2',
+        energyActivity: 'Lighting',
+        consumptionQuantity: '384000',
+        unit: 'kWh',
+        meterEquipmentId: 'MEIL-MTR-GRID-400KV',
+        openingMeterReading: '124500',
+        closingMeterReading: '508500',
+        energyPurchased: '384000',
+        energyGenerated: '510000',
+        renewableEnergyQuantity: '510000',
+        reportingPeriod: 'FY 2026-27 (Annual)',
+        sourceDocument: 'Electricity bill',
+        remarks: 'Reconciled with TGSPDCL utility invoice & captive solar generation log.',
+        evidenceId: '',
+        factor: calc.factor,
+        estTco2e: calc.estTco2e,
+        estGj: calc.estGj,
+      },
+    ]
+  })
+
+  // View Step: 'ENTRY' (input/draft each item) | 'ORGANIZED' (all items organized in one consolidated view)
+  const [viewStep, setViewStep] = useState<'ENTRY' | 'ORGANIZED'>(
+    initial.viewStep === 'ORGANIZED' ? 'ORGANIZED' : 'ENTRY'
+  )
+
+  // Currently editing item id (if null, creating new source item)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+
+  // Active form inputs for the selected Energy Source item
+  const [energySource, setEnergySource] = useState('Grid electricity')
+  const [emissionDataType, setEmissionDataType] = useState('Scope 2')
+  const [energyActivity, setEnergyActivity] = useState('Lighting')
+  const [consumptionQuantity, setConsumptionQuantity] = useState('384000')
+  const [unit, setUnit] = useState('kWh')
+  const [meterEquipmentId, setMeterEquipmentId] = useState('MEIL-MTR-GRID-400KV')
+  const [openingMeterReading, setOpeningMeterReading] = useState('124500')
+  const [closingMeterReading, setClosingMeterReading] = useState('508500')
+  const [energyPurchased, setEnergyPurchased] = useState('384000')
+  const [energyGenerated, setEnergyGenerated] = useState('510000')
+  const [renewableEnergyQuantity, setRenewableEnergyQuantity] = useState('510000')
+  const [reportingPeriod, setReportingPeriod] = useState('FY 2026-27 (Annual)')
+  const [sourceDocument, setSourceDocument] = useState('Electricity bill')
+  const [remarks, setRemarks] = useState(
+    'Reconciled with TGSPDCL utility invoice & captive solar generation log (Total 3,931.60 GJ; 46.7% renewable).'
+  )
+  const [evidenceId, setEvidenceId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Switch energy source or click on an existing staged item
+  const handleSelectSource = (src: string) => {
+    setError('')
+    setEnergySource(src)
+    const existing = stagedItems.find((i) => i.energySource === src)
+    if (existing) {
+      // Load existing staged item for editing
+      setEditingItemId(existing.id)
+      setEmissionDataType(existing.emissionDataType)
+      setEnergyActivity(existing.energyActivity)
+      setConsumptionQuantity(existing.consumptionQuantity)
+      setUnit(existing.unit)
+      setMeterEquipmentId(existing.meterEquipmentId)
+      setOpeningMeterReading(existing.openingMeterReading)
+      setClosingMeterReading(existing.closingMeterReading)
+      setEnergyPurchased(existing.energyPurchased)
+      setEnergyGenerated(existing.energyGenerated)
+      setRenewableEnergyQuantity(existing.renewableEnergyQuantity)
+      setReportingPeriod(existing.reportingPeriod)
+      setSourceDocument(existing.sourceDocument)
+      setRemarks(existing.remarks)
+      setEvidenceId(existing.evidenceId)
+    } else {
+      // Load preset smart defaults for a clean new entry
+      setEditingItemId(null)
+      const preset = SOURCE_PRESETS[src] || SOURCE_PRESETS['Grid electricity']
+      setEmissionDataType(preset.scope)
+      setEnergyActivity(preset.activity)
+      setConsumptionQuantity(preset.defaultQty || '')
+      setUnit(preset.unit)
+      setMeterEquipmentId(preset.meter)
+      setOpeningMeterReading('')
+      setClosingMeterReading('')
+      setEnergyPurchased('')
+      setEnergyGenerated(src.includes('Renewable') ? '510000' : '')
+      setRenewableEnergyQuantity(src.includes('Renewable') ? '510000' : '')
+      setSourceDocument(preset.doc)
+      setRemarks(`Measured on site for ${src}. Verified with primary documentation.`)
+      setEvidenceId('')
+    }
+  }
+
+  // Load an existing staged item into the form fields
+  const handleEditStagedItem = (item: StagedEnergyItem) => {
+    setError('')
+    setViewStep('ENTRY')
+    setEditingItemId(item.id)
+    setEnergySource(item.energySource)
+    setEmissionDataType(item.emissionDataType)
+    setEnergyActivity(item.energyActivity)
+    setConsumptionQuantity(item.consumptionQuantity)
+    setUnit(item.unit)
+    setMeterEquipmentId(item.meterEquipmentId)
+    setOpeningMeterReading(item.openingMeterReading)
+    setClosingMeterReading(item.closingMeterReading)
+    setEnergyPurchased(item.energyPurchased)
+    setEnergyGenerated(item.energyGenerated)
+    setRenewableEnergyQuantity(item.renewableEnergyQuantity)
+    setReportingPeriod(item.reportingPeriod)
+    setSourceDocument(item.sourceDocument)
+    setRemarks(item.remarks)
+    setEvidenceId(item.evidenceId)
+    toast.info(`Editing ${item.energySource}`, {
+      description: 'Update the fields below and click Update Draft Item.',
+    })
+  }
+
+  // Remove a staged item from the draft list
+  const handleRemoveStagedItem = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    setStagedItems((prev) => {
+      const next = prev.filter((i) => i.id !== id)
+      toast.success('Source item removed from draft')
+      return next
+    })
+    if (editingItemId === id) {
+      setEditingItemId(null)
+    }
+  }
+
+  // SPECIAL ADD BUTTON: Works like a draft for this energy source item
+  const handleAddOrUpdateItem = () => {
+    setError('')
+    const qtyVal = Number(consumptionQuantity)
+    if (!consumptionQuantity || isNaN(qtyVal) || qtyVal <= 0) {
+      setError(`Please enter a valid consumption quantity (> 0) for ${energySource}.`)
+      return false
+    }
+
+    const { factor, gjRate, estTco2e, estGj } = calculateItemEmissions(energySource, consumptionQuantity)
+    const attachedEv = evidence.find((ev) => ev.id === evidenceId)
+
+    const newItem: StagedEnergyItem = {
+      id: editingItemId || `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      energySource,
+      emissionDataType,
+      energyActivity,
+      consumptionQuantity,
+      unit,
+      meterEquipmentId,
+      openingMeterReading,
+      closingMeterReading,
+      energyPurchased,
+      energyGenerated,
+      renewableEnergyQuantity,
+      reportingPeriod,
+      sourceDocument,
+      remarks,
+      evidenceId,
+      evidenceFileName: attachedEv?.fileName,
+      factor,
+      estTco2e,
+      estGj,
+    }
+
+    setStagedItems((prev) => {
+      const existsIndex = prev.findIndex((i) => i.id === newItem.id || i.energySource === newItem.energySource)
+      if (existsIndex >= 0) {
+        const copy = [...prev]
+        copy[existsIndex] = newItem
+        return copy
+      }
+      return [...prev, newItem]
+    })
+
+    toast.success(
+      editingItemId
+        ? `✓ ${energySource} updated in draft list!`
+        : `✓ ${energySource} added to draft list!`,
+      {
+        description: `${Number(consumptionQuantity).toLocaleString()} ${unit} · ${estTco2e.toFixed(2)} tCO₂e. Choose second source item or click Next to organize.`,
+      }
+    )
+
+    setEditingItemId(null)
+
+    // Suggest next un-staged source so user can easily enter the second source item
+    const stagedSources = new Set([...stagedItems.map((i) => i.energySource), energySource])
+    const nextUnstaged = L1_ENERGY_SOURCES.find((s) => !stagedSources.has(s))
+    if (nextUnstaged) {
+      const preset = SOURCE_PRESETS[nextUnstaged]
+      setEnergySource(nextUnstaged)
+      setEmissionDataType(preset.scope)
+      setEnergyActivity(preset.activity)
+      setConsumptionQuantity('')
+      setUnit(preset.unit)
+      setMeterEquipmentId(preset.meter)
+      setOpeningMeterReading('')
+      setClosingMeterReading('')
+      setEnergyPurchased('')
+      setEnergyGenerated('')
+      setRenewableEnergyQuantity('')
+      setSourceDocument(preset.doc)
+      setRemarks(`Fuel/energy record for ${nextUnstaged}.`)
+      setEvidenceId('')
+    }
+
+    return true
+  }
+
+  // SPECIAL NEXT BUTTON: Organizes all items details in one consolidated summary
+  const handleNextOrganize = () => {
+    setError('')
+    // If current inputs have a valid unsaved quantity and isn't yet staged, auto-add it
+    const currentQty = Number(consumptionQuantity)
+    const isAlreadyStaged = stagedItems.some(
+      (i) => i.energySource === energySource && i.consumptionQuantity === consumptionQuantity
+    )
+
+    if (!isAlreadyStaged && currentQty > 0) {
+      handleAddOrUpdateItem()
+    } else if (stagedItems.length === 0) {
+      setError('Please add at least one Energy Source item before clicking Next.')
+      return
+    }
+
+    setViewStep('ORGANIZED')
+    toast.info('Organized Consolidated Summary', {
+      description: 'Review the consolidated multi-source breakdown below, then click Save Draft or Submit for Review.',
+    })
+  }
+
+  // Synchronize master payload to formStateRef.current[key] whenever items or fields change
   useEffect(() => {
+    const itemsToSave = stagedItems.length > 0 ? stagedItems : []
+    const totalQty = itemsToSave.reduce((sum, item) => sum + (Number(item.consumptionQuantity) || 0), 0)
+    const totalTco2e = itemsToSave.reduce((sum, item) => sum + item.estTco2e, 0)
+    const totalGj = itemsToSave.reduce((sum, item) => sum + item.estGj, 0)
+    const totalRenewable = itemsToSave.reduce((sum, item) => sum + (Number(item.renewableEnergyQuantity) || 0), 0)
+
+    const hasS1 = itemsToSave.some((i) => i.emissionDataType.includes('1'))
+    const hasS2 = itemsToSave.some((i) => i.emissionDataType.includes('2'))
+    const combinedScope = hasS1 && hasS2 ? 'Scope 1 & 2' : hasS1 ? 'Scope 1' : 'Scope 2'
+
     formStateRef.current[key] = {
-      energySource, energyActivity, consumptionQuantity, unit, meterEquipmentId,
-      openingMeterReading, closingMeterReading, energyPurchased, energyGenerated,
-      renewableEnergyQuantity, reportingPeriod, sourceDocument, remarks, evidenceId,
+      // Top-level compatibility fields
+      energySource: itemsToSave.map((i) => i.energySource).join(', ') || energySource,
+      emissionDataType: combinedScope,
+      energyActivity: itemsToSave.map((i) => i.energyActivity).join(', ') || energyActivity,
+      consumptionQuantity: String(totalQty || consumptionQuantity),
+      unit: itemsToSave[0]?.unit || unit,
+      meterEquipmentId: itemsToSave.map((i) => i.meterEquipmentId).filter(Boolean).join(', ') || meterEquipmentId,
+      openingMeterReading,
+      closingMeterReading,
+      energyPurchased,
+      energyGenerated,
+      renewableEnergyQuantity: String(totalRenewable || renewableEnergyQuantity),
+      reportingPeriod,
+      sourceDocument: itemsToSave.map((i) => i.sourceDocument).filter(Boolean).join(', ') || sourceDocument,
+      remarks: remarks || `Consolidated multi-source energy report (${itemsToSave.length} sources).`,
+      evidenceId: itemsToSave.find((i) => i.evidenceId)?.evidenceId || evidenceId,
+      // Full itemized collection & aggregated metrics
+      items: itemsToSave,
+      totalTco2e,
+      totalGj,
+      totalRenewable,
+      viewStep,
     }
   }, [
-    key, energySource, energyActivity, consumptionQuantity, unit, meterEquipmentId,
-    openingMeterReading, closingMeterReading, energyPurchased, energyGenerated,
-    renewableEnergyQuantity, reportingPeriod, sourceDocument, remarks, evidenceId, formStateRef,
+    key,
+    stagedItems,
+    viewStep,
+    energySource,
+    emissionDataType,
+    energyActivity,
+    consumptionQuantity,
+    unit,
+    meterEquipmentId,
+    openingMeterReading,
+    closingMeterReading,
+    energyPurchased,
+    energyGenerated,
+    renewableEnergyQuantity,
+    reportingPeriod,
+    sourceDocument,
+    remarks,
+    evidenceId,
+    formStateRef,
   ])
 
-  // Live calculations
+  // Live calculations for current active field
   const qty = Number(consumptionQuantity) || 0
   const open = Number(openingMeterReading) || 0
   const close = Number(closingMeterReading) || 0
   const meterDiff = close > open ? close - open : 0
-
-  const factor = energySource.toLowerCase().includes('diesel')
-    ? 2.637
-    : energySource.toLowerCase().includes('petrol')
-    ? 2.296
-    : energySource.toLowerCase().includes('renew')
-    ? 0.04
-    : 0.716
+  const currentPreset = SOURCE_PRESETS[energySource] || SOURCE_PRESETS['Grid electricity']
+  const factor = currentPreset.factor
   const estTco2e = qty > 0 ? (qty * factor) / 1000 : 0
 
+  // Aggregate stats across all staged items
+  const totalCombinedQty = stagedItems.reduce((acc, it) => acc + (Number(it.consumptionQuantity) || 0), 0)
+  const totalCombinedTco2e = stagedItems.reduce((acc, it) => acc + it.estTco2e, 0)
+  const totalCombinedGj = stagedItems.reduce((acc, it) => acc + it.estGj, 0)
+  const totalRenewableQty = stagedItems.reduce((acc, it) => acc + (Number(it.renewableEnergyQuantity) || 0), 0)
+  const renewablePct =
+    totalCombinedQty > 0 ? ((totalRenewableQty / totalCombinedQty) * 100).toFixed(1) : '0'
+
+  // Final Save Draft or Submit for Review
   const save = async (submitForReview = false) => {
     setError('')
-    if (!consumptionQuantity || Number(consumptionQuantity) <= 0) {
-      setError('Consumption quantity must be > 0')
-      return
+    // If user filled in current fields and hasn't staged it yet, ensure it's included
+    let effectiveItems = [...stagedItems]
+    if (effectiveItems.length === 0) {
+      if (!consumptionQuantity || Number(consumptionQuantity) <= 0) {
+        setError('Please enter consumption quantity > 0 and add at least one Energy Source item.')
+        return
+      }
+      const { factor: f, gjRate: g, estTco2e: t, estGj: gj } = calculateItemEmissions(energySource, consumptionQuantity)
+      effectiveItems = [
+        {
+          id: `item-${Date.now()}`,
+          energySource,
+          emissionDataType,
+          energyActivity,
+          consumptionQuantity,
+          unit,
+          meterEquipmentId,
+          openingMeterReading,
+          closingMeterReading,
+          energyPurchased,
+          energyGenerated,
+          renewableEnergyQuantity,
+          reportingPeriod,
+          sourceDocument,
+          remarks,
+          evidenceId,
+          factor: f,
+          estTco2e: t,
+          estGj: gj,
+        },
+      ]
+      setStagedItems(effectiveItems)
     }
+
     setSubmitting(true)
     try {
+      const payloadData: Record<string, any> = {
+        ...formStateRef.current[key],
+        items: effectiveItems,
+      }
+
       const res = await fetch('/api/data-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2352,13 +3112,18 @@ function Level1EnergyForm({
           module: 'ENERGY',
           projectId,
           reportingPeriodId: periodId,
-          evidenceId: evidenceId || undefined,
-          data: formStateRef.current[key],
+          evidenceId: payloadData.evidenceId || undefined,
+          data: payloadData,
           submitForReview,
         }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Energy record')
+      toast.success(
+        submitForReview
+          ? 'Energy submission sent for BU review!'
+          : 'Energy draft saved successfully!'
+      )
       onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -2368,193 +3133,783 @@ function Level1EnergyForm({
   }
 
   return (
-    <FormGrid>
-      {/* Live Energy Analytics banner placed on top */}
-      <div className="sm:col-span-2 rounded-xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-blue-50/90 p-3.5 text-xs text-blue-900 shadow-sm">
-        <div className="flex items-center justify-between font-bold">
-          <span className="flex items-center gap-1.5 text-blue-800">
-            <Calculator className="h-4 w-4 text-blue-600" /> Live Energy Analytics
-          </span>
-          <span className="rounded-full bg-blue-100/80 px-2 py-0.5 text-[10px] text-blue-700 font-mono font-bold">
-            Factor: {factor} kgCO₂e/{unit}
-          </span>
+    <div className="space-y-4">
+      {/* FLOW NAVIGATION TABS: STEP 1 (ITEM DRAFTING) -> STEP 2 (ORGANIZE ALL ITEMS) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition shadow-xs ${
+              viewStep === 'ENTRY'
+                ? 'bg-blue-600 text-white shadow-blue-500/20'
+                : 'bg-white/80 text-slate-700 hover:bg-white'
+            }`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>1. Add Source Items (Draft)</span>
+            {stagedItems.length > 0 && (
+              <span
+                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold ${
+                  viewStep === 'ENTRY' ? 'bg-blue-800 text-white' : 'bg-blue-100 text-blue-700'
+                }`}
+              >
+                {stagedItems.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition shadow-xs ${
+              viewStep === 'ORGANIZED'
+                ? 'bg-indigo-600 text-white shadow-indigo-500/20'
+                : 'bg-white/80 text-slate-700 hover:bg-white'
+            }`}
+          >
+            <ListOrdered className="h-3.5 w-3.5" />
+            <span>2. Organize All Items (Consolidated)</span>
+            {stagedItems.length > 0 && (
+              <span
+                className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-mono font-bold ${
+                  viewStep === 'ORGANIZED' ? 'bg-indigo-800 text-white' : 'bg-emerald-100 text-emerald-800'
+                }`}
+              >
+                ✓ Ready
+              </span>
+            )}
+          </button>
         </div>
-        <div className="mt-2.5 grid grid-cols-3 gap-2.5 text-center">
-          <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
-            <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Est. GHG</div>
-            <div className="text-sm font-bold text-slate-900">{estTco2e.toFixed(2)} tCO₂e</div>
-          </div>
-          <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
-            <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Meter Delta</div>
-            <div className="text-sm font-bold text-slate-900">{meterDiff > 0 ? meterDiff.toLocaleString() : '—'}</div>
-          </div>
-          <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
-            <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Scope</div>
-            <div className="text-sm font-bold text-slate-900">{energySource.toLowerCase().includes('grid') ? 'Scope 2' : 'Scope 1'}</div>
-          </div>
-        </div>
+
+        {viewStep === 'ENTRY' ? (
+          <button
+            type="button"
+            onClick={handleNextOrganize}
+            className="flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition"
+          >
+            <span>Next: Organize All ({stagedItems.length})</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setViewStep('ENTRY')}
+            className="flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            <span>Back to Add / Edit Items</span>
+          </button>
+        )}
       </div>
 
-      <FormField label="Energy Source" hint="Grid electricity, diesel, renewables, etc.">
-        <select
-          value={energySource}
-          disabled={readOnly}
-          onChange={(e) => setEnergySource(e.target.value)}
-          className={inputClass}
-        >
-          {L1_ENERGY_SOURCES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </FormField>
+      {/* ==============================================================
+          VIEW 1: ITEM DRAFT ENTRY (ADD ONE BY ONE, WITH ADD + NEXT)
+          ============================================================== */}
+      {viewStep === 'ENTRY' && (
+        <FormGrid>
+          {/* Live Energy Analytics banner placed on top */}
+          <div className="sm:col-span-2 rounded-xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-blue-50/90 p-3.5 text-xs text-blue-900 shadow-sm">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-1.5 text-blue-800">
+                <Calculator className="h-4 w-4 text-blue-600" /> Active Item Analytics ·{' '}
+                <span className="underline decoration-blue-300">{energySource}</span>
+              </span>
+              <span className="rounded-full bg-blue-100/80 px-2 py-0.5 text-[10px] text-blue-700 font-mono font-bold">
+                Factor: {factor} kgCO₂e/{unit}
+              </span>
+            </div>
+            <div className="mt-2.5 grid grid-cols-3 gap-2.5 text-center">
+              <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                  Est. GHG ({energySource})
+                </div>
+                <div className="text-sm font-bold text-slate-900">{estTco2e.toFixed(2)} tCO₂e</div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                  Meter Delta
+                </div>
+                <div className="text-sm font-bold text-slate-900">
+                  {meterDiff > 0 ? meterDiff.toLocaleString() : '—'}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white/95 p-2 shadow-xs border border-blue-100">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+                  GHG Scope
+                </div>
+                <div className="text-sm font-bold text-slate-900">{emissionDataType}</div>
+              </div>
+            </div>
+          </div>
 
-      <FormField label="Energy Activity" hint="Generator, construction equipment, lighting, etc.">
-        <select
-          value={energyActivity}
-          disabled={readOnly}
-          onChange={(e) => setEnergyActivity(e.target.value)}
-          className={inputClass}
-        >
-          {L1_ACTIVITIES.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-      </FormField>
+          {/* INTERACTIVE SOURCE ITEMS SELECTOR PILLS */}
+          <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-white/70 p-3 shadow-xs">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Select Energy Source Item to Fill / Draft:
+              </span>
+              <span className="text-[10px] text-slate-500 font-medium">
+                Click any source → Fill details &amp; evidence → Click Add (Draft)
+              </span>
+            </div>
 
-      <FormField label="Consumption Quantity" hint="Actual quantity consumed in the period.">
-        <input
-          type="number"
-          min="0"
-          step="any"
-          value={consumptionQuantity}
-          disabled={readOnly}
-          onChange={(e) => setConsumptionQuantity(e.target.value)}
-          placeholder="e.g. 42800"
-          className={inputClass}
-        />
-      </FormField>
+            <div className="flex flex-wrap gap-2">
+              {L1_ENERGY_SOURCES.map((s) => {
+                const preset = SOURCE_PRESETS[s] || SOURCE_PRESETS['Grid electricity']
+                const IconComponent = preset.icon
+                const isSelected = energySource === s
+                const staged = stagedItems.find((i) => i.energySource === s)
 
-      <FormField label="Unit" hint="Select the applicable measurement unit.">
-        <select
-          value={unit}
-          disabled={readOnly}
-          onChange={(e) => setUnit(e.target.value)}
-          className={inputClass}
-        >
-          {L1_UNITS.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
-      </FormField>
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => handleSelectSource(s)}
+                    className={`group relative flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-2 border-blue-600 bg-blue-50 text-blue-900 shadow-sm font-bold ring-2 ring-blue-200'
+                        : staged
+                        ? 'border border-emerald-300 bg-emerald-50/80 text-emerald-900 hover:bg-emerald-100/70'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <IconComponent
+                      className={`h-3.5 w-3.5 ${
+                        isSelected
+                          ? 'text-blue-600'
+                          : staged
+                          ? 'text-emerald-600'
+                          : 'text-slate-500'
+                      }`}
+                    />
+                    <span>{s}</span>
+                    {staged ? (
+                      <span className="ml-1 rounded-full bg-emerald-200/90 px-1.5 py-0.2 text-[9px] font-mono font-bold text-emerald-800">
+                        ✓ {Number(staged.consumptionQuantity).toLocaleString()} {staged.unit}
+                      </span>
+                    ) : (
+                      isSelected && (
+                        <span className="ml-1 rounded-full bg-blue-200/80 px-1.5 py-0.2 text-[9px] font-bold text-blue-800">
+                          Active
+                        </span>
+                      )
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-      <FormField label="Meter / Equipment ID" hint="Meter or DG equipment reference tag.">
-        <input
-          value={meterEquipmentId}
-          disabled={readOnly}
-          onChange={(e) => setMeterEquipmentId(e.target.value)}
-          placeholder="e.g. MTR-GJT-GRID-01"
-          className={inputClass}
-        />
-      </FormField>
+          {/* ITEM FORM INPUTS */}
+          <FormField label="Energy Source" hint="Selected energy source item for this entry.">
+            <select
+              value={energySource}
+              disabled={readOnly}
+              onChange={(e) => handleSelectSource(e.target.value)}
+              className={inputClass}
+            >
+              {L1_ENERGY_SOURCES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </FormField>
 
-      <FormField label="Reporting Period" hint="Target reporting period.">
-        <input
-          value={reportingPeriod}
-          disabled={readOnly}
-          onChange={(e) => setReportingPeriod(e.target.value)}
-          placeholder="e.g. June 2026"
-          className={inputClass}
-        />
-      </FormField>
+          <FormField label="GHG Emission Scope" hint="GHG Protocol scope for this specific source.">
+            <select
+              value={emissionDataType}
+              disabled={readOnly}
+              onChange={(e) => setEmissionDataType(e.target.value)}
+              className={inputClass}
+            >
+              <option value="Scope 1">Scope 1 — Direct Emissions (fuel burnt on site / DG)</option>
+              <option value="Scope 2">Scope 2 — Purchased Energy (grid electricity / steam)</option>
+              <option value="Scope 3">Scope 3 — Value Chain (upstream &amp; downstream)</option>
+            </select>
+          </FormField>
 
-      <FormField label="Opening Meter Reading" hint="If metered (kWh / L).">
-        <input
-          type="number"
-          value={openingMeterReading}
-          disabled={readOnly}
-          onChange={(e) => setOpeningMeterReading(e.target.value)}
-          placeholder="e.g. 124500"
-          className={inputClass}
-        />
-      </FormField>
+          <FormField label="Energy Activity" hint="Generator, lighting, construction, heating, etc.">
+            <select
+              value={energyActivity}
+              disabled={readOnly}
+              onChange={(e) => setEnergyActivity(e.target.value)}
+              className={inputClass}
+            >
+              {L1_ACTIVITIES.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </FormField>
 
-      <FormField label="Closing Meter Reading" hint="If metered (kWh / L).">
-        <input
-          type="number"
-          value={closingMeterReading}
-          disabled={readOnly}
-          onChange={(e) => setClosingMeterReading(e.target.value)}
-          placeholder="e.g. 167300"
-          className={inputClass}
-        />
-      </FormField>
+          <FormField label="Consumption Quantity" hint="Actual quantity consumed for this source item.">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              value={consumptionQuantity}
+              disabled={readOnly}
+              onChange={(e) => setConsumptionQuantity(e.target.value)}
+              placeholder="e.g. 384000"
+              className={inputClass}
+            />
+          </FormField>
 
-      <FormField label="Energy Purchased" hint="Quantity purchased from utility / fuel vendor.">
-        <input
-          type="number"
-          value={energyPurchased}
-          disabled={readOnly}
-          onChange={(e) => setEnergyPurchased(e.target.value)}
-          placeholder="e.g. 42800"
-          className={inputClass}
-        />
-      </FormField>
+          <FormField label="Unit" hint="Measurement unit.">
+            <select
+              value={unit}
+              disabled={readOnly}
+              onChange={(e) => setUnit(e.target.value)}
+              className={inputClass}
+            >
+              {L1_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </FormField>
 
-      <FormField label="Energy Generated" hint="On-site generation (solar / DG).">
-        <input
-          type="number"
-          value={energyGenerated}
-          disabled={readOnly}
-          onChange={(e) => setEnergyGenerated(e.target.value)}
-          placeholder="0"
-          className={inputClass}
-        />
-      </FormField>
+          <FormField label="Meter / Equipment ID" hint="Meter tag or generator equipment reference.">
+            <input
+              value={meterEquipmentId}
+              disabled={readOnly}
+              onChange={(e) => setMeterEquipmentId(e.target.value)}
+              placeholder="e.g. MEIL-MTR-GRID-400KV"
+              className={inputClass}
+            />
+          </FormField>
 
-      <FormField label="Renewable Energy Quantity" hint="Where supported & certified.">
-        <input
-          type="number"
-          value={renewableEnergyQuantity}
-          disabled={readOnly}
-          onChange={(e) => setRenewableEnergyQuantity(e.target.value)}
-          placeholder="0"
-          className={inputClass}
-        />
-      </FormField>
+          <FormField label="Reporting Period" hint="Target reporting period.">
+            <input
+              value={reportingPeriod}
+              disabled={readOnly}
+              onChange={(e) => setReportingPeriod(e.target.value)}
+              placeholder="e.g. June 2026"
+              className={inputClass}
+            />
+          </FormField>
 
-      <FormField label="Source Document" hint="Electricity bill, fuel register, meter log.">
-        <select
-          value={sourceDocument}
-          disabled={readOnly}
-          onChange={(e) => setSourceDocument(e.target.value)}
-          className={inputClass}
-        >
-          {L1_DOCUMENTS.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-      </FormField>
+          <FormField label="Opening Meter Reading" hint="If metered (kWh / L).">
+            <input
+              type="number"
+              value={openingMeterReading}
+              disabled={readOnly}
+              onChange={(e) => setOpeningMeterReading(e.target.value)}
+              placeholder="e.g. 124500"
+              className={inputClass}
+            />
+          </FormField>
 
-      <FormField label="Remarks" hint="Adjustments, stock balance or exceptions." full>
-        <textarea
-          value={remarks}
-          disabled={readOnly}
-          onChange={(e) => setRemarks(e.target.value)}
-          placeholder="e.g. Reconciled with utility billing invoice; opening stock verified."
-          className={inputClass + ' min-h-[55px] resize-y'}
-        />
-      </FormField>
+          <FormField label="Closing Meter Reading" hint="If metered (kWh / L).">
+            <input
+              type="number"
+              value={closingMeterReading}
+              disabled={readOnly}
+              onChange={(e) => setClosingMeterReading(e.target.value)}
+              placeholder="e.g. 508500"
+              className={inputClass}
+            />
+          </FormField>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
-    </FormGrid>
+          <FormField label="Energy Purchased" hint="Purchased quantity from utility / vendor.">
+            <input
+              type="number"
+              value={energyPurchased}
+              disabled={readOnly}
+              onChange={(e) => setEnergyPurchased(e.target.value)}
+              placeholder="e.g. 384000"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Energy Generated" hint="On-site generation (solar / captive DG).">
+            <input
+              type="number"
+              value={energyGenerated}
+              disabled={readOnly}
+              onChange={(e) => setEnergyGenerated(e.target.value)}
+              placeholder="0"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Renewable Energy Quantity" hint="Where certified & supported.">
+            <input
+              type="number"
+              value={renewableEnergyQuantity}
+              disabled={readOnly}
+              onChange={(e) => setRenewableEnergyQuantity(e.target.value)}
+              placeholder="0"
+              className={inputClass}
+            />
+          </FormField>
+
+          <FormField label="Source Document" hint="Electricity bill, fuel register, meter log.">
+            <select
+              value={sourceDocument}
+              disabled={readOnly}
+              onChange={(e) => setSourceDocument(e.target.value)}
+              className={inputClass}
+            >
+              {L1_DOCUMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          <FormField label="Remarks" hint="Adjustments, fuel batch or audit notes for this item." full>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Reconciled with billing invoice; stock log confirmed."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </FormField>
+
+          {/* ITEM EVIDENCE ATTACHMENT SECTION (BEFORE ADD BUTTON) */}
+          <div className="sm:col-span-2">
+            <FormEvidenceAttachSection
+              projectId={projectId}
+              periodId={periodId}
+              moduleKey="ENERGY"
+              evidence={evidence}
+              onUploaded={onEvidenceUploaded || (async () => {})}
+              selectedEvidenceId={evidenceId || null}
+              onSelectEvidence={(id) => setEvidenceId(id || '')}
+              onReview={onReviewEvidence}
+              readOnly={readOnly}
+            />
+          </div>
+
+          {/* SPECIAL ACTION BUTTONS FOR EVERY ITEM: ADD (DRAFT) + NEXT (ORGANIZE) */}
+          <div className="sm:col-span-2 rounded-2xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-emerald-50/90 p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-blue-600" />
+                  <span>Item Draft Actions · {energySource}</span>
+                </h4>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Fill details and attach evidence, then click <strong>Add Item (Draft)</strong> to stage it.
+                  When all sources are added, click <strong>Next: Organize All Items</strong>.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* 1. SPECIAL ADD ITEM (DRAFT) BUTTON */}
+                <button
+                  type="button"
+                  onClick={handleAddOrUpdateItem}
+                  disabled={readOnly}
+                  className="flex items-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>
+                    {editingItemId ? `Update ${energySource} Draft` : `Add ${energySource} (Draft)`}
+                  </span>
+                </button>
+
+                {/* 2. SPECIAL NEXT BUTTON */}
+                <button
+                  type="button"
+                  onClick={handleNextOrganize}
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-indigo-600 to-blue-700 px-4 py-2 text-xs font-bold text-white shadow-md shadow-indigo-500/20 hover:opacity-95 transition active:scale-95"
+                >
+                  <span>Next: Organize All Items</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/90 p-2.5 text-xs font-medium text-rose-800">
+                <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-rose-600" /> {error}
+              </div>
+            )}
+          </div>
+
+          {/* STAGED DRAFT ITEMS TABLE / LIST (SHOWN IN ENTRY VIEW) */}
+          {stagedItems.length > 0 && (
+            <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Staged Draft Items ({stagedItems.length} Sources Added)
+                    </h4>
+                    <p className="text-[10px] text-slate-500">
+                      Items saved as local draft. You can edit any item, add another source, or proceed to Organize.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700 border border-blue-200">
+                    Total: {totalCombinedTco2e.toFixed(2)} tCO₂e
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextOrganize}
+                    className="flex items-center gap-1 rounded-full bg-indigo-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition"
+                  >
+                    <span>Next: Organize</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-100">
+                    <tr>
+                      <th className="py-2 px-2.5">Source &amp; Scope</th>
+                      <th className="py-2 px-2.5">Activity &amp; Tag</th>
+                      <th className="py-2 px-2.5">Quantity &amp; Unit</th>
+                      <th className="py-2 px-2.5">Est. GHG</th>
+                      <th className="py-2 px-2.5">Evidence</th>
+                      <th className="py-2 px-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {stagedItems.map((item) => {
+                      const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                              <span>{item.energySource}</span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-medium">
+                              {item.emissionDataType}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            <div className="font-semibold text-slate-800">{item.energyActivity}</div>
+                            <div className="text-[10px] font-mono text-slate-500">
+                              {item.meterEquipmentId || '—'}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5 font-bold text-slate-900">
+                            {Number(item.consumptionQuantity).toLocaleString()} {item.unit}
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            <span className="font-bold text-slate-900">
+                              {item.estTco2e.toFixed(2)} tCO₂e
+                            </span>
+                            <div className="text-[10px] text-slate-400">
+                              {item.estGj.toFixed(1)} GJ
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-2.5">
+                            {attachedEv ? (
+                              <div className="flex items-center gap-1.5">
+                                <span
+                                  className="truncate max-w-[120px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                  title={attachedEv.fileName}
+                                >
+                                  {attachedEv.fileName}
+                                </span>
+                                {onReviewEvidence && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onReviewEvidence(attachedEv)}
+                                    className="text-blue-600 hover:text-blue-800 p-0.5"
+                                    title="Review evidence (flips engine preview)"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">None attached</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleEditStagedItem(item)}
+                                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                title="Edit this item"
+                              >
+                                <Edit3 className="h-3 w-3" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleRemoveStagedItem(item.id, e)}
+                                className="flex h-6 w-6 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+                                title="Remove item"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Standard Save Draft / Submit for review also available directly */}
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </FormGrid>
+      )}
+
+      {/* ==============================================================
+          VIEW 2: ORGANIZED CONSOLIDATED SUMMARY
+          (AFTER USER CLICKS "NEXT" TO COMBINE & ORGANIZE ALL ITEMS)
+          ============================================================== */}
+      {viewStep === 'ORGANIZED' && (
+        <div className="space-y-4">
+          {/* Header Banner */}
+          <div className="rounded-2xl border border-indigo-200 bg-gradient-to-r from-indigo-50/90 via-blue-50/80 to-indigo-50/90 p-4 text-xs text-indigo-950 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="status-pill status-approved !text-[10px]">
+                    Step 2: Consolidated
+                  </span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    All Energy Sources Organized in One View
+                  </h3>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1">
+                  Compiled {stagedItems.length} energy source items into a verified multi-source record.
+                  Review the summary, attach any final documentation, and click Save Draft or Submit for Review.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewStep('ENTRY')}
+                className="self-start sm:self-auto flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
+              >
+                <Plus className="h-3.5 w-3.5 text-blue-600" />
+                <span>Add / Edit More Sources</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Consolidated Executive Metric Tiles */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total Energy Consumed
+              </div>
+              <div className="text-base font-extrabold text-slate-900 mt-1">
+                {totalCombinedGj.toLocaleString(undefined, { maximumFractionDigits: 1 })} GJ
+              </div>
+              <div className="text-[10px] text-blue-700 mt-0.5">
+                {totalCombinedQty.toLocaleString()} primary units
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-indigo-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Total GHG Footprint
+              </div>
+              <div className="text-base font-extrabold text-indigo-950 mt-1">
+                {totalCombinedTco2e.toFixed(2)} tCO₂e
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">Scope 1 &amp; Scope 2 Blended</div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Renewable Share
+              </div>
+              <div className="text-base font-extrabold text-emerald-800 mt-1">{renewablePct}%</div>
+              <div className="text-[10px] text-emerald-700 mt-0.5">
+                {totalRenewableQty.toLocaleString()} kWh clean power
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-violet-200 bg-white p-3 shadow-xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                Audited Sources
+              </div>
+              <div className="text-base font-extrabold text-violet-950 mt-1">
+                {stagedItems.length} Sources
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">
+                {stagedItems.filter((i) => i.evidenceId).length} of {stagedItems.length} with attached evidence
+              </div>
+            </div>
+          </div>
+
+          {/* Consolidated Master Table of All Items */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                Consolidated Item Details Breakdown
+              </h4>
+              <span className="text-[10px] text-slate-500">
+                All details will be saved into the master draft and submitted together
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Energy Source</th>
+                    <th className="py-2.5 px-3">Scope</th>
+                    <th className="py-2.5 px-3">Activity</th>
+                    <th className="py-2.5 px-3">Quantity</th>
+                    <th className="py-2.5 px-3">GHG Factor</th>
+                    <th className="py-2.5 px-3">Est. tCO₂e</th>
+                    <th className="py-2.5 px-3">Attached Evidence</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stagedItems.map((item, idx) => {
+                    const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {item.energySource}
+                          {item.remarks && (
+                            <div className="text-[10px] font-normal text-slate-500 line-clamp-1">
+                              {item.remarks}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                              item.emissionDataType.includes('1')
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}
+                          >
+                            {item.emissionDataType}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-700">
+                          {item.energyActivity}
+                          {item.meterEquipmentId && (
+                            <div className="text-[10px] font-mono text-slate-400">
+                              {item.meterEquipmentId}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-900">
+                          {Number(item.consumptionQuantity).toLocaleString()} {item.unit}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
+                          {item.factor} kg/{item.unit}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-indigo-900">
+                          {item.estTco2e.toFixed(2)}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {attachedEv ? (
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="truncate max-w-[110px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
+                                title={attachedEv.fileName}
+                              >
+                                {attachedEv.fileName}
+                              </span>
+                              {onReviewEvidence && (
+                                <button
+                                  type="button"
+                                  onClick={() => onReviewEvidence(attachedEv)}
+                                  className="text-blue-600 hover:text-blue-800 p-0.5"
+                                  title="Review evidence (flips engine preview)"
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">None attached</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleEditStagedItem(item)}
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot className="bg-slate-50 font-bold text-slate-900 border-t border-slate-200">
+                  <tr>
+                    <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] uppercase tracking-wider text-slate-500">
+                      Consolidated Total:
+                    </td>
+                    <td className="py-2.5 px-3 font-bold">
+                      {totalCombinedQty.toLocaleString()} units ({totalCombinedGj.toFixed(1)} GJ)
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-400">—</td>
+                    <td className="py-2.5 px-3 text-indigo-900 font-extrabold">
+                      {totalCombinedTco2e.toFixed(2)} tCO₂e
+                    </td>
+                    <td colSpan={2} className="py-2.5 px-3 text-right text-[10px] text-slate-500">
+                      {stagedItems.length} sources combined
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Overall Remarks / Summary Note */}
+          <div className="rounded-xl border border-slate-200 bg-white/80 p-3">
+            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+              Consolidated Submission Remarks &amp; Audit Trail Note
+            </label>
+            <textarea
+              value={remarks}
+              disabled={readOnly}
+              onChange={(e) => setRemarks(e.target.value)}
+              placeholder="e.g. Consolidated multi-source reporting covering grid electricity, captive rooftop solar generation, and backup diesel generator registers."
+              className={inputClass + ' min-h-[55px] resize-y'}
+            />
+          </div>
+
+          {/* Primary Save Draft & Submit for Review buttons */}
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -2569,9 +3924,12 @@ const L2_DESTINATIONS = ['Surface water', 'Third party', 'Groundwater recharge',
 function Level2WaterForm({
   projectId,
   periodId,
+  evidence,
   readOnly,
   formStateRef,
   onSaved,
+  onEvidenceUploaded,
+  onReviewEvidence,
 }: LevelFormProps) {
   const key = `l2-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
@@ -2590,6 +3948,7 @@ function Level2WaterForm({
   const [testDateLab, setTestDateLab] = useState(initial.testDateLab ?? '2026-09-15 · SGS Environmental Testing Services')
   const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'CGWA Meter Log & ZLD Recycle Register')
   const [remarks, setRemarks] = useState(initial.remarks ?? 'Total water withdrawal 42,500 kL; 13,770 kL recycled (32.4% recovery achieved per BRSR P6).')
+  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -2597,12 +3956,12 @@ function Level2WaterForm({
     formStateRef.current[key] = {
       waterActivity, waterSource, waterQuantity, unit, meterSourceId, openingReading, closingReading,
       waterReusedRecycled, dischargeDestination, treatmentLevel, waterQualityResult, testDateLab,
-      supportingEvidence, remarks,
+      supportingEvidence, remarks, evidenceId,
     }
   }, [
     key, waterActivity, waterSource, waterQuantity, unit, meterSourceId, openingReading, closingReading,
     waterReusedRecycled, dischargeDestination, treatmentLevel, waterQualityResult, testDateLab,
-    supportingEvidence, remarks, formStateRef,
+    supportingEvidence, remarks, evidenceId, formStateRef,
   ])
 
   const qty = Number(waterQuantity) || 0
@@ -2627,6 +3986,7 @@ function Level2WaterForm({
           module: 'WATER',
           projectId,
           reportingPeriodId: periodId,
+          evidenceId: evidenceId || undefined,
           data: formStateRef.current[key],
           submitForReview,
         }),
@@ -2849,9 +4209,12 @@ function Level2WaterForm({
 function Level3GhgForm({
   projectId,
   periodId,
+  evidence,
   readOnly,
   formStateRef,
   onSaved,
+  onEvidenceUploaded,
+  onReviewEvidence,
 }: LevelFormProps) {
   const key = `l3-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
@@ -2870,19 +4233,20 @@ function Level3GhgForm({
   const [calculationMethod, setCalculationMethod] = useState(initial.calculationMethod ?? 'Activity data × Approved Factor')
   const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'SAP Fuel Procurement Ledger & Stack Emissions Report')
   const [remarks, setRemarks] = useState(initial.remarks ?? 'Scope 1: 186.40 tCO2e, Scope 2: 274.94 tCO2e (Total 461.34 tCO2e; intensity 0.0162 tCO2e/Cr turnover).')
+  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     formStateRef.current[key] = {
-      emissionDataType, emissionSource, fuelEnergyType, activityQuantity, unit,
-      pollutantType, testResult, samplingLocation, testDate, laboratoryTestMethod,
-      emissionFactorRef, calculationMethod, supportingEvidence, remarks,
+      emissionDataType, emissionSource, fuelEnergyType, activityQuantity, unit, pollutantType,
+      testResult, samplingLocation, testDate, laboratoryTestMethod, emissionFactorRef,
+      calculationMethod, supportingEvidence, remarks, evidenceId,
     }
   }, [
-    key, emissionDataType, emissionSource, fuelEnergyType, activityQuantity, unit,
-    pollutantType, testResult, samplingLocation, testDate, laboratoryTestMethod,
-    emissionFactorRef, calculationMethod, supportingEvidence, remarks, formStateRef,
+    key, emissionDataType, emissionSource, fuelEnergyType, activityQuantity, unit, pollutantType,
+    testResult, samplingLocation, testDate, laboratoryTestMethod, emissionFactorRef,
+    calculationMethod, supportingEvidence, remarks, evidenceId, formStateRef,
   ])
 
   const save = async (submitForReview = false) => {
@@ -2903,6 +4267,7 @@ function Level3GhgForm({
           module: 'EMISSIONS',
           projectId,
           reportingPeriodId: periodId,
+          evidenceId: evidenceId || undefined,
           data: formStateRef.current[key],
           submitForReview,
         }),
@@ -3070,6 +4435,21 @@ function Level3GhgForm({
         />
       </FormField>
 
+      {/* Attach evidence document directly from the form (after Remarks) */}
+      <div className="sm:col-span-2">
+        <FormEvidenceAttachSection
+          projectId={projectId}
+          periodId={periodId}
+          moduleKey="EMISSIONS"
+          evidence={evidence}
+          onUploaded={onEvidenceUploaded || (async () => {})}
+          selectedEvidenceId={evidenceId || null}
+          onSelectEvidence={(id) => setEvidenceId(id || '')}
+          onReview={onReviewEvidence}
+          readOnly={readOnly}
+        />
+      </div>
+
       <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
   )
@@ -3098,9 +4478,12 @@ const L4_METHODS = [
 function Level4WasteForm({
   projectId,
   periodId,
+  evidence,
   readOnly,
   formStateRef,
   onSaved,
+  onEvidenceUploaded,
+  onReviewEvidence,
 }: LevelFormProps) {
   const key = `l4-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
@@ -3119,6 +4502,7 @@ function Level4WasteForm({
   const [transferManifestNumber, setTransferManifestNumber] = useState(initial.transferManifestNumber ?? 'PCB-HAZ-MANIFEST-2026-0841')
   const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'Form 10 Hazardous Waste Manifest & Weighbridge Slips')
   const [remarks, setRemarks] = useState(initial.remarks ?? 'Total waste 17.20 T; 13.10 T recovered/recycled (76.2% circular recovery); 4.10 T safely disposed per CPCB regulations.')
+  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -3160,6 +4544,7 @@ function Level4WasteForm({
           module: 'WASTE',
           projectId,
           reportingPeriodId: periodId,
+          evidenceId: evidenceId || undefined,
           data: formStateRef.current[key],
           submitForReview,
         }),
@@ -3337,6 +4722,21 @@ function Level4WasteForm({
           className={inputClass}
         />
       </FormField>
+
+      {/* Attach evidence document directly from the form (after Remarks) */}
+      <div className="sm:col-span-2">
+        <FormEvidenceAttachSection
+          projectId={projectId}
+          periodId={periodId}
+          moduleKey="WASTE"
+          evidence={evidence}
+          onUploaded={onEvidenceUploaded || (async () => {})}
+          selectedEvidenceId={evidenceId || null}
+          onSelectEvidence={(id) => setEvidenceId(id || '')}
+          onReview={onReviewEvidence}
+          readOnly={readOnly}
+        />
+      </div>
 
       {/* Live Preview Card */}
       <div className="sm:col-span-2 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-3 text-xs text-emerald-900">
@@ -3934,9 +5334,12 @@ function Level6TrainingForm({
 function Level7ComplianceForm({
   projectId,
   periodId,
+  evidence,
   readOnly,
   formStateRef,
   onSaved,
+  onEvidenceUploaded,
+  onReviewEvidence,
 }: LevelFormProps) {
   const key = `l7-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
@@ -3956,6 +5359,7 @@ function Level7ComplianceForm({
   const [dueDate, setDueDate] = useState(initial.dueDate ?? '2026-12-31')
   const [closureDate, setClosureDate] = useState(initial.closureDate ?? '2026-08-20')
   const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'SPCB-VALID-CONSENT-ORDER-2026.pdf')
+  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -3964,13 +5368,13 @@ function Level7ComplianceForm({
       permitConsentType, permitNumber, issuingAuthority, issueDate, expiryDate,
       permitStatus, applicableActivity, inspectionDate, inspectionFindings,
       nonComplianceIdentified, correctiveAction, responsibleOwner, dueDate,
-      closureDate, supportingEvidence,
+      closureDate, supportingEvidence, evidenceId,
     }
   }, [
     key, permitConsentType, permitNumber, issuingAuthority, issueDate, expiryDate,
     permitStatus, applicableActivity, inspectionDate, inspectionFindings,
     nonComplianceIdentified, correctiveAction, responsibleOwner, dueDate,
-    closureDate, supportingEvidence, formStateRef,
+    closureDate, supportingEvidence, evidenceId, formStateRef,
   ])
 
   let daysRemaining = 365
@@ -3997,6 +5401,7 @@ function Level7ComplianceForm({
           module: 'COMPLIANCE',
           projectId,
           reportingPeriodId: periodId,
+          evidenceId: evidenceId || undefined,
           data: formStateRef.current[key],
           submitForReview,
         }),
@@ -4173,10 +5578,25 @@ function Level7ComplianceForm({
           value={supportingEvidence}
           disabled={readOnly}
           onChange={(e) => setSupportingEvidence(e.target.value)}
-          placeholder="e.g. Scanned Order Copy & Compliance Acknowledgement"
+          placeholder="e.g. TSPCB CTO Order #8941 & stack monitoring report"
           className={inputClass}
         />
       </FormField>
+
+      {/* Attach evidence document directly from the form (after Supporting Evidence / Permits) */}
+      <div className="sm:col-span-2">
+        <FormEvidenceAttachSection
+          projectId={projectId}
+          periodId={periodId}
+          moduleKey="COMPLIANCE"
+          evidence={evidence}
+          onUploaded={onEvidenceUploaded || (async () => {})}
+          selectedEvidenceId={evidenceId || null}
+          onSelectEvidence={(id) => setEvidenceId(id || '')}
+          onReview={onReviewEvidence}
+          readOnly={readOnly}
+        />
+      </div>
 
       {/* Live Preview Card */}
       <div className="sm:col-span-2 rounded-xl border border-teal-200/80 bg-teal-50/60 p-3 text-xs text-teal-900">
@@ -4454,9 +5874,12 @@ function Level8IncidentsForm({
 function Level9InitiativesForm({
   projectId,
   periodId,
+  evidence,
   readOnly,
   formStateRef,
   onSaved,
+  onEvidenceUploaded,
+  onReviewEvidence,
 }: LevelFormProps) {
   const key = `l9-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
@@ -4474,6 +5897,7 @@ function Level9InitiativesForm({
   const [calculationMethod, setCalculationMethod] = useState(initial.calculationMethod ?? 'Digital smart meter telemetric logs with automated SCADA baseline')
   const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'DOC-ENERGY-SAVINGS-CERT-2026.pdf')
   const [remarks, setRemarks] = useState(initial.remarks ?? 'Achieved 25.4% energy reduction and 32.4% circular water recovery meeting SEBI Principal 2 targets.')
+  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -4481,12 +5905,12 @@ function Level9InitiativesForm({
     formStateRef.current[key] = {
       activityInitiativeName, initiativeCategory, baselinePeriod, baselineValue,
       reportingPeriodValue, physicalOutputQuantity, outputUnit, startDate,
-      completionDate, outcome, calculationMethod, supportingEvidence, remarks,
+      completionDate, outcome, calculationMethod, supportingEvidence, remarks, evidenceId,
     }
   }, [
     key, activityInitiativeName, initiativeCategory, baselinePeriod, baselineValue,
     reportingPeriodValue, physicalOutputQuantity, outputUnit, startDate,
-    completionDate, outcome, calculationMethod, supportingEvidence, remarks, formStateRef,
+    completionDate, outcome, calculationMethod, supportingEvidence, remarks, evidenceId, formStateRef,
   ])
 
   const bVal = Number(baselineValue) || 0
@@ -4512,6 +5936,7 @@ function Level9InitiativesForm({
           module: 'INITIATIVES',
           projectId,
           reportingPeriodId: periodId,
+          evidenceId: evidenceId || undefined,
           data: formStateRef.current[key],
           submitForReview,
         }),
@@ -4673,6 +6098,21 @@ function Level9InitiativesForm({
         />
       </FormField>
 
+      {/* Attach evidence document directly from the form (after Remarks) */}
+      <div className="sm:col-span-2">
+        <FormEvidenceAttachSection
+          projectId={projectId}
+          periodId={periodId}
+          moduleKey="INITIATIVES"
+          evidence={evidence}
+          onUploaded={onEvidenceUploaded || (async () => {})}
+          selectedEvidenceId={evidenceId || null}
+          onSelectEvidence={(id) => setEvidenceId(id || '')}
+          onReview={onReviewEvidence}
+          readOnly={readOnly}
+        />
+      </div>
+
       {/* Live Preview Card */}
       <div className="sm:col-span-2 rounded-xl border border-blue-200/80 bg-blue-50/60 p-3 text-xs text-blue-900">
         <div className="flex items-center justify-between font-bold">
@@ -4707,7 +6147,13 @@ function Level9InitiativesForm({
    ============================================================ */
 function describeLevelRecord(r: any): string {
   if (r.data) {
-    if (r.level === 1) return `${r.data.energySource || 'Grid Electricity'} · ${r.data.consumptionQuantity || 0} ${r.data.unit || 'kWh'}`
+    if (r.level === 1) {
+      if (Array.isArray(r.data.items) && r.data.items.length > 0) {
+        const srcList = r.data.items.map((i: any) => i.energySource).slice(0, 3).join(', ')
+        return `Multi-Source (${r.data.items.length} items: ${srcList}${r.data.items.length > 3 ? '...' : ''}) · ${r.data.consumptionQuantity || 0} ${r.data.unit || 'units'}`
+      }
+      return [r.data.emissionDataType, r.data.energySource || 'Grid Electricity', `${r.data.consumptionQuantity || 0} ${r.data.unit || 'kWh'}`].filter(Boolean).join(' · ')
+    }
     if (r.level === 2) return `${r.data.waterActivity || 'Withdrawal'} (${r.data.waterSource || 'Groundwater'}) · ${r.data.waterQuantity || 0} ${r.data.unit || 'kL'}`
     if (r.level === 3) return `${r.data.emissionDataType || 'Scope 1'} · ${r.data.emissionSource || 'DG'} (${r.data.activityQuantity || 0} ${r.data.unit || 'L'})`
     if (r.level === 4) return `${r.data.wasteCategory || 'C&D'} · ${r.data.quantityGenerated || 0} ${r.data.unit || 'MT'}`

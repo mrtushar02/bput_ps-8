@@ -106,36 +106,87 @@ export async function POST(req: NextRequest) {
         }
 
         // Calculation
-        const src = String(data.energySource || '').toLowerCase()
-        let factor = 0.716 // default grid
-        let scope = 'SCOPE_2'
-        let meth = 'CEA v19'
-        let gjRate = 0.0036
-        if (src.includes('diesel')) {
-          factor = 2.637; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.0383
-        } else if (src.includes('petrol')) {
-          factor = 2.296; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.0348
-        } else if (src.includes('lpg')) {
-          factor = 2.98; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.046
-        } else if (src.includes('coal')) {
-          factor = 1.9; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.0227
-        } else if (src.includes('renewable')) {
-          factor = 0.04; scope = 'SCOPE_2'; meth = 'ISAE 3000'; gjRate = 0.0036
-        }
-        const tco2e = (qty * factor) / 1000
-        const gj = qty * gjRate
+        if (Array.isArray(data.items) && data.items.length > 0) {
+          let totalTco2e = 0
+          let totalGj = 0
+          const sourceSummaries: string[] = []
 
-        calculation = {
-          calculatedValue: Number(tco2e.toFixed(3)),
-          resultUnit: 'tCO2e',
-          scope,
-          factorId: `${meth.replace(/\s+/g, '-').toUpperCase()}-${scope}`,
-          factorVersion: 1,
-          methodologyNote: `${meth} (${factor} kgCO2e/unit) deterministic calculation`,
-          normalizedValue: Number(gj.toFixed(2)),
-          normalizedUnit: 'GJ',
-          sourceValue: qty,
-          sourceUnit: data.unit || 'kWh',
+          for (const it of data.items) {
+            const iQty = Number(it.consumptionQuantity) || 0
+            const iSrc = String(it.energySource || '').toLowerCase()
+            let iFactor = 0.716
+            let iGjRate = 0.0036
+            if (iSrc.includes('diesel')) {
+              iFactor = 2.637; iGjRate = 0.0383
+            } else if (iSrc.includes('petrol')) {
+              iFactor = 2.296; iGjRate = 0.0348
+            } else if (iSrc.includes('lpg')) {
+              iFactor = 2.98; iGjRate = 0.046
+            } else if (iSrc.includes('coal')) {
+              iFactor = 1.9; iGjRate = 0.0227
+            } else if (iSrc.includes('gas')) {
+              iFactor = 2.02; iGjRate = 0.038
+            } else if (iSrc.includes('renewable')) {
+              iFactor = 0.04; iGjRate = 0.0036
+            }
+            totalTco2e += (iQty * iFactor) / 1000
+            totalGj += iQty * iGjRate
+            sourceSummaries.push(`${it.energySource} (${iQty} ${it.unit || ''})`)
+          }
+
+          const hasS1 = data.items.some((i: any) => String(i.emissionDataType || '').includes('1'))
+          const hasS2 = data.items.some((i: any) => String(i.emissionDataType || '').includes('2'))
+          const calcScope = hasS1 && hasS2 ? 'SCOPE_1_2' : hasS1 ? 'SCOPE_1' : 'SCOPE_2'
+
+          calculation = {
+            calculatedValue: Number(totalTco2e.toFixed(3)),
+            resultUnit: 'tCO2e',
+            scope: calcScope,
+            factorId: `MULTI-SOURCE-${data.items.length}-ITEMS`,
+            factorVersion: 1,
+            methodologyNote: `Consolidated multi-source energy calculation (${data.items.length} sources: ${sourceSummaries.slice(0, 3).join(', ')}${sourceSummaries.length > 3 ? '...' : ''})`,
+            normalizedValue: Number(totalGj.toFixed(2)),
+            normalizedUnit: 'GJ',
+            sourceValue: qty,
+            sourceUnit: data.unit || 'kWh',
+          }
+        } else {
+          const src = String(data.energySource || '').toLowerCase()
+          let factor = 0.716 // default grid
+          let scope = 'SCOPE_2'
+          let meth = 'CEA v19'
+          let gjRate = 0.0036
+          if (src.includes('diesel')) {
+            factor = 2.637; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.0383
+          } else if (src.includes('petrol')) {
+            factor = 2.296; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.0348
+          } else if (src.includes('lpg')) {
+            factor = 2.98; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.046
+          } else if (src.includes('coal')) {
+            factor = 1.9; scope = 'SCOPE_1'; meth = 'IPCC 2006'; gjRate = 0.0227
+          } else if (src.includes('renewable')) {
+            factor = 0.04; scope = 'SCOPE_2'; meth = 'ISAE 3000'; gjRate = 0.0036
+          }
+          // Explicit user-selected GHG scope (Energy form dropdown) takes precedence
+          const declaredScope = String(data.emissionDataType || '').toUpperCase().replace(/[\s-]/g, '_')
+          if (declaredScope.startsWith('SCOPE_1')) scope = 'SCOPE_1'
+          else if (declaredScope.startsWith('SCOPE_2')) scope = 'SCOPE_2'
+          else if (declaredScope.startsWith('SCOPE_3')) scope = 'SCOPE_3'
+          const tco2e = (qty * factor) / 1000
+          const gj = qty * gjRate
+
+          calculation = {
+            calculatedValue: Number(tco2e.toFixed(3)),
+            resultUnit: 'tCO2e',
+            scope,
+            factorId: `${meth.replace(/\s+/g, '-').toUpperCase()}-${scope}`,
+            factorVersion: 1,
+            methodologyNote: `${meth} (${factor} kgCO2e/unit) deterministic calculation`,
+            normalizedValue: Number(gj.toFixed(2)),
+            normalizedUnit: 'GJ',
+            sourceValue: qty,
+            sourceUnit: data.unit || 'kWh',
+          }
         }
         break
       }
