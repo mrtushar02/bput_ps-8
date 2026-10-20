@@ -14,7 +14,7 @@ async function main() {
   // ---------- ROLES ----------
   const roleDefs = [
     ['SUPER_ADMIN', 'Super Admin', 'Entire system administration', 3],
-    ['PROJECT_USER', 'Project / Site User', 'Project-level source data entry', 1],
+    ['PROJECT_USER', 'Environment Data User', 'Project-level environmental source data entry', 1],
     ['FINANCE_USER', 'Finance & Resource Data Contributor', 'Financial turnover, CapEx/OpEx and resource expenditure collection', 1],
     ['HR_USER', 'HR User', 'Workforce & HR data', 1],
     ['EHS_USER', 'EHS / Safety User', 'Safety & environmental incidents', 1],
@@ -328,16 +328,16 @@ async function main() {
 
   // Submission — Gayatri April ENERGY module (approved through the chain)
   const sub = await db.submission.create({ data: { projectId: gayatri, reportingPeriodId: april, module: 'ENERGY', title: 'Gayatri Solar — Energy April 2026', status: 'APPROVED', recordIds: JSON.stringify([e1.id, e2.id, e3.id]), completionPct: 100, evidenceCount: 2, validationPassed: 3, validationErrors: 0, submittedBy: rohitId, submittedAt: new Date('2026-05-03') } })
-  await db.submissionStatusHistory.create({ data: { submissionId: sub.id, fromStatus: 'DRAFT', toStatus: 'SUBMITTED', actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Project / Site User', action: 'SUBMIT', comment: 'April energy data submitted with evidence', createdAt: new Date('2026-05-03T10:00:00Z') } })
+  await db.submissionStatusHistory.create({ data: { submissionId: sub.id, fromStatus: 'DRAFT', toStatus: 'SUBMITTED', actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Environment Data User', action: 'SUBMIT', comment: 'April energy data submitted with evidence', createdAt: new Date('2026-05-03T10:00:00Z') } })
   await db.submissionStatusHistory.create({ data: { submissionId: sub.id, fromStatus: 'SUBMITTED', toStatus: 'BU_APPROVED', actorId: userIds['rakesh@meil-esg.in'].id, actorName: 'Rakesh Verma', actorRole: 'Business Unit Reviewer', action: 'APPROVE', comment: 'Evidence verified, values consistent with meter readings', createdAt: new Date('2026-05-06T11:30:00Z') } })
   await db.submissionStatusHistory.create({ data: { submissionId: sub.id, fromStatus: 'BU_APPROVED', toStatus: 'SUBSIDIARY_APPROVED', actorId: userIds['nisha@meil-esg.in'].id, actorName: 'Nisha Pillai', actorRole: 'Subsidiary ESG Reviewer', action: 'APPROVE', comment: 'Consolidation reviewed, no exceptions', createdAt: new Date('2026-05-12T09:15:00Z') } })
 
   // Audit logs
   await db.auditLog.createMany({ data: [
-    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Project / Site User', action: 'CREATE', entityType: 'EnergyRecord', entityId: e1.id, newState: JSON.stringify({ quantity: 384000, source: 'Grid Electricity', status: 'DRAFT' }), reason: 'April grid electricity entry', createdAt: new Date('2026-05-02T08:20:00Z') },
-    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Project / Site User', action: 'EVIDENCE_UPLOAD', entityType: 'Evidence', entityId: ev1.id, newState: JSON.stringify({ fileName: 'GJT-Grid-Bill-Apr2026.pdf' }), reason: 'Evidence attached to grid record', createdAt: new Date('2026-05-02T08:45:00Z') },
-    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Project / Site User', action: 'CALCULATION', entityType: 'EnergyRecord', entityId: e1.id, newState: JSON.stringify({ calculatedValue: 274.94, scope: 'SCOPE_2', factorVersion: 1 }), reason: 'Emission calculation: 384000 kWh * 0.716', createdAt: new Date('2026-05-02T09:00:00Z') },
-    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Project / Site User', action: 'SUBMIT', entityType: 'Submission', entityId: sub.id, newState: JSON.stringify({ status: 'SUBMITTED' }), reason: 'Energy module submission April 2026', createdAt: new Date('2026-05-03T10:00:00Z') },
+    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Environment Data User', action: 'CREATE', entityType: 'EnergyRecord', entityId: e1.id, newState: JSON.stringify({ quantity: 384000, source: 'Grid Electricity', status: 'DRAFT' }), reason: 'April grid electricity entry', createdAt: new Date('2026-05-02T08:20:00Z') },
+    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Environment Data User', action: 'EVIDENCE_UPLOAD', entityType: 'Evidence', entityId: ev1.id, newState: JSON.stringify({ fileName: 'GJT-Grid-Bill-Apr2026.pdf' }), reason: 'Evidence attached to grid record', createdAt: new Date('2026-05-02T08:45:00Z') },
+    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Environment Data User', action: 'CALCULATION', entityType: 'EnergyRecord', entityId: e1.id, newState: JSON.stringify({ calculatedValue: 274.94, scope: 'SCOPE_2', factorVersion: 1 }), reason: 'Emission calculation: 384000 kWh * 0.716', createdAt: new Date('2026-05-02T09:00:00Z') },
+    { actorId: rohitId, actorName: 'Rohit Kumar', actorRole: 'Environment Data User', action: 'SUBMIT', entityType: 'Submission', entityId: sub.id, newState: JSON.stringify({ status: 'SUBMITTED' }), reason: 'Energy module submission April 2026', createdAt: new Date('2026-05-03T10:00:00Z') },
     { actorId: userIds['rakesh@meil-esg.in'].id, actorName: 'Rakesh Verma', actorRole: 'Business Unit Reviewer', action: 'EVIDENCE_VERIFY', entityType: 'Evidence', entityId: ev1.id, newState: JSON.stringify({ status: 'VERIFIED' }), reason: 'Grid bill verified against meter reading', createdAt: new Date('2026-05-06T11:00:00Z') },
     { actorId: userIds['rakesh@meil-esg.in'].id, actorName: 'Rakesh Verma', actorRole: 'Business Unit Reviewer', action: 'APPROVE', entityType: 'Submission', entityId: sub.id, oldState: JSON.stringify({ status: 'SUBMITTED' }), newState: JSON.stringify({ status: 'BU_APPROVED' }), reason: 'BU approval — evidence & validation clean', createdAt: new Date('2026-05-06T11:30:00Z') },
     { actorId: userIds['nisha@meil-esg.in'].id, actorName: 'Nisha Pillai', actorRole: 'Subsidiary ESG Reviewer', action: 'APPROVE', entityType: 'Submission', entityId: sub.id, oldState: JSON.stringify({ status: 'BU_APPROVED' }), newState: JSON.stringify({ status: 'SUBSIDIARY_APPROVED' }), reason: 'Subsidiary-level approval', createdAt: new Date('2026-05-12T09:15:00Z') },

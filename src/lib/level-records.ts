@@ -89,7 +89,7 @@ const DEFAULT_RECORDS: LevelRecord[] = [
     issues: [],
     status: 'APPROVED',
     revisionNumber: 1,
-    enteredBy: 'Rohit Kumar (Site User)',
+    enteredBy: 'Rohit Kumar (Environment Data User)',
     enteredAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
   },
@@ -131,7 +131,7 @@ const DEFAULT_RECORDS: LevelRecord[] = [
     issues: [],
     status: 'APPROVED',
     revisionNumber: 1,
-    enteredBy: 'Rohit Kumar (Site User)',
+    enteredBy: 'Rohit Kumar (Environment Data User)',
     enteredAt: new Date(Date.now() - 86400000 * 4).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 4).toISOString(),
   },
@@ -173,7 +173,7 @@ const DEFAULT_RECORDS: LevelRecord[] = [
     issues: [],
     status: 'APPROVED',
     revisionNumber: 1,
-    enteredBy: 'Rohit Kumar (Site User)',
+    enteredBy: 'Rohit Kumar (Environment Data User)',
     enteredAt: new Date(Date.now() - 86400000 * 3).toISOString(),
     updatedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
   },
@@ -208,7 +208,13 @@ export function getLevelRecords(projectId?: string, periodId?: string, level?: n
   return all.filter((r) => {
     if (projectId && r.projectId !== projectId) return false
     if (periodId && r.reportingPeriodId !== periodId) return false
-    if (level && r.level !== level) return false
+    if (level) {
+      if (level === 5) return r.level === 5 || r.level === 7
+      if (level === 6) return r.level === 6 || r.level === 9
+      if (level === 7) return r.level === 5 || r.level === 7
+      if (level === 9) return r.level === 6 || r.level === 9
+      return r.level === level
+    }
     return true
   })
 }

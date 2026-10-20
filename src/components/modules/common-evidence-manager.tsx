@@ -11,6 +11,7 @@ import {
   type EvidenceDocument,
   type ContributorRoleKey
 } from '@/lib/contributor-store'
+import { toast } from 'sonner'
 
 interface CommonEvidenceManagerProps {
   roleKey: ContributorRoleKey
@@ -256,7 +257,7 @@ export function CommonEvidenceManager({
                         </button>
                         <button
                           type="button"
-                          onClick={() => alert(`Downloading ${doc.documentName}...`)}
+                          onClick={() => toast.info(`Downloading ${doc.documentName}...`)}
                           className="rounded-lg p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                           title="Download Document"
                         >
@@ -470,7 +471,7 @@ export function CommonEvidenceManager({
                   <button
                     type="button"
                     onClick={() => {
-                      alert(`Downloading official certified extract for ${previewDoc.documentId}`)
+                      toast.success(`Downloading official certified extract for ${previewDoc.documentId}`)
                       setPreviewDoc(null)
                     }}
                     className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700"

@@ -249,8 +249,52 @@ export async function POST(req: NextRequest) {
         break
       }
 
-      case 5: {
-        // Health & Safety
+      case 5:
+      case 7: {
+        // If it's Environmental Compliance & Permits (or level 7)
+        if (data.permitNumber !== undefined || data.permitConsentType || data.issuingAuthority || Number(level) === 7 || data.levelName?.includes('Permit') || data.levelName?.includes('Compliance')) {
+          // Environmental Compliance & Permits
+          if (!data.permitNumber) {
+            issues.push({
+              ruleCode: 'ENV-PERMIT-NUM',
+              severity: 'ERROR',
+              message: 'Official permit / consent number is required',
+              field: 'permitNumber',
+            })
+          }
+          if (!data.expiryDate) {
+            issues.push({
+              ruleCode: 'ENV-EXPIRY-DATE',
+              severity: 'WARNING',
+              message: 'Expiry date is recommended for compliance monitoring and renewal alerts',
+              field: 'expiryDate',
+            })
+          }
+          if (data.nonComplianceIdentified && String(data.nonComplianceIdentified).includes('Yes') && !data.correctiveAction) {
+            issues.push({
+              ruleCode: 'ENV-REMEDY-PLAN',
+              severity: 'ERROR',
+              message: 'Corrective action plan and target due date are required for recorded non-compliances',
+              field: 'correctiveAction',
+            })
+          }
+          let daysLeft = 365
+          if (data.expiryDate) {
+            const exp = new Date(data.expiryDate).getTime()
+            const now = Date.now()
+            daysLeft = Math.round((exp - now) / 86400000)
+          }
+          calculation = {
+            calculatedValue: daysLeft,
+            resultUnit: 'Days until Expiration',
+            scope: 'STATUTORY_COMPLIANCE',
+            methodologyNote: daysLeft > 90 ? 'Consent valid & active' : daysLeft > 0 ? 'Renewal in progress window' : 'Expired — immediate action needed',
+            sourceValue: daysLeft,
+            sourceUnit: 'Days',
+          }
+          break
+        }
+        // Legacy Health & Safety
         const mhw = Number(data.totalPersonHoursWorked) || 0
         if (mhw <= 0) {
           issues.push({
@@ -275,8 +319,33 @@ export async function POST(req: NextRequest) {
         break
       }
 
-      case 6: {
-        // Training & Workforce Well-being
+      case 6:
+      case 9: {
+        if (data.activityInitiativeName !== undefined || data.initiativeCategory || data.baselineValue || Number(level) === 9 || data.levelName?.includes('Initiative')) {
+          // Resource-efficiency Initiatives
+          if (!data.activityInitiativeName) {
+            issues.push({
+              ruleCode: 'OPS-INITIATIVE-NAME',
+              severity: 'ERROR',
+              message: 'Initiative or project name is required',
+              field: 'activityInitiativeName',
+            })
+          }
+          const base = Number(data.baselineValue) || 0
+          const rep = Number(data.reportingPeriodValue) || 0
+          const diff = Math.max(0, base - rep)
+          const pct = base > 0 ? ((diff / base) * 100).toFixed(1) : '0'
+          calculation = {
+            calculatedValue: Number(diff.toFixed(2)),
+            resultUnit: `Achieved Reduction (${pct}%)`,
+            scope: 'RESOURCE_EFFICIENCY',
+            methodologyNote: `Baseline: ${base} vs Reporting: ${rep}. Achieved reduction: ${diff}.`,
+            sourceValue: rep,
+            sourceUnit: data.outputUnit || 'Units',
+          }
+          break
+        }
+        // Legacy Training & Workforce Well-being
         if (!data.trainingProgramme) {
           issues.push({
             ruleCode: 'TRN-PROG-NAME',
@@ -296,49 +365,6 @@ export async function POST(req: NextRequest) {
           methodologyNote: `${pCount} participants × ${durHours.toFixed(1)} hours`,
           sourceValue: pCount,
           sourceUnit: 'Participants',
-        }
-        break
-      }
-
-      case 7: {
-        // Environmental Compliance & Permits
-        if (!data.permitNumber) {
-          issues.push({
-            ruleCode: 'ENV-PERMIT-NUM',
-            severity: 'ERROR',
-            message: 'Official permit / consent number is required',
-            field: 'permitNumber',
-          })
-        }
-        if (!data.expiryDate) {
-          issues.push({
-            ruleCode: 'ENV-EXPIRY-DATE',
-            severity: 'WARNING',
-            message: 'Expiry date is recommended for compliance monitoring and renewal alerts',
-            field: 'expiryDate',
-          })
-        }
-        if (data.nonComplianceIdentified && String(data.nonComplianceIdentified).includes('Yes') && !data.correctiveAction) {
-          issues.push({
-            ruleCode: 'ENV-REMEDY-PLAN',
-            severity: 'ERROR',
-            message: 'Corrective action plan and target due date are required for recorded non-compliances',
-            field: 'correctiveAction',
-          })
-        }
-        let daysLeft = 365
-        if (data.expiryDate) {
-          const exp = new Date(data.expiryDate).getTime()
-          const now = Date.now()
-          daysLeft = Math.round((exp - now) / 86400000)
-        }
-        calculation = {
-          calculatedValue: daysLeft,
-          resultUnit: 'Days until Expiration',
-          scope: 'STATUTORY_COMPLIANCE',
-          methodologyNote: daysLeft > 90 ? 'Consent valid & active' : daysLeft > 0 ? 'Renewal in progress window' : 'Expired — immediate action needed',
-          sourceValue: daysLeft,
-          sourceUnit: 'Days',
         }
         break
       }
@@ -369,31 +395,6 @@ export async function POST(req: NextRequest) {
         }
         break
       }
-
-      case 9: {
-        // Resource-efficiency Initiatives
-        if (!data.activityInitiativeName) {
-          issues.push({
-            ruleCode: 'OPS-INITIATIVE-NAME',
-            severity: 'ERROR',
-            message: 'Initiative or project name is required',
-            field: 'activityInitiativeName',
-          })
-        }
-        const base = Number(data.baselineValue) || 0
-        const rep = Number(data.reportingPeriodValue) || 0
-        const diff = Math.max(0, base - rep)
-        const pct = base > 0 ? ((diff / base) * 100).toFixed(1) : '0'
-        calculation = {
-          calculatedValue: Number(diff.toFixed(2)),
-          resultUnit: `Achieved Reduction (${pct}%)`,
-          scope: 'RESOURCE_EFFICIENCY',
-          methodologyNote: `Baseline: ${base} vs Reporting: ${rep}. Achieved reduction: ${diff}.`,
-          sourceValue: rep,
-          sourceUnit: data.outputUnit || 'Units',
-        }
-        break
-      }
     }
 
     const hasErrors = issues.some((i) => i.severity === 'ERROR' || i.severity === 'BLOCKING')
@@ -417,7 +418,7 @@ export async function POST(req: NextRequest) {
       issues,
       status: 'DRAFT',
       revisionNumber: 1,
-      enteredBy: user.name || 'Site User',
+      enteredBy: user.name || 'Environment Data User',
       enteredAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }

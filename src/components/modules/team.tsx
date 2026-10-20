@@ -46,7 +46,7 @@ interface ChatMessage {
 // ============================================================
 const ROLE_LABEL: Record<RoleKey, string> = {
   SUPER_ADMIN: 'Super Admin',
-  PROJECT_USER: 'Project / Site User',
+  PROJECT_USER: 'Environment Data User',
   HR_USER: 'HR User',
   EHS_USER: 'EHS / Safety User',
   PROCUREMENT_USER: 'Procurement / Supply Chain User',

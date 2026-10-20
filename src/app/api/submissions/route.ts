@@ -169,8 +169,10 @@ export async function POST(req: NextRequest) {
       'LEVEL_5_SAFETY',
       'LEVEL_6_TRAINING',
       'LEVEL_7_PERMITS',
+      'LEVEL_5_PERMITS',
       'LEVEL_8_INCIDENTS',
       'LEVEL_9_INITIATIVES',
+      'LEVEL_6_INITIATIVES',
     ]
     if (!allowedModules.includes(moduleKey)) {
       return NextResponse.json(

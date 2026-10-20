@@ -39,7 +39,7 @@ const ROLE_NAV: Record<string, NavItem[]> = {
     { key: 'admin', label: 'Admin', icon: Settings2 },
   ],
 
-  // Project / Site User — data entry focused
+  // Environment Data User — data entry focused
   PROJECT_USER: [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
     { key: 'my-project', label: 'My Project', icon: Building2 },

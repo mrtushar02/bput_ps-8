@@ -192,7 +192,7 @@ export function FinanceWorkspace() {
   const handleAddExpenditure = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newExpDesc || newExpAmount <= 0) {
-      alert('Please enter a valid description and positive expenditure amount.')
+      showToast('Please enter a valid description and positive expenditure amount.')
       return
     }
     const item: Omit<ResourceExpenditureItem, 'id' | 'dateAdded'> = {
@@ -280,7 +280,7 @@ export function FinanceWorkspace() {
   const handleSubmitForReview = async () => {
     const res = financeStore.validateRecord(financialData, expenditures, documents)
     if (!res.readyForSubmission) {
-      alert(`Cannot submit record:\n\n• ${res.blockingErrors.join('\n• ')}`)
+      showToast(`Cannot submit: ${res.blockingErrors.join('; ')}`)
       return
     }
     financeStore.submitRecordForReview(financialData.common?.entityId || 'MEIL-SOL-GJT')
@@ -2325,7 +2325,7 @@ export function FinanceWorkspace() {
                             <History className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => alert(`Downloading verified attachment: ${doc.documentName}`)}
+                            onClick={() => showToast(`Downloading verified attachment: ${doc.documentName}`)}
                             className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600"
                             title="Download Document"
                           >

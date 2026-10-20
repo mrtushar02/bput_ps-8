@@ -1033,6 +1033,18 @@ function UploadForm({
   const [busy, setBusy] = useState(false)
   const [dragOver, setDragOver] = useState(false)
 
+  useEffect(() => {
+    if (!projId && projects.length > 0) {
+      setProjId(projects[0].id)
+    }
+  }, [projects, projId])
+
+  useEffect(() => {
+    if (!perId && periods.length > 0) {
+      setPerId(periods[0].id)
+    }
+  }, [periods, perId])
+
   const handleDrop = (ev: React.DragEvent<HTMLDivElement>) => {
     ev.preventDefault()
     setDragOver(false)
@@ -1052,8 +1064,8 @@ function UploadForm({
       fd.append('documentType', docType)
       if (docDate) fd.append('documentDate', docDate)
       fd.append('module', mod)
-      if (projId) fd.append('projectId', projId)
-      if (perId) fd.append('periodId', perId)
+      if (projId && projId !== 'none') fd.append('projectId', projId)
+      if (perId && perId !== 'none') fd.append('periodId', perId)
 
       const res = await fetch('/api/evidence', { method: 'POST', body: fd })
       const j = await res.json().catch(() => ({}))
@@ -1148,13 +1160,13 @@ function UploadForm({
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold text-slate-600">Project</Label>
-          <Select value={projId} onValueChange={setProjId}>
-            <SelectTrigger className="bg-white/60"><SelectValue /></SelectTrigger>
+          <Select value={projId || undefined} onValueChange={setProjId}>
+            <SelectTrigger className="bg-white/60"><SelectValue placeholder="Select project" /></SelectTrigger>
             <SelectContent>
               {projects.length > 0 ? projects.map(p => (
                 <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
               )) : (
-                <SelectItem value="" className="text-xs text-slate-400">No projects loaded</SelectItem>
+                <SelectItem value="none" disabled className="text-xs text-slate-400">No projects loaded</SelectItem>
               )}
             </SelectContent>
           </Select>
@@ -1163,13 +1175,13 @@ function UploadForm({
 
       <div className="space-y-1.5">
         <Label className="text-xs font-semibold text-slate-600">Reporting Period</Label>
-        <Select value={perId} onValueChange={setPerId}>
-          <SelectTrigger className="bg-white/60"><SelectValue /></SelectTrigger>
+        <Select value={perId || undefined} onValueChange={setPerId}>
+          <SelectTrigger className="bg-white/60"><SelectValue placeholder="Select period" /></SelectTrigger>
           <SelectContent>
             {periods.length > 0 ? periods.map(p => (
               <SelectItem key={p.id} value={p.id} className="text-xs">{p.label}</SelectItem>
             )) : (
-              <SelectItem value="" className="text-xs text-slate-400">No periods loaded</SelectItem>
+              <SelectItem value="none" disabled className="text-xs text-slate-400">No periods loaded</SelectItem>
             )}
           </SelectContent>
         </Select>
