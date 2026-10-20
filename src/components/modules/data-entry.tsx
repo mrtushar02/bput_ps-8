@@ -1305,61 +1305,63 @@ function FlippableEngineEvidencePanel({
               backfaceVisibility: 'hidden',
               WebkitBackfaceVisibility: 'hidden',
             }}
-            className={`glass glass-shimmer rounded-[22px] p-5 shadow-sm border border-white/60 transition-opacity duration-300 ${
+            className={`glass glass-shimmer min-h-[720px] rounded-[22px] p-5 shadow-sm border border-white/60 transition-opacity duration-300 flex flex-col justify-between ${
               isFlipped ? 'pointer-events-none invisible opacity-0' : 'relative opacity-100'
             }`}
           >
-            {/* Header */}
-            <div className="mb-3.5 flex items-start justify-between">
-              <div className="flex items-start gap-2.5">
-                <div className="kpi-tile bg-violet-50 text-violet-600 shadow-sm">
-                  <FlaskConical className="h-4 w-4" />
+            <div>
+              {/* Header */}
+              <div className="mb-3.5 flex items-start justify-between">
+                <div className="flex items-start gap-2.5">
+                  <div className="kpi-tile bg-violet-50 text-violet-600 shadow-sm">
+                    <FlaskConical className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Engine Preview</h3>
+                    <p className="text-[11px] text-slate-500">
+                      Deterministic calculations &amp; verification checks
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Engine Preview</h3>
-                  <p className="text-[11px] text-slate-500">
-                    Deterministic calculations &amp; verification checks
-                  </p>
-                </div>
+                {reviewEvidence && (
+                  <button
+                    type="button"
+                    onClick={() => setIsFlipped(true)}
+                    className="btn-glass flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 shadow-xs"
+                    title="View document review flip side"
+                  >
+                    <Eye className="h-3 w-3" />
+                    <span>Review Card</span>
+                  </button>
+                )}
               </div>
-              {reviewEvidence && (
-                <button
-                  type="button"
-                  onClick={() => setIsFlipped(true)}
-                  className="btn-glass flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 shadow-xs"
-                  title="View document review flip side"
-                >
-                  <Eye className="h-3 w-3" />
-                  <span>Review Card</span>
-                </button>
-              )}
+
+              {/* Engine Calculation Output */}
+              <CalculationPreview saved={saved} activeSub={activeSub} />
+
+              {/* Engine Validations */}
+              <ValidationResults saved={saved} validationRun={validationRun} />
+
+              {/* Evidence Upload Card (Workable upload, store and column list) */}
+              <EvidenceUploadSection
+                projectId={projectId}
+                periodId={periodId}
+                moduleKey={activeSub.moduleKey}
+                evidence={evidence}
+                onUploaded={onEvidenceUploaded}
+                onReview={handleStartReview}
+                selectedEvidenceId={saved?.evidenceId || null}
+                onSelectEvidence={onAttachEvidence}
+              />
+
+              {/* Evidence Picker dropdown selector (Step 2) */}
+              <EvidencePicker
+                evidence={evidence}
+                step={step}
+                saved={saved}
+                onPick={onAttachEvidence}
+              />
             </div>
-
-            {/* Engine Calculation Output */}
-            <CalculationPreview saved={saved} activeSub={activeSub} />
-
-            {/* Engine Validations */}
-            <ValidationResults saved={saved} validationRun={validationRun} />
-
-            {/* Evidence Upload Card (Workable upload, store and column list) */}
-            <EvidenceUploadSection
-              projectId={projectId}
-              periodId={periodId}
-              moduleKey={activeSub.moduleKey}
-              evidence={evidence}
-              onUploaded={onEvidenceUploaded}
-              onReview={handleStartReview}
-              selectedEvidenceId={saved?.evidenceId || null}
-              onSelectEvidence={onAttachEvidence}
-            />
-
-            {/* Evidence Picker dropdown selector (Step 2) */}
-            <EvidencePicker
-              evidence={evidence}
-              step={step}
-              saved={saved}
-              onPick={onAttachEvidence}
-            />
 
             {/* Submit Outcome Banner */}
             {submitResult && (
@@ -1397,7 +1399,7 @@ function FlippableEngineEvidencePanel({
               WebkitBackfaceVisibility: 'hidden',
               transform: 'rotateY(180deg)',
             }}
-            className={`glass glass-shimmer rounded-[22px] p-5 shadow-xl border border-blue-200/70 bg-gradient-to-b from-white/95 to-blue-50/70 transition-opacity duration-300 ${
+            className={`glass glass-shimmer min-h-[720px] rounded-[22px] p-5 shadow-xl border border-blue-200/70 bg-gradient-to-b from-white/95 to-blue-50/70 transition-opacity duration-300 flex flex-col justify-between ${
               !isFlipped
                 ? 'absolute inset-0 pointer-events-none invisible opacity-0'
                 : 'relative z-10 opacity-100'
@@ -1810,7 +1812,7 @@ function EvidenceReviewBackface({
         </div>
 
         {/* Live Document Viewer Canvas with Real PDF / Image Rendering */}
-        <div className="relative min-h-[220px] max-h-[300px] flex-1 rounded-xl border border-slate-200 bg-white p-2 flex flex-col items-center justify-center overflow-hidden shadow-inner">
+        <div className="relative min-h-[380px] flex-1 rounded-xl border border-slate-200 bg-white p-2.5 flex flex-col items-center justify-center overflow-hidden shadow-inner">
           {isImage ? (
             imgError ? (
               /* Fallback if image failed */
@@ -2550,30 +2552,6 @@ function Level1EnergyForm({
           className={inputClass + ' min-h-[55px] resize-y'}
         />
       </FormField>
-
-      {/* Live Preview Card */}
-      <div className="sm:col-span-2 rounded-xl border border-blue-200/80 bg-blue-50/60 p-3 text-xs text-blue-900">
-        <div className="flex items-center justify-between font-bold">
-          <span className="flex items-center gap-1.5">
-            <Calculator className="h-3.5 w-3.5 text-blue-600" /> Live Energy Analytics
-          </span>
-          <span className="text-[10px] text-blue-700 font-mono">Factor: {factor} kgCO₂e/{unit}</span>
-        </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Est. GHG</div>
-            <div className="text-sm font-bold text-slate-900">{estTco2e.toFixed(2)} tCO₂e</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Meter Delta</div>
-            <div className="text-sm font-bold text-slate-900">{meterDiff > 0 ? meterDiff.toLocaleString() : '—'}</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Scope</div>
-            <div className="text-sm font-bold text-slate-900">{energySource.toLowerCase().includes('grid') ? 'Scope 2' : 'Scope 1'}</div>
-          </div>
-        </div>
-      </div>
 
       <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
     </FormGrid>
