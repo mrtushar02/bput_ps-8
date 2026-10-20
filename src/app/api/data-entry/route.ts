@@ -416,7 +416,42 @@ export async function POST(req: NextRequest) {
       case 7: {
         // If it's Environmental Compliance & Permits (or level 7)
         if (data.permitNumber !== undefined || data.permitConsentType || data.issuingAuthority || Number(level) === 7 || data.levelName?.includes('Permit') || data.levelName?.includes('Compliance')) {
-          // Environmental Compliance & Permits
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            let validCount = 0
+            let expiringCount = 0
+            let nonCompliantCount = 0
+            const now = Date.now()
+
+            for (const it of data.items) {
+              if (it.nonComplianceIdentified === 'Yes') {
+                nonCompliantCount++
+              }
+              if (it.expiryDate) {
+                const exp = new Date(it.expiryDate).getTime()
+                const daysLeft = Math.round((exp - now) / 86400000)
+                if (daysLeft <= 90 && daysLeft >= 0) expiringCount++
+                if (daysLeft > 0) validCount++
+              } else {
+                if (it.permitStatus === 'Valid') validCount++
+              }
+            }
+
+            const compliancePct = Math.round(((data.items.length - nonCompliantCount) / data.items.length) * 100)
+            calculation = {
+              calculatedValue: compliancePct,
+              resultUnit: '% Regulatory Compliance',
+              scope: 'STATUTORY_COMPLIANCE',
+              factorId: `MULTI-PERMIT-${data.items.length}-AUTHORIZATIONS`,
+              methodologyNote: `Portfolio of ${data.items.length} environmental authorizations: ${validCount} active/valid, ${expiringCount} renewal windows (<90d), ${nonCompliantCount} non-compliances flagged.`,
+              sourceValue: data.items.length,
+              sourceUnit: 'Permits',
+              normalizedValue: validCount,
+              normalizedUnit: 'Valid Authorizations',
+            }
+            break
+          }
+
+          // Environmental Compliance & Permits (Single)
           if (!data.permitNumber) {
             issues.push({
               ruleCode: 'ENV-PERMIT-NUM',
@@ -485,7 +520,36 @@ export async function POST(req: NextRequest) {
       case 6:
       case 9: {
         if (data.activityInitiativeName !== undefined || data.initiativeCategory || data.baselineValue || Number(level) === 9 || data.levelName?.includes('Initiative')) {
-          // Resource-efficiency Initiatives
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            let totalBase = 0
+            let totalRep = 0
+            let totalSavings = 0
+
+            for (const it of data.items) {
+              const b = Number(it.baselineValue) || 0
+              const r = Number(it.reportingPeriodValue) || 0
+              const s = Math.max(0, b - r)
+              totalBase += b
+              totalRep += r
+              totalSavings += s
+            }
+
+            const avgPct = totalBase > 0 ? ((totalSavings / totalBase) * 100).toFixed(1) : '0'
+            calculation = {
+              calculatedValue: Number(totalSavings.toFixed(2)),
+              resultUnit: `Net Resources Conserved (${avgPct}%)`,
+              scope: 'RESOURCE_EFFICIENCY',
+              factorId: `MULTI-INITIATIVE-${data.items.length}-PROJECTS`,
+              methodologyNote: `Portfolio of ${data.items.length} ESG initiatives: Cumulative baseline ${totalBase.toLocaleString()} vs reporting ${totalRep.toLocaleString()}. Total conservation: ${totalSavings.toLocaleString()} (${avgPct}% reduction).`,
+              sourceValue: totalRep,
+              sourceUnit: 'Aggregated Units',
+              normalizedValue: Number(totalSavings.toFixed(2)),
+              normalizedUnit: 'Conserved Units',
+            }
+            break
+          }
+
+          // Resource-efficiency Initiatives (Single)
           if (!data.activityInitiativeName) {
             issues.push({
               ruleCode: 'OPS-INITIATIVE-NAME',

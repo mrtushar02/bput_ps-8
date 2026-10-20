@@ -24,6 +24,7 @@ import {
   Maximize2, Minimize2, ZoomIn, ZoomOut, X, FileQuestion,
   Plus, Trash2, Edit3, ArrowRight, ArrowLeft, Sun, Fuel, ListOrdered,
   Waves, CloudRain, Wind, Truck, Factory, CloudFog, Box, Package, RefreshCw, ShieldAlert,
+  Landmark, Trees, Cpu,
   type LucideIcon,
 } from 'lucide-react'
 import { useApp } from '@/lib/auth-context'
@@ -1488,37 +1489,42 @@ function EvidenceUploadSection({
   const [docType, setDocType] = useState('INVOICE')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleUploadFile = async (file: File) => {
-    if (!file) return
+  const handleUploadFiles = async (files: FileList | File[]) => {
+    const fileList = Array.from(files)
+    if (fileList.length === 0) return
     setUploading(true)
-    const toastId = toast.loading(`Uploading ${file.name}...`)
+    const toastId = toast.loading(`Uploading ${fileList.length} evidence document(s)...`)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('documentType', docType)
-      fd.append('module', moduleKey)
-      if (projectId) fd.append('projectId', projectId)
-      if (periodId) fd.append('periodId', periodId)
+      let lastUploaded: EvidenceItem | null = null
+      for (const file of fileList) {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('documentType', docType)
+        fd.append('module', moduleKey)
+        if (projectId) fd.append('projectId', projectId)
+        if (periodId) fd.append('periodId', periodId)
 
-      const res = await fetch('/api/evidence', {
-        method: 'POST',
-        body: fd,
-      })
+        const res = await fetch('/api/evidence', {
+          method: 'POST',
+          body: fd,
+        })
 
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error || 'Failed to upload evidence document')
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err?.error || `Failed to upload ${file.name}`)
+        }
+
+        lastUploaded = await res.json()
       }
 
-      const uploaded = await res.json()
-      toast.success(`${file.name} uploaded & verified!`, {
+      toast.success(`${fileList.length} document(s) uploaded & verified!`, {
         id: toastId,
         description: `Stored in Evidence Vault (SHA-256 hash created). Click Review to inspect.`,
       })
       await onUploaded()
       // Auto-trigger review of the freshly uploaded evidence
-      if (uploaded) {
-        onReview(uploaded)
+      if (lastUploaded) {
+        onReview(lastUploaded)
       }
     } catch (e: any) {
       toast.error('Upload failed', {
@@ -1532,15 +1538,17 @@ function EvidenceUploadSection({
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) handleUploadFile(file)
+    if (e.target.files && e.target.files.length > 0) {
+      handleUploadFiles(e.target.files)
+    }
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragActive(false)
-    const file = e.dataTransfer.files?.[0]
-    if (file) handleUploadFile(file)
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleUploadFiles(e.dataTransfer.files)
+    }
   }
 
   return (
@@ -1577,6 +1585,7 @@ function EvidenceUploadSection({
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           className="hidden"
           accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.doc,.docx"
           onChange={handleFileChange}
@@ -2187,8 +2196,10 @@ interface FormEvidenceAttachSectionProps {
   moduleKey: string
   evidence: EvidenceItem[]
   onUploaded: () => Promise<void>
-  selectedEvidenceId: string | null
-  onSelectEvidence: (id: string | null) => void
+  selectedEvidenceId?: string | null
+  onSelectEvidence?: (id: string | null) => void
+  selectedEvidenceIds?: string[]
+  onSelectEvidenceIds?: (ids: string[]) => void
   onReview?: (ev: EvidenceItem) => void
   readOnly: boolean
 }
@@ -2201,6 +2212,8 @@ function FormEvidenceAttachSection({
   onUploaded,
   selectedEvidenceId,
   onSelectEvidence,
+  selectedEvidenceIds,
+  onSelectEvidenceIds,
   onReview,
   readOnly,
 }: FormEvidenceAttachSectionProps) {
@@ -2208,30 +2221,77 @@ function FormEvidenceAttachSection({
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleUploadFile = async (file: File) => {
-    if (!file || readOnly) return
-    setUploading(true)
-    const toastId = toast.loading(`Uploading ${file.name}...`)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('documentType', 'INVOICE')
-      fd.append('module', moduleKey)
-      if (projectId) fd.append('projectId', projectId)
-      if (periodId) fd.append('periodId', periodId)
+  // Derive active attached IDs (combining single and array props)
+  const activeIds = useMemo(() => {
+    if (selectedEvidenceIds !== undefined) return selectedEvidenceIds
+    if (selectedEvidenceId) return [selectedEvidenceId]
+    return []
+  }, [selectedEvidenceIds, selectedEvidenceId])
 
-      const res = await fetch('/api/evidence', { method: 'POST', body: fd })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err?.error || 'Failed to upload evidence document')
+  const attachedList = useMemo(() => {
+    return evidence.filter((ev) => activeIds.includes(ev.id))
+  }, [evidence, activeIds])
+
+  const toggleEvidence = (evId: string) => {
+    if (readOnly) return
+    const isSelected = activeIds.includes(evId)
+    const nextIds = isSelected ? activeIds.filter((id) => id !== evId) : [...activeIds, evId]
+
+    if (onSelectEvidenceIds) {
+      onSelectEvidenceIds(nextIds)
+    }
+    if (onSelectEvidence) {
+      onSelectEvidence(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null)
+    }
+  }
+
+  const handleUploadFiles = async (files: FileList | File[]) => {
+    const fileList = Array.from(files)
+    if (fileList.length === 0 || readOnly) return
+    setUploading(true)
+    const toastId = toast.loading(`Uploading ${fileList.length} evidence document(s)...`)
+    try {
+      const newIds: string[] = []
+      let lastUploaded: EvidenceItem | null = null
+
+      for (const file of fileList) {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('documentType', 'INVOICE')
+        fd.append('module', moduleKey)
+        if (projectId) fd.append('projectId', projectId)
+        if (periodId) fd.append('periodId', periodId)
+
+        const res = await fetch('/api/evidence', { method: 'POST', body: fd })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err?.error || `Failed to upload ${file.name}`)
+        }
+        const uploaded = await res.json()
+        if (uploaded?.id) {
+          newIds.push(uploaded.id)
+          lastUploaded = uploaded
+        }
       }
-      const uploaded = await res.json()
-      toast.success(`${file.name} uploaded & verified!`, {
+
+      toast.success(`${fileList.length} document(s) uploaded & verified!`, {
         id: toastId,
         description: 'Stored in Evidence Vault (SHA-256 hash created) and attached below.',
       })
       await onUploaded()
-      if (uploaded?.id) onSelectEvidence(uploaded.id)
+
+      if (newIds.length > 0) {
+        const combined = Array.from(new Set([...activeIds, ...newIds]))
+        if (onSelectEvidenceIds) {
+          onSelectEvidenceIds(combined)
+        }
+        if (onSelectEvidence) {
+          onSelectEvidence(combined[combined.length - 1])
+        }
+        if (lastUploaded && onReview) {
+          onReview(lastUploaded)
+        }
+      }
     } catch (e: any) {
       toast.error('Upload failed', {
         id: toastId,
@@ -2243,8 +2303,6 @@ function FormEvidenceAttachSection({
     }
   }
 
-  const attached = evidence.find((ev) => ev.id === selectedEvidenceId) || null
-
   return (
     <div className="rounded-xl border border-violet-200/80 bg-gradient-to-b from-violet-50/70 to-white/80 p-3 shadow-sm">
       {/* Header */}
@@ -2254,35 +2312,77 @@ function FormEvidenceAttachSection({
             <Link2 className="h-3 w-3" />
           </div>
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
-            Attach Evidence Document
+            Attach Evidence Documents (Multiple Allowed)
           </span>
         </div>
-        <span className={`status-pill ${attached ? 'status-approved' : 'status-draft'}`}>
-          {attached ? 'Attached' : 'Optional'}
+        <span className={`status-pill ${attachedList.length > 0 ? 'status-approved' : 'status-draft'}`}>
+          {attachedList.length > 0 ? `${attachedList.length} Attached` : 'Optional'}
         </span>
       </div>
 
-      {/* Currently attached document */}
-      {attached && (
-        <div className="mb-2 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5">
-          <div className="flex min-w-0 items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-            <span className="truncate text-[11px] font-bold text-emerald-900" title={attached.fileName}>
-              {attached.fileName}
+      {/* Currently attached documents deck */}
+      {attachedList.length > 0 && (
+        <div className="mb-2.5 rounded-lg border border-emerald-200 bg-emerald-50/80 p-2">
+          <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Attached Documents ({attachedList.length})
             </span>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onSelectEvidenceIds) onSelectEvidenceIds([])
+                  if (onSelectEvidence) onSelectEvidence(null)
+                }}
+                className="text-[9px] font-bold text-rose-600 hover:underline"
+              >
+                Clear All
+              </button>
+            )}
           </div>
-          <button
-            type="button"
-            disabled={readOnly}
-            onClick={() => onSelectEvidence(null)}
-            className="shrink-0 rounded-full border border-emerald-300 bg-white px-2 py-0.5 text-[9px] font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-40"
-          >
-            Detach
-          </button>
+          <div className="flex flex-wrap gap-1.5">
+            {attachedList.map((att) => (
+              <div
+                key={att.id}
+                className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-white/95 px-2 py-1 text-xs text-slate-800 shadow-2xs"
+              >
+                {att.fileName.match(/\.pdf$/i) ? (
+                  <FileText className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                ) : att.fileName.match(/\.(png|jpg|jpeg|webp)$/i) ? (
+                  <ImageIcon className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                ) : (
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                )}
+                <span className="max-w-[150px] truncate text-[11px] font-semibold" title={att.fileName}>
+                  {att.fileName}
+                </span>
+                {onReview && (
+                  <button
+                    type="button"
+                    onClick={() => onReview(att)}
+                    className="flex h-5 w-5 items-center justify-center rounded bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                    title="Review document (flips Engine Preview card 180°)"
+                  >
+                    <Eye className="h-3 w-3" />
+                  </button>
+                )}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => toggleEvidence(att.id)}
+                    className="flex h-5 w-5 items-center justify-center rounded bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                    title="Detach document"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Upload dropzone */}
+      {/* Upload dropzone (multiple allowed) */}
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -2292,8 +2392,7 @@ function FormEvidenceAttachSection({
         onDrop={(e) => {
           e.preventDefault()
           setDragActive(false)
-          const file = e.dataTransfer.files?.[0]
-          if (file) handleUploadFile(file)
+          if (e.dataTransfer.files?.length) handleUploadFiles(e.dataTransfer.files)
         }}
         onClick={() => !readOnly && !uploading && fileInputRef.current?.click()}
         className={`group flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-3 text-center transition-all ${
@@ -2307,12 +2406,12 @@ function FormEvidenceAttachSection({
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           className="hidden"
           accept=".pdf,.png,.jpg,.jpeg,.webp,.xlsx,.xls,.csv,.doc,.docx"
           disabled={readOnly}
           onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) handleUploadFile(file)
+            if (e.target.files?.length) handleUploadFiles(e.target.files)
           }}
         />
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-50 text-violet-600 transition-transform group-hover:scale-110">
@@ -2323,10 +2422,10 @@ function FormEvidenceAttachSection({
           )}
         </div>
         <div className="mt-1 text-[11px] font-bold text-slate-800">
-          {uploading ? 'Processing & hashing file…' : 'Upload bill / log / certificate for this record'}
+          {uploading ? 'Processing & hashing file(s)…' : 'Upload document(s) for this record (Multi-file enabled)'}
         </div>
         <div className="text-[9px] text-slate-500">
-          PDF, PNG, JPG, XLSX, CSV (Max 25MB · SHA-256 tamper-evident)
+          Select single or multiple files · PDF, PNG, JPG, XLSX, CSV (Max 25MB · SHA-256 tamper-evident)
         </div>
       </div>
 
@@ -2338,7 +2437,7 @@ function FormEvidenceAttachSection({
           </div>
           <div className="max-h-44 space-y-1.5 overflow-y-auto scroll-elegant pr-0.5">
             {evidence.map((ev) => {
-              const isSelected = selectedEvidenceId === ev.id
+              const isSelected = activeIds.includes(ev.id)
               return (
                 <div
                   key={ev.id}
@@ -2378,7 +2477,7 @@ function FormEvidenceAttachSection({
                     <button
                       type="button"
                       disabled={readOnly}
-                      onClick={() => onSelectEvidence(isSelected ? null : ev.id)}
+                      onClick={() => toggleEvidence(ev.id)}
                       className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-bold shadow-xs transition disabled:cursor-not-allowed disabled:opacity-40 ${
                         isSelected
                           ? 'bg-emerald-600 text-white hover:bg-emerald-700'
@@ -8530,7 +8629,117 @@ function Level6TrainingForm({
 
 /* ============================================================
    LEVEL 7: ENVIRONMENTAL COMPLIANCE & PERMITS FORM
+   (MULTI-ITEM DRAFT & ORGANIZE WORKFLOW)
    ============================================================ */
+const L7_PERMIT_TYPES = [
+  'Consent to Operate (CTO)',
+  'Consent to Establish (CTE)',
+  'Environmental Clearance (EC)',
+  'Hazardous Waste Authorization',
+  'Groundwater NOC (CGWA)',
+  'Forest Clearance / Tree Transit',
+  'Factory License & Boilers Registration',
+  'Noise & Ambient Air Authorization',
+  'Other Statutory Clearance',
+]
+
+const L7_PRESETS: Record<
+  string,
+  {
+    authority: string
+    activity: string
+    validityYears: number
+    icon: LucideIcon
+    sampleNo: string
+  }
+> = {
+  'Consent to Operate (CTO)': {
+    authority: 'State Pollution Control Board (SPCB)',
+    activity: 'Concrete Batching, 400kV Substation & Solar PV EPC Operations',
+    validityYears: 3,
+    icon: ShieldCheck,
+    sampleNo: 'TSPCB/HYD/CTO/2026-8941',
+  },
+  'Consent to Establish (CTE)': {
+    authority: 'State Pollution Control Board (SPCB)',
+    activity: 'Phase-2 Substation Expansion & Inverter Yard Construction',
+    validityYears: 5,
+    icon: Building2,
+    sampleNo: 'TSPCB/CTE/EXP/2026-0412',
+  },
+  'Environmental Clearance (EC)': {
+    authority: 'Ministry of Environment, Forest and Climate Change (MoEFCC)',
+    activity: 'Full-scale Infrastructure Transmission & Canal Reach Package',
+    validityYears: 7,
+    icon: Landmark,
+    sampleNo: 'MoEFCC/IA/AP/INFRA/2024-912',
+  },
+  'Hazardous Waste Authorization': {
+    authority: 'State Pollution Control Board (SPCB)',
+    activity: 'Handling, Storage & Transit of Used Transformer Oil & Spent Batteries',
+    validityYears: 5,
+    icon: ShieldAlert,
+    sampleNo: 'HWA/SPCB/FORM-2/2026-118',
+  },
+  'Groundwater NOC (CGWA)': {
+    authority: 'Central Ground Water Authority (CGWA)',
+    activity: 'Deep Borewell Abstraction & Dewatering for Substation Trenching',
+    validityYears: 3,
+    icon: Waves,
+    sampleNo: 'CGWA/NOC/IND/ORIG/2025-4509',
+  },
+  'Forest Clearance / Tree Transit': {
+    authority: 'State Forest Department / MoEFCC Regional Office',
+    activity: 'Linear Transmission Line Right of Way (RoW) & Compensatory Afforestation',
+    validityYears: 10,
+    icon: Trees,
+    sampleNo: 'FD/DIV/ROW/TRANS/2024-77',
+  },
+  'Factory License & Boilers Registration': {
+    authority: 'Directorate of Factories and Boilers',
+    activity: 'Aggregate Processing Plant & Steam Auxiliary Operations',
+    validityYears: 1,
+    icon: Factory,
+    sampleNo: 'FAC/LIC/ZONE-4/2026-302',
+  },
+  'Noise & Ambient Air Authorization': {
+    authority: 'State Pollution Control Board (SPCB)',
+    activity: 'Heavy DG Set Stack Emissions & Night Construction Acoustic Enclosures',
+    validityYears: 2,
+    icon: Wind,
+    sampleNo: 'SPCB/AIR-NOISE/AUTH/2026-098',
+  },
+  'Other Statutory Clearance': {
+    authority: 'Local Municipal / District Magistrate',
+    activity: 'Public Infrastructure Utility Wayleave & Drainage NOC',
+    validityYears: 2,
+    icon: FileCheck2,
+    sampleNo: 'DIST/MAG/NOC/2026-551',
+  },
+}
+
+export interface StagedPermitItem {
+  id: string
+  permitConsentType: string
+  permitNumber: string
+  issuingAuthority: string
+  applicableActivity: string
+  issueDate: string
+  expiryDate: string
+  permitStatus: string
+  inspectionDate: string
+  inspectionFindings: string
+  nonComplianceIdentified: string
+  correctiveAction: string
+  responsibleOwner: string
+  dueDate: string
+  closureDate: string
+  supportingEvidence: string
+  evidenceIds: string[]
+  evidenceFiles: EvidenceItem[]
+  daysRemaining: number
+}
+
 function Level7ComplianceForm({
   projectId,
   periodId,
@@ -8544,6 +8753,16 @@ function Level7ComplianceForm({
   const key = `l7-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
 
+  // Workflow mode: 1 = Item Drafting, 2 = Organized Consolidated Summary
+  const [workflowStep, setWorkflowStep] = useState<1 | 2>(initial.items?.length > 0 ? 2 : 1)
+
+  // Staged multi-item collection
+  const [stagedItems, setStagedItems] = useState<StagedPermitItem[]>(() => {
+    if (Array.isArray(initial.items) && initial.items.length > 0) return initial.items
+    return []
+  })
+
+  // Active form inputs
   const [permitConsentType, setPermitConsentType] = useState(initial.permitConsentType ?? 'Consent to Operate (CTO)')
   const [permitNumber, setPermitNumber] = useState(initial.permitNumber ?? 'TSPCB/HYD/CTO/2026-8941')
   const [issuingAuthority, setIssuingAuthority] = useState(initial.issuingAuthority ?? 'State Pollution Control Board (SPCB)')
@@ -8558,39 +8777,209 @@ function Level7ComplianceForm({
   const [responsibleOwner, setResponsibleOwner] = useState(initial.responsibleOwner ?? 'S. Nageswara Rao (VP - Regulatory & Legal)')
   const [dueDate, setDueDate] = useState(initial.dueDate ?? '2026-12-31')
   const [closureDate, setClosureDate] = useState(initial.closureDate ?? '2026-08-20')
-  const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'SPCB-VALID-CONSENT-ORDER-2026.pdf')
-  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
+  const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? '')
+  const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>(() => {
+    if (Array.isArray(initial.evidenceIds)) return initial.evidenceIds
+    if (initial.evidenceId) return [initial.evidenceId]
+    return []
+  })
+
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    formStateRef.current[key] = {
-      permitConsentType, permitNumber, issuingAuthority, issueDate, expiryDate,
-      permitStatus, applicableActivity, inspectionDate, inspectionFindings,
-      nonComplianceIdentified, correctiveAction, responsibleOwner, dueDate,
-      closureDate, supportingEvidence, evidenceId,
-    }
-  }, [
-    key, permitConsentType, permitNumber, issuingAuthority, issueDate, expiryDate,
-    permitStatus, applicableActivity, inspectionDate, inspectionFindings,
-    nonComplianceIdentified, correctiveAction, responsibleOwner, dueDate,
-    closureDate, supportingEvidence, evidenceId, formStateRef,
-  ])
-
+  // Calculate days remaining
   let daysRemaining = 365
   if (expiryDate) {
     const exp = new Date(expiryDate).getTime()
     daysRemaining = Math.round((exp - Date.now()) / 86400000)
   }
 
+  // Auto-fill defaults when selecting permit type
+  const handleSelectPresetType = (type: string) => {
+    setPermitConsentType(type)
+    const preset = L7_PRESETS[type]
+    if (preset) {
+      setIssuingAuthority(preset.authority)
+      setApplicableActivity(preset.activity)
+      if (!permitNumber || permitNumber.startsWith('TSPCB/')) {
+        setPermitNumber(preset.sampleNo)
+      }
+    }
+  }
+
+  // Sync state to parent ref
+  useEffect(() => {
+    formStateRef.current[key] = {
+      permitConsentType,
+      permitNumber,
+      issuingAuthority,
+      applicableActivity,
+      issueDate,
+      expiryDate,
+      permitStatus,
+      inspectionDate,
+      inspectionFindings,
+      nonComplianceIdentified,
+      correctiveAction,
+      responsibleOwner,
+      dueDate,
+      closureDate,
+      supportingEvidence,
+      evidenceIds: selectedEvidenceIds,
+      evidenceId: selectedEvidenceIds[0] || null,
+      items: stagedItems,
+    }
+  }, [
+    key,
+    permitConsentType,
+    permitNumber,
+    issuingAuthority,
+    applicableActivity,
+    issueDate,
+    expiryDate,
+    permitStatus,
+    inspectionDate,
+    inspectionFindings,
+    nonComplianceIdentified,
+    correctiveAction,
+    responsibleOwner,
+    dueDate,
+    closureDate,
+    supportingEvidence,
+    selectedEvidenceIds,
+    stagedItems,
+    formStateRef,
+  ])
+
+  // Package current inputs into StagedPermitItem
+  const packageCurrentItem = (): StagedPermitItem => {
+    const attFiles = evidence.filter((e) => selectedEvidenceIds.includes(e.id))
+    return {
+      id: editingId || `permit-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      permitConsentType,
+      permitNumber: permitNumber || 'PENDING-REG-REF',
+      issuingAuthority: issuingAuthority || 'Regulatory Authority',
+      applicableActivity: applicableActivity || 'Project Site Operations',
+      issueDate,
+      expiryDate,
+      permitStatus,
+      inspectionDate,
+      inspectionFindings,
+      nonComplianceIdentified,
+      correctiveAction,
+      responsibleOwner,
+      dueDate,
+      closureDate,
+      supportingEvidence,
+      evidenceIds: selectedEvidenceIds,
+      evidenceFiles: attFiles,
+      daysRemaining,
+    }
+  }
+
+  // Add / Update item in staging
+  const stageCurrentItem = (resetForm = true) => {
+    if (!permitNumber) {
+      setError('Permit reference number is required')
+      return false
+    }
+    setError('')
+
+    const item = packageCurrentItem()
+    setStagedItems((prev) => {
+      const idx = prev.findIndex((p) => p.id === item.id)
+      if (idx >= 0) {
+        const next = [...prev]
+        next[idx] = item
+        return next
+      }
+      return [...prev, item]
+    })
+
+    toast.success(`Permit "${item.permitConsentType}" staged (${item.permitNumber})`, {
+      description: `${item.evidenceIds.length} evidence file(s) attached.`,
+    })
+
+    if (resetForm) {
+      setEditingId(null)
+      // Pick next un-staged permit type
+      const currentTypes = stagedItems.map((s) => s.permitConsentType)
+      currentTypes.push(item.permitConsentType)
+      const nextType = L7_PERMIT_TYPES.find((t) => !currentTypes.includes(t)) || L7_PERMIT_TYPES[0]
+      handleSelectPresetType(nextType)
+      setSelectedEvidenceIds([])
+      setSupportingEvidence('')
+    }
+    return true
+  }
+
+  // Edit existing staged item
+  const handleEditItem = (item: StagedPermitItem) => {
+    setEditingId(item.id)
+    setPermitConsentType(item.permitConsentType)
+    setPermitNumber(item.permitNumber)
+    setIssuingAuthority(item.issuingAuthority)
+    setApplicableActivity(item.applicableActivity)
+    setIssueDate(item.issueDate)
+    setExpiryDate(item.expiryDate)
+    setPermitStatus(item.permitStatus)
+    setInspectionDate(item.inspectionDate)
+    setInspectionFindings(item.inspectionFindings)
+    setNonComplianceIdentified(item.nonComplianceIdentified)
+    setCorrectiveAction(item.correctiveAction)
+    setResponsibleOwner(item.responsibleOwner)
+    setDueDate(item.dueDate)
+    setClosureDate(item.closureDate)
+    setSupportingEvidence(item.supportingEvidence)
+    setSelectedEvidenceIds(item.evidenceIds || [])
+    setWorkflowStep(1)
+  }
+
+  // Delete staged item
+  const handleDeleteItem = (id: string) => {
+    setStagedItems((prev) => prev.filter((p) => p.id !== id))
+    toast.info('Permit item removed from draft staging')
+  }
+
+  // Move to Step 2
+  const handleProceedToOrganize = () => {
+    if (permitNumber && !stagedItems.some((p) => p.id === editingId)) {
+      stageCurrentItem(false)
+    }
+    setWorkflowStep(2)
+  }
+
+  // Consolidated Portfolio Metrics
+  const summaryMetrics = useMemo(() => {
+    const total = stagedItems.length
+    const valid = stagedItems.filter((p) => p.permitStatus === 'Valid').length
+    const expiringSoon = stagedItems.filter((p) => p.daysRemaining <= 90 && p.daysRemaining >= 0).length
+    const nonCompliant = stagedItems.filter((p) => p.nonComplianceIdentified === 'Yes').length
+    const complianceRate = total > 0 ? Math.round(((total - nonCompliant) / total) * 100) : 100
+    const totalDocs = stagedItems.reduce((acc, p) => acc + (p.evidenceIds?.length || 0), 0)
+
+    return { total, valid, expiringSoon, nonCompliant, complianceRate, totalDocs }
+  }, [stagedItems])
+
+  // Save / Submit handler
   const save = async (submitForReview = false) => {
     setError('')
-    if (!permitNumber) {
-      setError('Permit number is required')
-      return
+    let itemsToSave = stagedItems
+    if (itemsToSave.length === 0) {
+      if (!permitNumber) {
+        setError('At least one permit authorization must be added or entered')
+        return
+      }
+      itemsToSave = [packageCurrentItem()]
+      setStagedItems(itemsToSave)
     }
+
     setSubmitting(true)
     try {
+      const primaryItem = itemsToSave[0]
+      const allEvIds = Array.from(new Set(itemsToSave.flatMap((it) => it.evidenceIds || [])))
+
       const res = await fetch('/api/data-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -8601,13 +8990,26 @@ function Level7ComplianceForm({
           module: 'COMPLIANCE',
           projectId,
           reportingPeriodId: periodId,
-          evidenceId: evidenceId || undefined,
-          data: formStateRef.current[key],
+          evidenceId: allEvIds[0] || undefined,
+          data: {
+            ...primaryItem,
+            evidenceIds: allEvIds,
+            items: itemsToSave,
+            totalPermits: itemsToSave.length,
+            complianceRate: summaryMetrics.complianceRate,
+          },
           submitForReview,
         }),
       })
+
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Permit record')
+
+      toast.success(
+        submitForReview
+          ? `Permits & Compliance submitted for review (${itemsToSave.length} authorizations)!`
+          : `Permit portfolio draft saved (${itemsToSave.length} authorizations).`,
+      )
       onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -8617,213 +9019,640 @@ function Level7ComplianceForm({
   }
 
   return (
-    <FormGrid>
-      <FormField label="Permit / Consent Type" hint="Applicable environmental authorization.">
-        <select
-          value={permitConsentType}
-          disabled={readOnly}
-          onChange={(e) => setPermitConsentType(e.target.value)}
-          className={inputClass}
-        >
-          {['Consent to Operate (CTO)', 'Consent to Establish (CTE)', 'Environmental Clearance (EC)', 'Hazardous Waste Authorization', 'Groundwater NOC (CGWA)', 'Forest Clearance'].map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
-      </FormField>
+    <div className="space-y-4">
+      {/* SEGMENTED VIEW CONTROLLER PILL */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-teal-200/90 bg-gradient-to-r from-teal-50/90 via-white/80 to-emerald-50/90 p-2 shadow-sm">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setWorkflowStep(1)}
+            className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+              workflowStep === 1
+                ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20'
+                : 'bg-white/80 text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200/80'
+            }`}
+          >
+            <FileCheck2 className="h-3.5 w-3.5" />
+            <span>1. Permit Drafting</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+                workflowStep === 1 ? 'bg-teal-700 text-white' : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {stagedItems.length}
+            </span>
+          </button>
 
-      <FormField label="Permit Number" hint="Official regulatory reference code.">
-        <input
-          value={permitNumber}
-          disabled={readOnly}
-          onChange={(e) => setPermitNumber(e.target.value)}
-          placeholder="e.g. SPCB/VJA/CTO/2024-8891"
-          className={inputClass}
-        />
-      </FormField>
+          <button
+            type="button"
+            onClick={() => {
+              if (stagedItems.length === 0) stageCurrentItem(false)
+              setWorkflowStep(2)
+            }}
+            className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+              workflowStep === 2
+                ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20'
+                : 'bg-white/80 text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200/80'
+            }`}
+          >
+            <Layers className="h-3.5 w-3.5" />
+            <span>2. Organized Summary</span>
+            {stagedItems.length > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black text-white">
+                ✓
+              </span>
+            )}
+          </button>
+        </div>
 
-      <FormField label="Issuing Authority" hint="SPCB, CPCB, MoEFCC, CGWA.">
-        <input
-          value={issuingAuthority}
-          disabled={readOnly}
-          onChange={(e) => setIssuingAuthority(e.target.value)}
-          placeholder="e.g. State Pollution Control Board"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Applicable Activity" hint="Activity covered by the permit.">
-        <input
-          value={applicableActivity}
-          disabled={readOnly}
-          onChange={(e) => setApplicableActivity(e.target.value)}
-          placeholder="e.g. RMC Batching plant and asphalt operations"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Issue Date" hint="Date issued.">
-        <input
-          type="date"
-          value={issueDate}
-          disabled={readOnly}
-          onChange={(e) => setIssueDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Expiry Date" hint="Date of expiry.">
-        <input
-          type="date"
-          value={expiryDate}
-          disabled={readOnly}
-          onChange={(e) => setExpiryDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Permit Status" hint="Valid / Expiring / Expired.">
-        <select
-          value={permitStatus}
-          disabled={readOnly}
-          onChange={(e) => setPermitStatus(e.target.value)}
-          className={inputClass}
-        >
-          {['Valid', 'Expiring within 90 days', 'Expired', 'Renewal in progress'].map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Inspection Date" hint="Where applicable.">
-        <input
-          type="date"
-          value={inspectionDate}
-          disabled={readOnly}
-          onChange={(e) => setInspectionDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Inspection Findings" hint="Actual findings from regulatory officer." full>
-        <textarea
-          value={inspectionFindings}
-          disabled={readOnly}
-          onChange={(e) => setInspectionFindings(e.target.value)}
-          placeholder="e.g. Site visited by Regional Officer; greenbelt and dust control found satisfactory."
-          className={inputClass + ' min-h-[50px] resize-y'}
-        />
-      </FormField>
-
-      <FormField label="Non-compliance Identified" hint="Yes / No / Under assessment.">
-        <select
-          value={nonComplianceIdentified}
-          disabled={readOnly}
-          onChange={(e) => setNonComplianceIdentified(e.target.value)}
-          className={inputClass}
-        >
-          {['No', 'Yes', 'Under assessment'].map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Responsible Owner" hint="Assigned person or role.">
-        <input
-          value={responsibleOwner}
-          disabled={readOnly}
-          onChange={(e) => setResponsibleOwner(e.target.value)}
-          placeholder="e.g. Site Environmental Lead"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Corrective Action" hint="Action taken or planned." full>
-        <input
-          value={correctiveAction}
-          disabled={readOnly}
-          onChange={(e) => setCorrectiveAction(e.target.value)}
-          placeholder="e.g. Additional water sprinklers installed at aggregate stockyard"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Due Date" hint="Target closure date.">
-        <input
-          type="date"
-          value={dueDate}
-          disabled={readOnly}
-          onChange={(e) => setDueDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Closure Date" hint="Actual closure date.">
-        <input
-          type="date"
-          value={closureDate}
-          disabled={readOnly}
-          onChange={(e) => setClosureDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Supporting Evidence" hint="Permit, consent, inspection report." full>
-        <input
-          value={supportingEvidence}
-          disabled={readOnly}
-          onChange={(e) => setSupportingEvidence(e.target.value)}
-          placeholder="e.g. TSPCB CTO Order #8941 & stack monitoring report"
-          className={inputClass}
-        />
-      </FormField>
-
-      {/* Attach evidence document directly from the form (after Supporting Evidence / Permits) */}
-      <div className="sm:col-span-2">
-        <FormEvidenceAttachSection
-          projectId={projectId}
-          periodId={periodId}
-          moduleKey="COMPLIANCE"
-          evidence={evidence}
-          onUploaded={onEvidenceUploaded || (async () => {})}
-          selectedEvidenceId={evidenceId || null}
-          onSelectEvidence={(id) => setEvidenceId(id || '')}
-          onReview={onReviewEvidence}
-          readOnly={readOnly}
-        />
-      </div>
-
-      {/* Live Preview Card */}
-      <div className="sm:col-span-2 rounded-xl border border-teal-200/80 bg-teal-50/60 p-3 text-xs text-teal-900">
-        <div className="flex items-center justify-between font-bold">
-          <span className="flex items-center gap-1.5">
-            <FileCheck2 className="h-3.5 w-3.5 text-teal-600" /> Consent Validity Window
+        <div className="hidden sm:flex items-center gap-3 text-xs pr-2">
+          <span className="text-[11px] font-bold text-slate-600">
+            Portfolio:{' '}
+            <span className="font-extrabold text-teal-700">{stagedItems.length} Permits</span>
           </span>
-          <span className="text-[10px] text-teal-700">Non-compliance: {nonComplianceIdentified}</span>
-        </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Days to Expiry</div>
-            <div className="text-sm font-bold text-slate-900">{daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Permit Status</div>
-            <div className="text-sm font-bold text-slate-900">{permitStatus}</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Authority</div>
-            <div className="text-sm font-bold text-slate-900">{issuingAuthority.split(' ')[0]}</div>
-          </div>
+          <span className="text-slate-300">•</span>
+          <span className="text-[11px] font-bold text-slate-600">
+            Compliance: <span className="font-extrabold text-emerald-600">{summaryMetrics.complianceRate}%</span>
+          </span>
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
-    </FormGrid>
+      {/* ================= STEP 1: ITEM DRAFTING ================= */}
+      {workflowStep === 1 && (
+        <div className="space-y-4">
+          {/* Source Preset Chips Dock */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-3 shadow-2xs">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Select Environmental Permit / Statutory Authorization:
+              </span>
+              <span className="text-[10px] text-teal-600 font-semibold">
+                Click preset chip to auto-populate authority &amp; activity
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {L7_PERMIT_TYPES.map((type) => {
+                const preset = L7_PRESETS[type]
+                const IconComponent = preset?.icon || ShieldCheck
+                const isSelected = permitConsentType === type
+                const staged = stagedItems.find((s) => s.permitConsentType === type)
+
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => handleSelectPresetType(type)}
+                    className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-2 border-teal-500 bg-teal-50/90 text-teal-900 shadow-sm'
+                        : 'border border-slate-200/80 bg-white/90 text-slate-700 hover:border-teal-300 hover:bg-teal-50/40'
+                    }`}
+                  >
+                    <IconComponent
+                      className={`h-3.5 w-3.5 ${isSelected ? 'text-teal-600' : 'text-slate-500 group-hover:text-teal-600'}`}
+                    />
+                    <span>{type}</span>
+                    {staged && (
+                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-800">
+                        ✓ Added
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Form Grid */}
+          <FormGrid>
+            <FormField label="Permit / Consent Type" hint="Selected environmental authorization.">
+              <select
+                value={permitConsentType}
+                disabled={readOnly}
+                onChange={(e) => handleSelectPresetType(e.target.value)}
+                className={inputClass}
+              >
+                {L7_PERMIT_TYPES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Permit Reference Number" hint="Official statutory registration code.">
+              <input
+                value={permitNumber}
+                disabled={readOnly}
+                onChange={(e) => setPermitNumber(e.target.value)}
+                placeholder="e.g. TSPCB/HYD/CTO/2026-8941"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Issuing Authority" hint="SPCB, CPCB, MoEFCC, CGWA.">
+              <input
+                value={issuingAuthority}
+                disabled={readOnly}
+                onChange={(e) => setIssuingAuthority(e.target.value)}
+                placeholder="e.g. State Pollution Control Board"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Applicable Activity" hint="Activity covered by the permit.">
+              <input
+                value={applicableActivity}
+                disabled={readOnly}
+                onChange={(e) => setApplicableActivity(e.target.value)}
+                placeholder="e.g. Concrete Batching & Solar PV EPC Operations"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Issue Date" hint="Date of authorization.">
+              <input
+                type="date"
+                value={issueDate}
+                disabled={readOnly}
+                onChange={(e) => setIssueDate(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Expiry Date" hint="Date of validity expiry.">
+              <input
+                type="date"
+                value={expiryDate}
+                disabled={readOnly}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Permit Status" hint="Current validity standing.">
+              <select
+                value={permitStatus}
+                disabled={readOnly}
+                onChange={(e) => setPermitStatus(e.target.value)}
+                className={inputClass}
+              >
+                {['Valid', 'Expiring within 90 days', 'Expired', 'Renewal in progress'].map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Inspection Date" hint="Most recent regulatory inspection.">
+              <input
+                type="date"
+                value={inspectionDate}
+                disabled={readOnly}
+                onChange={(e) => setInspectionDate(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Inspection Findings" hint="Actual findings from regulatory officer." full>
+              <textarea
+                value={inspectionFindings}
+                disabled={readOnly}
+                onChange={(e) => setInspectionFindings(e.target.value)}
+                placeholder="e.g. Site visited by Regional Officer; greenbelt and dust control found satisfactory."
+                className={inputClass + ' min-h-[50px] resize-y'}
+              />
+            </FormField>
+
+            <FormField label="Non-compliance Identified" hint="Yes / No / Under assessment.">
+              <select
+                value={nonComplianceIdentified}
+                disabled={readOnly}
+                onChange={(e) => setNonComplianceIdentified(e.target.value)}
+                className={inputClass}
+              >
+                {['No', 'Yes', 'Under assessment'].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Responsible Owner" hint="Assigned person or role.">
+              <input
+                value={responsibleOwner}
+                disabled={readOnly}
+                onChange={(e) => setResponsibleOwner(e.target.value)}
+                placeholder="e.g. Site Environmental Lead / VP Legal"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Corrective Action" hint="Action taken or planned if non-compliance." full>
+              <input
+                value={correctiveAction}
+                disabled={readOnly}
+                onChange={(e) => setCorrectiveAction(e.target.value)}
+                placeholder="e.g. Quarterly ambient air and ZLD monitoring reports submitted to PCB portal."
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Target Due Date" hint="Statutory closure deadline.">
+              <input
+                type="date"
+                value={dueDate}
+                disabled={readOnly}
+                onChange={(e) => setDueDate(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Actual Closure Date" hint="Date of confirmed closure.">
+              <input
+                type="date"
+                value={closureDate}
+                disabled={readOnly}
+                onChange={(e) => setClosureDate(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Supporting Evidence Remarks" hint="Document notes, register entry." full>
+              <input
+                value={supportingEvidence}
+                disabled={readOnly}
+                onChange={(e) => setSupportingEvidence(e.target.value)}
+                placeholder="e.g. Statutory order copy and quarterly compliance return"
+                className={inputClass}
+              />
+            </FormField>
+
+            {/* In-Form Multi-Evidence Attach Section */}
+            <div className="sm:col-span-2">
+              <FormEvidenceAttachSection
+                projectId={projectId}
+                periodId={periodId}
+                moduleKey="COMPLIANCE"
+                evidence={evidence}
+                onUploaded={onEvidenceUploaded || (async () => {})}
+                selectedEvidenceIds={selectedEvidenceIds}
+                onSelectEvidenceIds={setSelectedEvidenceIds}
+                onReview={onReviewEvidence}
+                readOnly={readOnly}
+              />
+            </div>
+
+            {/* Live Expiry Preview Card */}
+            <div className="sm:col-span-2 rounded-xl border border-teal-200/80 bg-teal-50/60 p-3 text-xs text-teal-900">
+              <div className="flex items-center justify-between font-bold">
+                <span className="flex items-center gap-1.5">
+                  <FileCheck2 className="h-3.5 w-3.5 text-teal-600" /> Consent Validity Window
+                </span>
+                <span className="text-[10px] text-teal-700">Non-compliance: {nonComplianceIdentified}</span>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-white/80 p-1.5">
+                  <div className="text-[9px] uppercase text-slate-500 font-bold">Days to Expiry</div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/80 p-1.5">
+                  <div className="text-[9px] uppercase text-slate-500 font-bold">Permit Status</div>
+                  <div className="text-sm font-bold text-slate-900">{permitStatus}</div>
+                </div>
+                <div className="rounded-lg bg-white/80 p-1.5">
+                  <div className="text-[9px] uppercase text-slate-500 font-bold">Authority</div>
+                  <div className="text-sm font-bold text-slate-900">{issuingAuthority.split(' ')[0]}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ACTION RIBBON: ADD (DRAFT) + NEXT: ORGANIZE */}
+            <div className="sm:col-span-2 pt-2">
+              {error && (
+                <div className="mb-2 rounded-xl border border-rose-200 bg-rose-50/80 p-2.5 text-xs font-medium text-rose-800">
+                  <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-rose-600" /> {error}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2.5">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => stageCurrentItem(true)}
+                    className="flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-teal-500/20 hover:bg-teal-700 transition disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>{editingId ? 'Update Permit' : `+ Add ${permitConsentType.split('(')[0].trim()} (Draft)`}</span>
+                  </button>
+                  <span className="text-[11px] text-slate-500">
+                    {stagedItems.length} authorization(s) currently staged
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleProceedToOrganize}
+                  className="flex items-center gap-1.5 rounded-xl border border-teal-300 bg-white px-4 py-2 text-xs font-bold text-teal-700 shadow-xs hover:bg-teal-50 transition"
+                >
+                  <span>Next: Organize All Permits ({stagedItems.length})</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </FormGrid>
+
+          {/* Staged Permits Table (Step 1) */}
+          {stagedItems.length > 0 && (
+            <div className="rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-xs">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4 text-teal-600" />
+                  <span className="text-xs font-bold text-slate-800">
+                    Staged Permits &amp; Authorizations ({stagedItems.length})
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500">
+                  Click Edit to update inputs · Click eye to review evidence (flips card)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="py-2 pr-3">Permit Type</th>
+                      <th className="py-2 px-3">Reference #</th>
+                      <th className="py-2 px-3">Issuing Authority</th>
+                      <th className="py-2 px-3">Expiry Date</th>
+                      <th className="py-2 px-3">Status</th>
+                      <th className="py-2 px-3">Attached Evidence</th>
+                      <th className="py-2 pl-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {stagedItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-teal-50/30 transition">
+                        <td className="py-2.5 pr-3 font-semibold text-slate-800">
+                          {item.permitConsentType}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700">
+                          {item.permitNumber}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600">{item.issuingAuthority}</td>
+                        <td className="py-2.5 px-3 text-slate-600 font-mono text-[11px]">
+                          {item.expiryDate || 'N/A'}{' '}
+                          <span className="text-[10px] text-slate-400 font-sans">
+                            ({item.daysRemaining > 0 ? `${item.daysRemaining}d` : 'Expired'})
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                              item.permitStatus === 'Valid'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}
+                          >
+                            {item.permitStatus}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {item.evidenceFiles && item.evidenceFiles.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {item.evidenceFiles.map((ev) => (
+                                <button
+                                  key={ev.id}
+                                  type="button"
+                                  onClick={() => onReviewEvidence && onReviewEvidence(ev)}
+                                  className="flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition"
+                                  title="Review evidence (flips card 180°)"
+                                >
+                                  <Eye className="h-2.5 w-2.5" />
+                                  <span className="max-w-[80px] truncate">{ev.fileName}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">None</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pl-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleEditItem(item)}
+                              className="rounded-lg p-1 text-slate-500 hover:bg-teal-100 hover:text-teal-800 transition"
+                              title="Edit item"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="rounded-lg p-1 text-slate-400 hover:bg-rose-100 hover:text-rose-700 transition"
+                              title="Remove item"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================= STEP 2: ORGANIZED CONSOLIDATED SUMMARY ================= */}
+      {workflowStep === 2 && (
+        <div className="space-y-4">
+          {/* Bento KPI Metric Tiles */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border border-teal-200/90 bg-gradient-to-br from-teal-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-teal-800">
+                <span>Total Clearances</span>
+                <ShieldCheck className="h-3.5 w-3.5 text-teal-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-slate-900">{summaryMetrics.total}</div>
+              <div className="text-[10px] text-slate-500">Statutory authorizations</div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                <span>Compliance Rate</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-emerald-600">
+                {summaryMetrics.complianceRate}%
+              </div>
+              <div className="text-[10px] text-slate-500">{summaryMetrics.valid} valid consents</div>
+            </div>
+
+            <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-br from-amber-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                <span>Expiring Soon</span>
+                <Clock className="h-3.5 w-3.5 text-amber-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-amber-600">{summaryMetrics.expiringSoon}</div>
+              <div className="text-[10px] text-slate-500">Within 90-day window</div>
+            </div>
+
+            <div className="rounded-2xl border border-rose-200/90 bg-gradient-to-br from-rose-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-rose-800">
+                <span>Non-compliances</span>
+                <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-rose-600">{summaryMetrics.nonCompliant}</div>
+              <div className="text-[10px] text-slate-500">Pending corrective actions</div>
+            </div>
+          </div>
+
+          {/* Master Consolidated Breakdown Table */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-xs">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Consolidated Environmental Permits &amp; Compliance Portfolio
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Organized audit portfolio for SEBI BRSR Principle 6 statutory disclosures
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWorkflowStep(1)}
+                className="flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 hover:bg-teal-100 transition"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>+ Add Another Permit</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="py-2.5 pr-3">Permit Type</th>
+                    <th className="py-2.5 px-3">Reference #</th>
+                    <th className="py-2.5 px-3">Issuing Authority</th>
+                    <th className="py-2.5 px-3">Validity Window</th>
+                    <th className="py-2.5 px-3">Compliance Status</th>
+                    <th className="py-2.5 px-3">Attached Documents</th>
+                    <th className="py-2.5 pl-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stagedItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/60 transition">
+                      <td className="py-2.5 pr-3 font-semibold text-slate-800">
+                        {item.permitConsentType}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-700">
+                        {item.permitNumber}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600">{item.issuingAuthority}</td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
+                        {item.expiryDate || 'N/A'}{' '}
+                        <span className="text-[10px] text-slate-400 font-sans">
+                          ({item.daysRemaining > 0 ? `${item.daysRemaining}d` : 'Expired'})
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                            item.permitStatus === 'Valid'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}
+                        >
+                          {item.permitStatus}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {item.evidenceFiles && item.evidenceFiles.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {item.evidenceFiles.map((ev) => (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                onClick={() => onReviewEvidence && onReviewEvidence(ev)}
+                                className="flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition"
+                                title="Review document (flips Engine Preview card)"
+                              >
+                                <Eye className="h-2.5 w-2.5" />
+                                <span className="max-w-[90px] truncate">{ev.fileName}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">None attached</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pl-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleEditItem(item)}
+                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 transition"
+                            title="Edit"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-slate-200 font-bold bg-slate-50/50">
+                    <td className="py-2.5 pr-3 text-slate-800">
+                      Portfolio Total ({stagedItems.length} Authorizations)
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-500">—</td>
+                    <td className="py-2.5 px-3 text-slate-500">—</td>
+                    <td className="py-2.5 px-3 text-teal-800">
+                      {summaryMetrics.expiringSoon} Expiring Soon
+                    </td>
+                    <td className="py-2.5 px-3 text-emerald-700 font-bold">
+                      {summaryMetrics.complianceRate}% Compliant
+                    </td>
+                    <td className="py-2.5 px-3 text-blue-700">
+                      {summaryMetrics.totalDocs} Document(s)
+                    </td>
+                    <td className="py-2.5 pl-3 text-right text-slate-400">—</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Master Actions */}
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -9070,7 +9899,136 @@ function Level8IncidentsForm({
 
 /* ============================================================
    LEVEL 9: SITE OPERATIONS & RESOURCE-EFFICIENCY INITIATIVES FORM
+   (MULTI-ITEM DRAFT & ORGANIZE WORKFLOW)
    ============================================================ */
+const L9_CATEGORIES = [
+  'Solar PV Rooftop & Captive Clean Power',
+  'ZLD & Closed-Loop Water Recycling',
+  'Energy Efficient Motors & VFD Retrofits',
+  'Electric Vehicles (EV) & Fleet Decarbonization',
+  'Waste Heat Recovery (WHR) System',
+  'Rainwater Harvesting & Recharge Pits',
+  'Bio-diversity & Miyawaki Afforestation',
+  'Circular Raw Material Substitution',
+  'Process Digitization & Smart Telemetry',
+]
+
+const L9_PRESETS: Record<
+  string,
+  {
+    category: string
+    unit: string
+    defaultBase: string
+    defaultRep: string
+    icon: LucideIcon
+    calculationMethod: string
+    outcome: string
+  }
+> = {
+  'Solar PV Rooftop & Captive Clean Power': {
+    category: 'Energy',
+    unit: 'kWh / Month',
+    defaultBase: '185000',
+    defaultRep: '138000',
+    icon: Sun,
+    calculationMethod: 'Digital smart meter telemetric logs with automated SCADA baseline',
+    outcome: 'Measured outcome',
+  },
+  'ZLD & Closed-Loop Water Recycling': {
+    category: 'Water',
+    unit: 'kL Recycled / Month',
+    defaultBase: '4200',
+    defaultRep: '2140',
+    icon: Droplet,
+    calculationMethod: 'Automated flowmeter telemetry on STP/ETP tertiary permeate return',
+    outcome: 'Measured outcome',
+  },
+  'Energy Efficient Motors & VFD Retrofits': {
+    category: 'Energy',
+    unit: 'kWh Saved / Month',
+    defaultBase: '64000',
+    defaultRep: '48000',
+    icon: Cpu,
+    calculationMethod: 'Sub-metered baseline power logs before and after VFD installation',
+    outcome: 'Measured outcome',
+  },
+  'Electric Vehicles (EV) & Fleet Decarbonization': {
+    category: 'GHG / Fleet',
+    unit: 'Litres Diesel Displaced',
+    defaultBase: '12500',
+    defaultRep: '7200',
+    icon: Truck,
+    calculationMethod: 'Fuel dispenser telemetry and EV battery charging kWh correlation',
+    outcome: 'Measured outcome',
+  },
+  'Waste Heat Recovery (WHR) System': {
+    category: 'Energy',
+    unit: 'GJ Thermal Energy',
+    defaultBase: '950',
+    defaultRep: '610',
+    icon: Flame,
+    calculationMethod: 'Flue gas heat exchanger temperature delta and enthalpy flow rate',
+    outcome: 'Measured outcome',
+  },
+  'Rainwater Harvesting & Recharge Pits': {
+    category: 'Water',
+    unit: 'kL Water Harvested',
+    defaultBase: '1800',
+    defaultRep: '3450',
+    icon: CloudRain,
+    calculationMethod: 'Catchment area run-off coefficient and storage level sensor logs',
+    outcome: 'Measured outcome',
+  },
+  'Bio-diversity & Miyawaki Afforestation': {
+    category: 'Biodiversity',
+    unit: 'Native Saplings Planted',
+    defaultBase: '2500',
+    defaultRep: '6800',
+    icon: Trees,
+    calculationMethod: 'Geotagged drone survey and physical plantation survival audit log',
+    outcome: 'Verified audit',
+  },
+  'Circular Raw Material Substitution': {
+    category: 'Waste / Circular',
+    unit: 'MT Fly Ash / GGBS Utilized',
+    defaultBase: '450',
+    defaultRep: '890',
+    icon: RefreshCw,
+    calculationMethod: 'RMC batching plant load-cell digital weighbridge dispatch manifests',
+    outcome: 'Measured outcome',
+  },
+  'Process Digitization & Smart Telemetry': {
+    category: 'Process',
+    unit: 'Person-Hours Saved / Month',
+    defaultBase: '320',
+    defaultRep: '85',
+    icon: Sparkles,
+    calculationMethod: 'Paperless digital inspection checklists and automated validation workflows',
+    outcome: 'Measured outcome',
+  },
+}
+
+export interface StagedInitiativeItem {
+  id: string
+  activityInitiativeName: string
+  initiativeCategory: string
+  baselinePeriod: string
+  baselineValue: string
+  reportingPeriodValue: string
+  physicalOutputQuantity: string
+  outputUnit: string
+  startDate: string
+  completionDate: string
+  outcome: string
+  calculationMethod: string
+  supportingEvidence: string
+  remarks: string
+  evidenceIds: string[]
+  evidenceFiles: EvidenceItem[]
+  savings: number
+  pctSaved: number
+}
+
 function Level9InitiativesForm({
   projectId,
   periodId,
@@ -9084,48 +10042,238 @@ function Level9InitiativesForm({
   const key = `l9-${projectId}-${periodId}`
   const initial = formStateRef.current[key] || {}
 
-  const [activityInitiativeName, setActivityInitiativeName] = useState(initial.activityInitiativeName ?? 'Solar PV Tracker Optimization & ZLD Closed-loop Water Recycling')
+  // Workflow mode: 1 = Item Drafting, 2 = Organized Consolidated Summary
+  const [workflowStep, setWorkflowStep] = useState<1 | 2>(initial.items?.length > 0 ? 2 : 1)
+
+  // Staged multi-item collection
+  const [stagedItems, setStagedItems] = useState<StagedInitiativeItem[]>(() => {
+    if (Array.isArray(initial.items) && initial.items.length > 0) return initial.items
+    return []
+  })
+
+  // Active form inputs
+  const [activityInitiativeName, setActivityInitiativeName] = useState(
+    initial.activityInitiativeName ?? 'Solar PV Rooftop & Captive Clean Power',
+  )
   const [initiativeCategory, setInitiativeCategory] = useState(initial.initiativeCategory ?? 'Energy')
   const [baselinePeriod, setBaselinePeriod] = useState(initial.baselinePeriod ?? 'FY 2025-26 Average')
   const [baselineValue, setBaselineValue] = useState(initial.baselineValue ?? '185000')
   const [reportingPeriodValue, setReportingPeriodValue] = useState(initial.reportingPeriodValue ?? '138000')
   const [physicalOutputQuantity, setPhysicalOutputQuantity] = useState(initial.physicalOutputQuantity ?? '384000')
-  const [outputUnit, setOutputUnit] = useState(initial.outputUnit ?? 'kWh generated / KL treated')
+  const [outputUnit, setOutputUnit] = useState(initial.outputUnit ?? 'kWh / Month')
   const [startDate, setStartDate] = useState(initial.startDate ?? '2026-04-01')
   const [completionDate, setCompletionDate] = useState(initial.completionDate ?? '2026-09-30')
   const [outcome, setOutcome] = useState(initial.outcome ?? 'Measured outcome')
-  const [calculationMethod, setCalculationMethod] = useState(initial.calculationMethod ?? 'Digital smart meter telemetric logs with automated SCADA baseline')
-  const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? 'DOC-ENERGY-SAVINGS-CERT-2026.pdf')
-  const [remarks, setRemarks] = useState(initial.remarks ?? 'Achieved 25.4% energy reduction and 32.4% circular water recovery meeting SEBI Principal 2 targets.')
-  const [evidenceId, setEvidenceId] = useState(initial.evidenceId ?? '')
+  const [calculationMethod, setCalculationMethod] = useState(
+    initial.calculationMethod ?? 'Digital smart meter telemetric logs with automated SCADA baseline',
+  )
+  const [supportingEvidence, setSupportingEvidence] = useState(initial.supportingEvidence ?? '')
+  const [remarks, setRemarks] = useState(
+    initial.remarks ?? 'Achieved 25.4% energy reduction meeting SEBI Principle 6 emission reduction targets.',
+  )
+  const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>(() => {
+    if (Array.isArray(initial.evidenceIds)) return initial.evidenceIds
+    if (initial.evidenceId) return [initial.evidenceId]
+    return []
+  })
+
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    formStateRef.current[key] = {
-      activityInitiativeName, initiativeCategory, baselinePeriod, baselineValue,
-      reportingPeriodValue, physicalOutputQuantity, outputUnit, startDate,
-      completionDate, outcome, calculationMethod, supportingEvidence, remarks, evidenceId,
-    }
-  }, [
-    key, activityInitiativeName, initiativeCategory, baselinePeriod, baselineValue,
-    reportingPeriodValue, physicalOutputQuantity, outputUnit, startDate,
-    completionDate, outcome, calculationMethod, supportingEvidence, remarks, evidenceId, formStateRef,
-  ])
-
+  // Live calculation of current inputs
   const bVal = Number(baselineValue) || 0
   const rVal = Number(reportingPeriodValue) || 0
-  const diff = bVal > rVal ? bVal - rVal : 0
-  const pctSaved = bVal > 0 ? ((diff / bVal) * 100).toFixed(1) : '0'
+  const diff = Math.max(0, bVal - rVal)
+  const pctSaved = bVal > 0 ? Number(((diff / bVal) * 100).toFixed(1)) : 0
 
-  const save = async (submitForReview = false) => {
-    setError('')
+  // Auto-fill defaults when selecting preset
+  const handleSelectPresetCategory = (name: string) => {
+    setActivityInitiativeName(name)
+    const preset = L9_PRESETS[name]
+    if (preset) {
+      setInitiativeCategory(preset.category)
+      setOutputUnit(preset.unit)
+      setBaselineValue(preset.defaultBase)
+      setReportingPeriodValue(preset.defaultRep)
+      setCalculationMethod(preset.calculationMethod)
+      setOutcome(preset.outcome)
+    }
+  }
+
+  // Sync state to parent ref
+  useEffect(() => {
+    formStateRef.current[key] = {
+      activityInitiativeName,
+      initiativeCategory,
+      baselinePeriod,
+      baselineValue,
+      reportingPeriodValue,
+      physicalOutputQuantity,
+      outputUnit,
+      startDate,
+      completionDate,
+      outcome,
+      calculationMethod,
+      supportingEvidence,
+      remarks,
+      evidenceIds: selectedEvidenceIds,
+      evidenceId: selectedEvidenceIds[0] || null,
+      items: stagedItems,
+    }
+  }, [
+    key,
+    activityInitiativeName,
+    initiativeCategory,
+    baselinePeriod,
+    baselineValue,
+    reportingPeriodValue,
+    physicalOutputQuantity,
+    outputUnit,
+    startDate,
+    completionDate,
+    outcome,
+    calculationMethod,
+    supportingEvidence,
+    remarks,
+    selectedEvidenceIds,
+    stagedItems,
+    formStateRef,
+  ])
+
+  // Package current inputs into StagedInitiativeItem
+  const packageCurrentItem = (): StagedInitiativeItem => {
+    const attFiles = evidence.filter((e) => selectedEvidenceIds.includes(e.id))
+    return {
+      id: editingId || `init-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+      activityInitiativeName: activityInitiativeName || 'Site ESG Initiative',
+      initiativeCategory,
+      baselinePeriod,
+      baselineValue,
+      reportingPeriodValue,
+      physicalOutputQuantity,
+      outputUnit,
+      startDate,
+      completionDate,
+      outcome,
+      calculationMethod,
+      supportingEvidence,
+      remarks,
+      evidenceIds: selectedEvidenceIds,
+      evidenceFiles: attFiles,
+      savings: diff,
+      pctSaved,
+    }
+  }
+
+  // Add / Update item in staging
+  const stageCurrentItem = (resetForm = true) => {
     if (!activityInitiativeName) {
       setError('Initiative name is required')
-      return
+      return false
     }
+    setError('')
+
+    const item = packageCurrentItem()
+    setStagedItems((prev) => {
+      const idx = prev.findIndex((p) => p.id === item.id)
+      if (idx >= 0) {
+        const next = [...prev]
+        next[idx] = item
+        return next
+      }
+      return [...prev, item]
+    })
+
+    toast.success(`Initiative "${item.activityInitiativeName}" staged`, {
+      description: `Resource conservation: ${item.savings.toLocaleString()} ${item.outputUnit} (${item.pctSaved}% gain).`,
+    })
+
+    if (resetForm) {
+      setEditingId(null)
+      // Pick next un-staged category
+      const currentNames = stagedItems.map((s) => s.activityInitiativeName)
+      currentNames.push(item.activityInitiativeName)
+      const nextCat = L9_CATEGORIES.find((c) => !currentNames.includes(c)) || L9_CATEGORIES[0]
+      handleSelectPresetCategory(nextCat)
+      setSelectedEvidenceIds([])
+      setSupportingEvidence('')
+    }
+    return true
+  }
+
+  // Edit existing staged item
+  const handleEditItem = (item: StagedInitiativeItem) => {
+    setEditingId(item.id)
+    setActivityInitiativeName(item.activityInitiativeName)
+    setInitiativeCategory(item.initiativeCategory)
+    setBaselinePeriod(item.baselinePeriod)
+    setBaselineValue(item.baselineValue)
+    setReportingPeriodValue(item.reportingPeriodValue)
+    setPhysicalOutputQuantity(item.physicalOutputQuantity)
+    setOutputUnit(item.outputUnit)
+    setStartDate(item.startDate)
+    setCompletionDate(item.completionDate)
+    setOutcome(item.outcome)
+    setCalculationMethod(item.calculationMethod)
+    setSupportingEvidence(item.supportingEvidence)
+    setRemarks(item.remarks)
+    setSelectedEvidenceIds(item.evidenceIds || [])
+    setWorkflowStep(1)
+  }
+
+  // Delete staged item
+  const handleDeleteItem = (id: string) => {
+    setStagedItems((prev) => prev.filter((p) => p.id !== id))
+    toast.info('Initiative removed from draft staging')
+  }
+
+  // Move to Step 2
+  const handleProceedToOrganize = () => {
+    if (activityInitiativeName && !stagedItems.some((p) => p.id === editingId)) {
+      stageCurrentItem(false)
+    }
+    setWorkflowStep(2)
+  }
+
+  // Consolidated Portfolio Metrics
+  const summaryMetrics = useMemo(() => {
+    const total = stagedItems.length
+    let totalBase = 0
+    let totalRep = 0
+    let totalSavings = 0
+
+    for (const it of stagedItems) {
+      totalBase += Number(it.baselineValue) || 0
+      totalRep += Number(it.reportingPeriodValue) || 0
+      totalSavings += it.savings || 0
+    }
+
+    const avgReduction = totalBase > 0 ? Number(((totalSavings / totalBase) * 100).toFixed(1)) : 0
+    const measuredCount = stagedItems.filter((i) => i.outcome?.includes('Measured')).length
+    const totalDocs = stagedItems.reduce((acc, p) => acc + (p.evidenceIds?.length || 0), 0)
+
+    return { total, totalBase, totalRep, totalSavings, avgReduction, measuredCount, totalDocs }
+  }, [stagedItems])
+
+  // Save / Submit handler
+  const save = async (submitForReview = false) => {
+    setError('')
+    let itemsToSave = stagedItems
+    if (itemsToSave.length === 0) {
+      if (!activityInitiativeName) {
+        setError('At least one initiative project must be entered')
+        return
+      }
+      itemsToSave = [packageCurrentItem()]
+      setStagedItems(itemsToSave)
+    }
+
     setSubmitting(true)
     try {
+      const primaryItem = itemsToSave[0]
+      const allEvIds = Array.from(new Set(itemsToSave.flatMap((it) => it.evidenceIds || [])))
+
       const res = await fetch('/api/data-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -9136,13 +10284,27 @@ function Level9InitiativesForm({
           module: 'INITIATIVES',
           projectId,
           reportingPeriodId: periodId,
-          evidenceId: evidenceId || undefined,
-          data: formStateRef.current[key],
+          evidenceId: allEvIds[0] || undefined,
+          data: {
+            ...primaryItem,
+            evidenceIds: allEvIds,
+            items: itemsToSave,
+            totalInitiatives: itemsToSave.length,
+            totalSavings: summaryMetrics.totalSavings,
+            avgReduction: summaryMetrics.avgReduction,
+          },
           submitForReview,
         }),
       })
+
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save Initiative record')
+
+      toast.success(
+        submitForReview
+          ? `Environmental Initiatives submitted for review (${itemsToSave.length} projects)!`
+          : `Initiatives portfolio draft saved (${itemsToSave.length} projects).`,
+      )
       onSaved(d.record, submitForReview)
     } catch (e: any) {
       setError(e?.message || 'Save failed')
@@ -9152,193 +10314,629 @@ function Level9InitiativesForm({
   }
 
   return (
-    <FormGrid>
-      <FormField label="Activity / Initiative Name" hint="Work activity or improvement project." full>
-        <input
-          value={activityInitiativeName}
-          disabled={readOnly}
-          onChange={(e) => setActivityInitiativeName(e.target.value)}
-          placeholder="e.g. Installation of 100 kWp Rooftop Solar PV on Site Fabrication Camp"
-          className={inputClass}
-        />
-      </FormField>
+    <div className="space-y-4">
+      {/* SEGMENTED VIEW CONTROLLER PILL */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200/90 bg-gradient-to-r from-blue-50/90 via-white/80 to-indigo-50/90 p-2 shadow-sm">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setWorkflowStep(1)}
+            className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+              workflowStep === 1
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'bg-white/80 text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200/80'
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>1. Initiative Drafting</span>
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+                workflowStep === 1 ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {stagedItems.length}
+            </span>
+          </button>
 
-      <FormField label="Initiative Category" hint="Energy, water, waste, safety, other.">
-        <select
-          value={initiativeCategory}
-          disabled={readOnly}
-          onChange={(e) => setInitiativeCategory(e.target.value)}
-          className={inputClass}
-        >
-          {['Energy', 'Water', 'Waste', 'Safety', 'Material Efficiency', 'Other'].map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </FormField>
+          <button
+            type="button"
+            onClick={() => {
+              if (stagedItems.length === 0) stageCurrentItem(false)
+              setWorkflowStep(2)
+            }}
+            className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+              workflowStep === 2
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'bg-white/80 text-slate-600 hover:bg-white hover:text-slate-900 border border-slate-200/80'
+            }`}
+          >
+            <Layers className="h-3.5 w-3.5" />
+            <span>2. Organized Summary</span>
+            {stagedItems.length > 0 && (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black text-white">
+                ✓
+              </span>
+            )}
+          </button>
+        </div>
 
-      <FormField label="Baseline Period" hint="Reference period.">
-        <input
-          value={baselinePeriod}
-          disabled={readOnly}
-          onChange={(e) => setBaselinePeriod(e.target.value)}
-          placeholder="e.g. FY 2025-26 Average"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Baseline Value" hint="Measured starting value.">
-        <input
-          type="number"
-          min="0"
-          value={baselineValue}
-          disabled={readOnly}
-          onChange={(e) => setBaselineValue(e.target.value)}
-          placeholder="e.g. 142000"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Reporting-period Value" hint="Current measured value.">
-        <input
-          type="number"
-          min="0"
-          value={reportingPeriodValue}
-          disabled={readOnly}
-          onChange={(e) => setReportingPeriodValue(e.target.value)}
-          placeholder="e.g. 118000"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Physical Output Quantity" hint="If used for intensity calculations.">
-        <input
-          type="number"
-          value={physicalOutputQuantity}
-          disabled={readOnly}
-          onChange={(e) => setPhysicalOutputQuantity(e.target.value)}
-          placeholder="e.g. 18.5"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Output Unit" hint="Approved project-specific unit.">
-        <input
-          value={outputUnit}
-          disabled={readOnly}
-          onChange={(e) => setOutputUnit(e.target.value)}
-          placeholder="e.g. km of highway / MT steel"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Start Date" hint="Initiative start date.">
-        <input
-          type="date"
-          value={startDate}
-          disabled={readOnly}
-          onChange={(e) => setStartDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Completion Date" hint="If completed.">
-        <input
-          type="date"
-          value={completionDate}
-          disabled={readOnly}
-          onChange={(e) => setCompletionDate(e.target.value)}
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Outcome Type" hint="Measured outcome, target or estimate.">
-        <select
-          value={outcome}
-          disabled={readOnly}
-          onChange={(e) => setOutcome(e.target.value)}
-          className={inputClass}
-        >
-          {['Measured outcome', 'Target / Planned', 'Engineering estimate'].map((o) => (
-            <option key={o} value={o}>
-              {o}
-            </option>
-          ))}
-        </select>
-      </FormField>
-
-      <FormField label="Calculation Method" hint="Where calculated.">
-        <input
-          value={calculationMethod}
-          disabled={readOnly}
-          onChange={(e) => setCalculationMethod(e.target.value)}
-          placeholder="e.g. Sub-meter billing comparison (IPMVP)"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Supporting Evidence" hint="Progress report, measurements, completion record." full>
-        <input
-          value={supportingEvidence}
-          disabled={readOnly}
-          onChange={(e) => setSupportingEvidence(e.target.value)}
-          placeholder="e.g. Commissioning Certificate & Solar Generation Log"
-          className={inputClass}
-        />
-      </FormField>
-
-      <FormField label="Remarks" hint="Assumptions or limitations." full>
-        <textarea
-          value={remarks}
-          disabled={readOnly}
-          onChange={(e) => setRemarks(e.target.value)}
-          placeholder="e.g. Net reduction achieved following solar panel synchronization."
-          className={inputClass + ' min-h-[50px] resize-y'}
-        />
-      </FormField>
-
-      {/* Attach evidence document directly from the form (after Remarks) */}
-      <div className="sm:col-span-2">
-        <FormEvidenceAttachSection
-          projectId={projectId}
-          periodId={periodId}
-          moduleKey="INITIATIVES"
-          evidence={evidence}
-          onUploaded={onEvidenceUploaded || (async () => {})}
-          selectedEvidenceId={evidenceId || null}
-          onSelectEvidence={(id) => setEvidenceId(id || '')}
-          onReview={onReviewEvidence}
-          readOnly={readOnly}
-        />
-      </div>
-
-      {/* Live Preview Card */}
-      <div className="sm:col-span-2 rounded-xl border border-blue-200/80 bg-blue-50/60 p-3 text-xs text-blue-900">
-        <div className="flex items-center justify-between font-bold">
-          <span className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-blue-600" /> Resource Savings Analytics
+        <div className="hidden sm:flex items-center gap-3 text-xs pr-2">
+          <span className="text-[11px] font-bold text-slate-600">
+            Portfolio:{' '}
+            <span className="font-extrabold text-blue-700">{stagedItems.length} Initiatives</span>
           </span>
-          <span className="text-[10px] text-blue-700">Outcome: {outcome}</span>
-        </div>
-        <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Achieved Savings</div>
-            <div className="text-sm font-bold text-slate-900">{diff > 0 ? diff.toLocaleString() : '0'}</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Reduction %</div>
-            <div className="text-sm font-bold text-slate-900">{pctSaved}%</div>
-          </div>
-          <div className="rounded-lg bg-white/80 p-1.5">
-            <div className="text-[9px] uppercase text-slate-500 font-bold">Baseline Value</div>
-            <div className="text-sm font-bold text-slate-900">{bVal.toLocaleString()}</div>
-          </div>
+          <span className="text-slate-300">•</span>
+          <span className="text-[11px] font-bold text-slate-600">
+            Avg Reduction: <span className="font-extrabold text-emerald-600">{summaryMetrics.avgReduction}%</span>
+          </span>
         </div>
       </div>
 
-      <FormSaveActions error={error} submitting={submitting} readOnly={readOnly} onSave={() => save(false)} onSubmitForReview={() => save(true)} />
-    </FormGrid>
+      {/* ================= STEP 1: ITEM DRAFTING ================= */}
+      {workflowStep === 1 && (
+        <div className="space-y-4">
+          {/* Preset Chips Dock */}
+          <div className="rounded-2xl border border-slate-200/80 bg-white/70 p-3 shadow-2xs">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Select Environmental Initiative / Resource-Efficiency Program:
+              </span>
+              <span className="text-[10px] text-blue-600 font-semibold">
+                Click preset chip to populate baseline, metrics &amp; methodology
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {L9_CATEGORIES.map((cat) => {
+                const preset = L9_PRESETS[cat]
+                const IconComponent = preset?.icon || Sparkles
+                const isSelected = activityInitiativeName === cat
+                const staged = stagedItems.find((s) => s.activityInitiativeName === cat)
+
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => handleSelectPresetCategory(cat)}
+                    className={`group relative flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-2 border-blue-500 bg-blue-50/90 text-blue-900 shadow-sm'
+                        : 'border border-slate-200/80 bg-white/90 text-slate-700 hover:border-blue-300 hover:bg-blue-50/40'
+                    }`}
+                  >
+                    <IconComponent
+                      className={`h-3.5 w-3.5 ${isSelected ? 'text-blue-600' : 'text-slate-500 group-hover:text-blue-600'}`}
+                    />
+                    <span>{cat}</span>
+                    {staged && (
+                      <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-800">
+                        ✓ Added
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Form Grid */}
+          <FormGrid>
+            <FormField label="Activity / Initiative Name" hint="Clean energy, water recycling, waste or materials." full>
+              <input
+                value={activityInitiativeName}
+                disabled={readOnly}
+                onChange={(e) => setActivityInitiativeName(e.target.value)}
+                placeholder="e.g. Installation of 100 kWp Rooftop Solar PV on Site Fabrication Camp"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Initiative Category" hint="Energy, water, waste, fleet, circularity.">
+              <select
+                value={initiativeCategory}
+                disabled={readOnly}
+                onChange={(e) => setInitiativeCategory(e.target.value)}
+                className={inputClass}
+              >
+                {['Energy', 'Water', 'Waste / Circular', 'GHG / Fleet', 'Biodiversity', 'Process', 'Other'].map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Baseline Period" hint="Reference period or historical baseline.">
+              <input
+                value={baselinePeriod}
+                disabled={readOnly}
+                onChange={(e) => setBaselinePeriod(e.target.value)}
+                placeholder="e.g. FY 2025-26 Average"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Baseline Value" hint="Starting consumption or un-optimized quantity.">
+              <input
+                type="number"
+                min="0"
+                value={baselineValue}
+                disabled={readOnly}
+                onChange={(e) => setBaselineValue(e.target.value)}
+                placeholder="e.g. 185000"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Reporting Period Value" hint="Current metered consumption post-initiative.">
+              <input
+                type="number"
+                min="0"
+                value={reportingPeriodValue}
+                disabled={readOnly}
+                onChange={(e) => setReportingPeriodValue(e.target.value)}
+                placeholder="e.g. 138000"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Physical Output Quantity" hint="Production output volume for intensity derivation.">
+              <input
+                type="number"
+                value={physicalOutputQuantity}
+                disabled={readOnly}
+                onChange={(e) => setPhysicalOutputQuantity(e.target.value)}
+                placeholder="e.g. 384000"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Measurement / Output Unit" hint="Unit of measurement.">
+              <input
+                value={outputUnit}
+                disabled={readOnly}
+                onChange={(e) => setOutputUnit(e.target.value)}
+                placeholder="e.g. kWh / Month or kL treated"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Initiative Start Date" hint="Date of commissioning or project start.">
+              <input
+                type="date"
+                value={startDate}
+                disabled={readOnly}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Completion / Target Date" hint="Date achieved or project milestone.">
+              <input
+                type="date"
+                value={completionDate}
+                disabled={readOnly}
+                onChange={(e) => setCompletionDate(e.target.value)}
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Outcome Type" hint="Measured, planned or engineering estimate.">
+              <select
+                value={outcome}
+                disabled={readOnly}
+                onChange={(e) => setOutcome(e.target.value)}
+                className={inputClass}
+              >
+                {['Measured outcome', 'Target / Planned', 'Engineering estimate', 'Verified audit'].map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+
+            <FormField label="Calculation Methodology" hint="Protocol used for savings calculation." full>
+              <input
+                value={calculationMethod}
+                disabled={readOnly}
+                onChange={(e) => setCalculationMethod(e.target.value)}
+                placeholder="e.g. Digital smart meter telemetric logs with automated SCADA baseline (IPMVP)"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Supporting Evidence Remarks" hint="Commissioning certificate, meter logs." full>
+              <input
+                value={supportingEvidence}
+                disabled={readOnly}
+                onChange={(e) => setSupportingEvidence(e.target.value)}
+                placeholder="e.g. Commissioning Certificate & Solar Generation Log"
+                className={inputClass}
+              />
+            </FormField>
+
+            <FormField label="Remarks & Assumptions" hint="Operational constraints, boundary notes." full>
+              <textarea
+                value={remarks}
+                disabled={readOnly}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="e.g. Net reduction achieved following solar panel synchronization."
+                className={inputClass + ' min-h-[50px] resize-y'}
+              />
+            </FormField>
+
+            {/* In-Form Multi-Evidence Attach Section */}
+            <div className="sm:col-span-2">
+              <FormEvidenceAttachSection
+                projectId={projectId}
+                periodId={periodId}
+                moduleKey="INITIATIVES"
+                evidence={evidence}
+                onUploaded={onEvidenceUploaded || (async () => {})}
+                selectedEvidenceIds={selectedEvidenceIds}
+                onSelectEvidenceIds={setSelectedEvidenceIds}
+                onReview={onReviewEvidence}
+                readOnly={readOnly}
+              />
+            </div>
+
+            {/* Live Savings Preview Card */}
+            <div className="sm:col-span-2 rounded-xl border border-blue-200/80 bg-blue-50/60 p-3 text-xs text-blue-900">
+              <div className="flex items-center justify-between font-bold">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-blue-600" /> Resource Savings Analytics
+                </span>
+                <span className="text-[10px] text-blue-700">Outcome: {outcome}</span>
+              </div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-white/80 p-1.5">
+                  <div className="text-[9px] uppercase text-slate-500 font-bold">Achieved Savings</div>
+                  <div className="text-sm font-bold text-slate-900">
+                    {diff > 0 ? diff.toLocaleString() : '0'} {outputUnit.split('/')[0].trim()}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-white/80 p-1.5">
+                  <div className="text-[9px] uppercase text-slate-500 font-bold">Reduction %</div>
+                  <div className="text-sm font-bold text-slate-900">{pctSaved}%</div>
+                </div>
+                <div className="rounded-lg bg-white/80 p-1.5">
+                  <div className="text-[9px] uppercase text-slate-500 font-bold">Baseline Value</div>
+                  <div className="text-sm font-bold text-slate-900">{bVal.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ACTION RIBBON: ADD (DRAFT) + NEXT: ORGANIZE */}
+            <div className="sm:col-span-2 pt-2">
+              {error && (
+                <div className="mb-2 rounded-xl border border-rose-200 bg-rose-50/80 p-2.5 text-xs font-medium text-rose-800">
+                  <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-rose-600" /> {error}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2.5">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => stageCurrentItem(true)}
+                    className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition disabled:opacity-40"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>
+                      {editingId
+                        ? 'Update Initiative'
+                        : `+ Add ${activityInitiativeName.split('&')[0].trim()} (Draft)`}
+                    </span>
+                  </button>
+                  <span className="text-[11px] text-slate-500">
+                    {stagedItems.length} initiative(s) currently staged
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleProceedToOrganize}
+                  className="flex items-center gap-1.5 rounded-xl border border-blue-300 bg-white px-4 py-2 text-xs font-bold text-blue-700 shadow-xs hover:bg-blue-50 transition"
+                >
+                  <span>Next: Organize All Initiatives ({stagedItems.length})</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          </FormGrid>
+
+          {/* Staged Initiatives Table (Step 1) */}
+          {stagedItems.length > 0 && (
+            <div className="rounded-2xl border border-slate-200/90 bg-white/90 p-3 shadow-xs">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4 text-blue-600" />
+                  <span className="text-xs font-bold text-slate-800">
+                    Staged ESG Initiatives ({stagedItems.length})
+                  </span>
+                </div>
+                <span className="text-[10px] text-slate-500">
+                  Click Edit to modify · Click eye to review evidence (flips card)
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200/80 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      <th className="py-2 pr-3">Initiative Name</th>
+                      <th className="py-2 px-3">Category</th>
+                      <th className="py-2 px-3">Baseline</th>
+                      <th className="py-2 px-3">Reporting Period</th>
+                      <th className="py-2 px-3">Net Savings</th>
+                      <th className="py-2 px-3">Reduction %</th>
+                      <th className="py-2 px-3">Attached Evidence</th>
+                      <th className="py-2 pl-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {stagedItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-blue-50/30 transition">
+                        <td className="py-2.5 pr-3 font-semibold text-slate-800">
+                          {item.activityInitiativeName}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-800">
+                            {item.initiativeCategory}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600">
+                          {Number(item.baselineValue || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-slate-600">
+                          {Number(item.reportingPeriodValue || 0).toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold font-mono text-emerald-600">
+                          {item.savings > 0 ? `-${item.savings.toLocaleString()}` : '0'}{' '}
+                          <span className="text-[9px] font-sans text-slate-500">{item.outputUnit.split('/')[0]}</span>
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-emerald-700">
+                          {item.pctSaved}%
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {item.evidenceFiles && item.evidenceFiles.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {item.evidenceFiles.map((ev) => (
+                                <button
+                                  key={ev.id}
+                                  type="button"
+                                  onClick={() => onReviewEvidence && onReviewEvidence(ev)}
+                                  className="flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition"
+                                  title="Review evidence (flips card 180°)"
+                                >
+                                  <Eye className="h-2.5 w-2.5" />
+                                  <span className="max-w-[80px] truncate">{ev.fileName}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">None</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pl-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleEditItem(item)}
+                              className="rounded-lg p-1 text-slate-500 hover:bg-blue-100 hover:text-blue-800 transition"
+                              title="Edit item"
+                            >
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteItem(item.id)}
+                              className="rounded-lg p-1 text-slate-400 hover:bg-rose-100 hover:text-rose-700 transition"
+                              title="Remove item"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ================= STEP 2: ORGANIZED CONSOLIDATED SUMMARY ================= */}
+      {workflowStep === 2 && (
+        <div className="space-y-4">
+          {/* Bento KPI Metric Tiles */}
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border border-blue-200/90 bg-gradient-to-br from-blue-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-blue-800">
+                <span>Active Initiatives</span>
+                <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-slate-900">{summaryMetrics.total}</div>
+              <div className="text-[10px] text-slate-500">Resource reduction projects</div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+                <span>Net Conserved</span>
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-emerald-600">
+                {summaryMetrics.totalSavings.toLocaleString()}
+              </div>
+              <div className="text-[10px] text-slate-500">Consolidated resource savings</div>
+            </div>
+
+            <div className="rounded-2xl border border-indigo-200/90 bg-gradient-to-br from-indigo-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-indigo-800">
+                <span>Avg Reduction Rate</span>
+                <CheckCircle2 className="h-3.5 w-3.5 text-indigo-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-indigo-600">
+                {summaryMetrics.avgReduction}%
+              </div>
+              <div className="text-[10px] text-slate-500">Cumulative portfolio reduction</div>
+            </div>
+
+            <div className="rounded-2xl border border-cyan-200/90 bg-gradient-to-br from-cyan-50/80 to-white/90 p-3 shadow-2xs">
+              <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-cyan-800">
+                <span>Measured Outcomes</span>
+                <Layers className="h-3.5 w-3.5 text-cyan-600" />
+              </div>
+              <div className="mt-1 text-xl font-black text-cyan-600">
+                {summaryMetrics.measuredCount} / {summaryMetrics.total}
+              </div>
+              <div className="text-[10px] text-slate-500">{summaryMetrics.totalDocs} audit document(s)</div>
+            </div>
+          </div>
+
+          {/* Master Consolidated Breakdown Table */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-xs">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">
+                  Consolidated Environmental Initiatives Portfolio
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  SEBI BRSR Principle 6 resource-efficiency disclosures and verified carbon/water reductions
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWorkflowStep(1)}
+                className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>+ Add Another Initiative</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <th className="py-2.5 pr-3">Initiative Name</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3">Baseline Volume</th>
+                    <th className="py-2.5 px-3">Reporting Volume</th>
+                    <th className="py-2.5 px-3">Conserved Savings</th>
+                    <th className="py-2.5 px-3">Gain %</th>
+                    <th className="py-2.5 px-3">Attached Documents</th>
+                    <th className="py-2.5 pl-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stagedItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/60 transition">
+                      <td className="py-2.5 pr-3 font-semibold text-slate-800">
+                        {item.activityInitiativeName}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-800">
+                          {item.initiativeCategory}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-600">
+                        {Number(item.baselineValue || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-slate-600">
+                        {Number(item.reportingPeriodValue || 0).toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold font-mono text-emerald-600">
+                        {item.savings > 0 ? `-${item.savings.toLocaleString()}` : '0'}{' '}
+                        <span className="text-[9px] font-sans text-slate-500">{item.outputUnit.split('/')[0]}</span>
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-emerald-700">
+                        {item.pctSaved}%
+                      </td>
+                      <td className="py-2.5 px-3">
+                        {item.evidenceFiles && item.evidenceFiles.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {item.evidenceFiles.map((ev) => (
+                              <button
+                                key={ev.id}
+                                type="button"
+                                onClick={() => onReviewEvidence && onReviewEvidence(ev)}
+                                className="flex items-center gap-1 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 transition"
+                                title="Review document (flips Engine Preview card)"
+                              >
+                                <Eye className="h-2.5 w-2.5" />
+                                <span className="max-w-[90px] truncate">{ev.fileName}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">None attached</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 pl-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleEditItem(item)}
+                            className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 transition"
+                            title="Edit"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-slate-200 font-bold bg-slate-50/50">
+                    <td className="py-2.5 pr-3 text-slate-800">
+                      Portfolio Total ({stagedItems.length} Initiatives)
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-500">—</td>
+                    <td className="py-2.5 px-3 font-mono text-slate-700">
+                      {summaryMetrics.totalBase.toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-700">
+                      {summaryMetrics.totalRep.toLocaleString()}
+                    </td>
+                    <td className="py-2.5 px-3 font-bold font-mono text-emerald-700">
+                      {summaryMetrics.totalSavings.toLocaleString()} Saved
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-emerald-700">
+                      {summaryMetrics.avgReduction}% Gain
+                    </td>
+                    <td className="py-2.5 px-3 text-blue-700">
+                      {summaryMetrics.totalDocs} Document(s)
+                    </td>
+                    <td className="py-2.5 pl-3 text-right text-slate-400">—</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Master Actions */}
+          <FormSaveActions
+            error={error}
+            submitting={submitting}
+            readOnly={readOnly}
+            onSave={() => save(false)}
+            onSubmitForReview={() => save(true)}
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -9375,11 +10973,21 @@ function describeLevelRecord(r: any): string {
       }
       return `${r.data.wasteCategory || 'C&D'} · ${r.data.quantityGenerated || 0} ${r.data.unit || 'MT'}`
     }
-    if (r.level === 5) return `${r.data.incidentType || 'Incident'} · ${r.data.totalPersonHoursWorked || 0} hrs`
-    if (r.level === 6) return `${r.data.trainingProgramme || 'Training'} · ${r.data.participants || 0} participants`
-    if (r.level === 7) return `${r.data.permitConsentType || 'Permit'} #${r.data.permitNumber || 'N/A'}`
+    if (r.level === 5 || r.level === 7 || r.levelKey === 'level7') {
+      if (Array.isArray(r.data.items) && r.data.items.length > 0) {
+        const typeList = r.data.items.map((i: any) => i.permitConsentType?.split('(')[0].trim() || 'Permit').slice(0, 3).join(', ')
+        return `Multi-Permit Portfolio (${r.data.items.length} authorizations: ${typeList}${r.data.items.length > 3 ? '...' : ''}) · ${r.data.complianceRate ?? 100}% compliant`
+      }
+      return `${r.data.permitConsentType || 'Permit'} #${r.data.permitNumber || 'N/A'}`
+    }
+    if (r.level === 6 || r.level === 9 || r.levelKey === 'level9') {
+      if (Array.isArray(r.data.items) && r.data.items.length > 0) {
+        const initList = r.data.items.map((i: any) => i.activityInitiativeName?.split('&')[0].trim() || 'Project').slice(0, 3).join(', ')
+        return `Multi-Initiative Program (${r.data.items.length} projects: ${initList}${r.data.items.length > 3 ? '...' : ''}) · ${Number(r.data.totalSavings || 0).toLocaleString()} saved`
+      }
+      return `${r.data.activityInitiativeName || 'Initiative'} · ${r.data.outcome || 'Measured'}`
+    }
     if (r.level === 8) return `${r.data.recordType || 'Grievance'} · ${r.data.category || 'Spill'} (${r.data.currentStatus || 'Open'})`
-    if (r.level === 9) return `${r.data.activityInitiativeName || 'Initiative'} · ${r.data.outcome || 'Measured'}`
   }
   return r.id?.slice(-8) ?? 'Record'
 }

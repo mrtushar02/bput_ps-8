@@ -31,7 +31,11 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status') || undefined
   const take = Math.min(Number(searchParams.get('take') || 50), 200)
 
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = {
+    NOT: {
+      filePath: { startsWith: '/evidence/' },
+    },
+  }
   if (projectId) where.projectId = projectId
   if (periodId) where.reportingPeriodId = periodId
   if (moduleFilter) where.module = moduleFilter
