@@ -13,7 +13,7 @@ async function main() {
 
   // ---------- ROLES ----------
   const roleDefs = [
-    ['SUPER_ADMIN', 'Super Admin', 'Entire system administration', 3],
+    ['GROUP_ADMIN', 'Group Admin', 'Group-wide ESG reporting, organizational oversight, reporting timelines, and consolidated reports.', 3],
     ['PROJECT_USER', 'Environment Data User', 'Project-level environmental source data entry', 1],
     ['FINANCE_USER', 'Finance & Resource Data Contributor', 'Financial turnover, CapEx/OpEx and resource expenditure collection', 1],
     ['HR_USER', 'HR User', 'Workforce & HR data', 1],
@@ -56,11 +56,11 @@ async function main() {
     const p = await db.permission.upsert({ where: { key }, update: {}, create: { key, category: cat } })
     permIds[key] = p.id
   }
-  // Grant all permissions to SUPER_ADMIN, and a curated set to others
+  // Grant all permissions to GROUP_ADMIN, and a curated set to others
   for (const [key] of perms) {
     await db.rolePermission.upsert({
-      where: { roleId_permissionId: { roleId: roles.SUPER_ADMIN, permissionId: permIds[key] } },
-      update: {}, create: { roleId: roles.SUPER_ADMIN, permissionId: permIds[key] },
+      where: { roleId_permissionId: { roleId: roles.GROUP_ADMIN, permissionId: permIds[key] } },
+      update: {}, create: { roleId: roles.GROUP_ADMIN, permissionId: permIds[key] },
     })
   }
   const rolePermMap: Record<string, string[]> = {
@@ -117,7 +117,7 @@ async function main() {
   // ---------- USERS (demo, illustrative) ----------
   const pass = await bcrypt.hash('esg12345', 10)
   const users = [
-    { email: 'admin@meil-esg.in', name: 'Arjun Mehta', code: 'MEIL-ADM-001', role: 'SUPER_ADMIN', groupId: group.id },
+    { email: 'admin@meil-esg.in', name: 'Arjun Mehta', code: 'MEIL-ADM-001', role: 'GROUP_ADMIN', groupId: group.id },
     { email: 'rohit@meil-esg.in', name: 'Rohit Kumar', code: 'MEIL-PU-014', role: 'PROJECT_USER', scope: { type: 'PROJECT', id: projIds['MEIL-SOL-GJT'] } },
     { email: 'sunita@meil-esg.in', name: 'Sunita Rao', code: 'MEIL-HR-022', role: 'HR_USER', scope: { type: 'SUBSIDIARY', id: subA.id } },
     { email: 'kvenkat@meil-esg.in', name: 'K. Venkat', code: 'MEIL-EHS-009', role: 'EHS_USER', scope: { type: 'PROJECT', id: projIds['MEIL-SOL-GJT'] } },

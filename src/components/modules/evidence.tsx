@@ -140,8 +140,9 @@ type RoleGate = {
 function useRoleGate(): RoleGate {
   const { user } = useApp()
   const key = user?.roles?.[0]?.key ?? ''
-  // Verifiers: SUPER_ADMIN, BU_REVIEWER, SUBSIDIARY_REVIEWER, GROUP_REVIEWER
+  // Verifiers: GROUP_ADMIN, SUPER_ADMIN, BU_REVIEWER, SUBSIDIARY_REVIEWER, GROUP_REVIEWER
   const canVerify =
+    key === 'GROUP_ADMIN' ||
     key === 'SUPER_ADMIN' ||
     key === 'BU_REVIEWER' ||
     key === 'SUBSIDIARY_REVIEWER' ||

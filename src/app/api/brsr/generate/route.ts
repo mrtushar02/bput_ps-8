@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const allowed =
       (await userHasPermission(user.id, 'brsr.generate')) ||
       user.roles.some((r: any) =>
-        ['ESG_MANAGER', 'BRSR_MANAGER', 'GROUP_REVIEWER', 'SUPER_ADMIN'].includes(r.key)
+        ['ESG_MANAGER', 'BRSR_MANAGER', 'GROUP_REVIEWER', 'GROUP_ADMIN', 'SUPER_ADMIN'].includes(r.key)
       )
     if (!allowed) return NextResponse.json({ error: 'Forbidden — brsr.generate required' }, { status: 403 })
   } catch (e: any) {

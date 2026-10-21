@@ -593,7 +593,7 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
 ]
 
 const SEEDED_TEAM: { name: string; role: string; gradient: string; active: boolean }[] = [
-  { name: 'Arjun Mehta',          role: 'Super Admin',     gradient: 'from-slate-500 to-slate-700',   active: true  },
+  { name: 'Arjun Mehta',          role: 'Group Admin',     gradient: 'from-slate-700 to-slate-900',   active: true  },
   { name: 'Rohit Kumar',          role: 'Project User',    gradient: 'from-sky-500 to-blue-600',      active: true  },
   { name: 'Sunita Rao',          role: 'HR User',         gradient: 'from-cyan-500 to-teal-600',     active: true  },
   { name: 'K. Venkat',            role: 'EHS User',        gradient: 'from-amber-500 to-orange-600',  active: true  },

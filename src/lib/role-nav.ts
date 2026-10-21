@@ -25,7 +25,19 @@ export interface NavItem {
 
 // Role-specific navigation maps (per the master spec's role definitions)
 const ROLE_NAV: Record<string, NavItem[]> = {
-  // Super Admin — full system access
+  // Group Admin — group-wide ESG reporting, organizational oversight, timelines, consolidated reports
+  GROUP_ADMIN: [
+    { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { key: 'my-project', label: 'My Project', icon: Building2 },
+    { key: 'data-entry', label: 'Data Entry', icon: FileText, badgeTone: 'green' },
+    { key: 'evidence', label: 'Evidence', icon: Link2, badgeTone: 'blue' },
+    { key: 'submissions', label: 'Submissions', icon: Send, badgeTone: 'amber' },
+    { key: 'reports', label: 'Reports', icon: FileBarChart },
+    { key: 'analytics', label: 'Analytics', icon: TrendingUp },
+    { key: 'audit', label: 'Audit & Trace', icon: History },
+    { key: 'brsr', label: 'BRSR', icon: FileCheck2 },
+    { key: 'admin', label: 'Admin', icon: Settings2 },
+  ],
   SUPER_ADMIN: [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
     { key: 'my-project', label: 'My Project', icon: Building2 },

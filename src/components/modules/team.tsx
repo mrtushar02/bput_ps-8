@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 // Types
 // ============================================================
 type RoleKey =
-  | 'SUPER_ADMIN' | 'PROJECT_USER' | 'HR_USER' | 'EHS_USER' | 'PROCUREMENT_USER'
+  | 'GROUP_ADMIN' | 'SUPER_ADMIN' | 'PROJECT_USER' | 'HR_USER' | 'EHS_USER' | 'PROCUREMENT_USER'
   | 'CSR_USER' | 'COMPLIANCE_USER' | 'BU_REVIEWER' | 'SUBSIDIARY_REVIEWER'
   | 'GROUP_REVIEWER' | 'ESG_MANAGER' | 'ESG_ANALYST' | 'BRSR_MANAGER'
   | 'AUDITOR' | 'EXECUTIVE'
@@ -45,7 +45,8 @@ interface ChatMessage {
 // Static demo data — mirrors prisma/seed.ts roster (all Illustrative)
 // ============================================================
 const ROLE_LABEL: Record<RoleKey, string> = {
-  SUPER_ADMIN: 'Super Admin',
+  GROUP_ADMIN: 'Group Admin',
+  SUPER_ADMIN: 'Group Admin',
   PROJECT_USER: 'Environment Data User',
   HR_USER: 'HR User',
   EHS_USER: 'EHS / Safety User',
@@ -63,7 +64,8 @@ const ROLE_LABEL: Record<RoleKey, string> = {
 }
 
 const ROLE_TINT: Record<RoleKey, string> = {
-  SUPER_ADMIN: 'from-slate-600 to-slate-800',
+  GROUP_ADMIN: 'from-slate-700 via-indigo-950 to-slate-900',
+  SUPER_ADMIN: 'from-slate-700 via-indigo-950 to-slate-900',
   PROJECT_USER: 'from-sky-500 to-blue-600',
   HR_USER: 'from-cyan-500 to-teal-600',
   EHS_USER: 'from-amber-500 to-orange-600',
@@ -81,7 +83,7 @@ const ROLE_TINT: Record<RoleKey, string> = {
 }
 
 const TEAM_MEMBERS: TeamMember[] = [
-  { id: 'u1',  name: 'Arjun Mehta',        email: 'admin@meil-esg.in',    roleKey: 'SUPER_ADMIN',         roleLabel: ROLE_LABEL.SUPER_ADMIN,         employeeCode: 'MEIL-ADM-001',  active: true,  demo: true },
+  { id: 'u1',  name: 'Arjun Mehta',        email: 'admin@meil-esg.in',    roleKey: 'GROUP_ADMIN',         roleLabel: ROLE_LABEL.GROUP_ADMIN,         employeeCode: 'MEIL-ADM-001',  active: true,  demo: true },
   { id: 'u2',  name: 'Rohit Kumar',        email: 'rohit@meil-esg.in',    roleKey: 'PROJECT_USER',         roleLabel: ROLE_LABEL.PROJECT_USER,         employeeCode: 'MEIL-PU-014',  active: true,  demo: true },
   { id: 'u3',  name: 'Sunita Rao',          email: 'sunita@meil-esg.in',  roleKey: 'HR_USER',              roleLabel: ROLE_LABEL.HR_USER,              employeeCode: 'MEIL-HR-022',  active: false, demo: true },
   { id: 'u4',  name: 'K. Venkat',          email: 'kvenkat@meil-esg.in',  roleKey: 'EHS_USER',             roleLabel: ROLE_LABEL.EHS_USER,             employeeCode: 'MEIL-EHS-009', active: true,  demo: true },

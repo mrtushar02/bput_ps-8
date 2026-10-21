@@ -201,7 +201,7 @@ interface RoleGate {
 function useRoleGate(): RoleGate {
   const { user } = useApp()
   const key = user?.roles?.[0]?.key ?? ''
-  if (key === 'SUPER_ADMIN') {
+  if (key === 'GROUP_ADMIN' || key === 'SUPER_ADMIN') {
     return { canSubmit: true, canReview: true, canReject: true, canApprove: true, canLock: true, isReadOnly: false }
   }
   return {

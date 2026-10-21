@@ -75,7 +75,7 @@ export function AdminModule() {
   const [error, setError] = useState('')
   const [tab, setTab] = useState<'organization' | 'users' | 'roles' | 'periods' | 'units' | 'factors' | 'brsr' | 'health'>('organization')
 
-  const isSuperAdmin = user?.roles?.[0]?.key === 'SUPER_ADMIN'
+  const isGroupAdmin = user?.roles?.[0]?.key === 'GROUP_ADMIN' || user?.roles?.[0]?.key === 'SUPER_ADMIN'
 
   useEffect(() => {
     Promise.all([
@@ -90,8 +90,8 @@ export function AdminModule() {
       .catch(e => { setError(e.message); setLoading(false) })
   }, [])
 
-  // For non-super-admins, only organization + system health tabs are visible
-  const visibleTabs: { key: typeof tab; label: string; icon: any }[] = isSuperAdmin
+  // For non-group-admins, only organization + system health tabs are visible
+  const visibleTabs: { key: typeof tab; label: string; icon: any }[] = isGroupAdmin
     ? [
       { key: 'organization', label: 'Organization', icon: Building2 },
       { key: 'users', label: 'Users', icon: Users },
@@ -117,14 +117,14 @@ export function AdminModule() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight text-slate-800">Admin / System Settings</h1>
-            <span className={`status-pill ${isSuperAdmin ? 'status-approved' : 'status-submitted'}`}>
+            <span className={`status-pill ${isGroupAdmin ? 'status-approved' : 'status-submitted'}`}>
               <ShieldCheck className="h-3 w-3" /> {user?.roles?.[0]?.name ?? 'Unknown'}
             </span>
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            {isSuperAdmin
-              ? 'Full system control plane — organization, RBAC, reporting periods, units, factors, BRSR framework, and system health.'
-              : 'Read-only — admin actions require the Super Admin role.'}
+            {isGroupAdmin
+              ? 'Full group control plane — organization, RBAC, reporting periods, units, factors, BRSR framework, and system health.'
+              : 'Read-only — admin actions require the Group Admin role.'}
           </p>
         </div>
         <button onClick={() => location.reload()} className="glass-subtle flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-white">
@@ -132,10 +132,10 @@ export function AdminModule() {
         </button>
       </div>
 
-      {!isSuperAdmin && (
+      {!isGroupAdmin && (
         <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2.5 text-[11px] text-slate-500">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-          <span><strong className="text-slate-700">Read-only mode.</strong> Admin actions (create/edit users, roles, periods, units, factors, BRSR config) require the Super Admin role.</span>
+          <span><strong className="text-slate-700">Read-only mode.</strong> Admin actions (create/edit users, roles, periods, units, factors, BRSR config) require the Group Admin role.</span>
         </div>
       )}
 
@@ -797,7 +797,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 // Reference data — clearly marked illustrative
 // ============================================================
 const DEMO_USERS = [
-  { name: 'System Administrator', email: 'admin@meil-esg.in', code: 'MEIL-0001', role: 'SUPER_ADMIN', scope: 'MEIL Group', demo: true },
+  { name: 'System Administrator', email: 'admin@meil-esg.in', code: 'MEIL-0001', role: 'GROUP_ADMIN', scope: 'MEIL Group', demo: true },
   { name: 'Rohit Sharma', email: 'rohit@meil-esg.in', code: 'MEIL-1001', role: 'PROJECT_DATA_ENTRY', scope: 'Gayatri Solar', demo: true },
   { name: 'Priya Verma', email: 'priya@meil-esg.in', code: 'MEIL-1002', role: 'PROJECT_DATA_ENTRY', scope: 'NTPC RTPS', demo: true },
   { name: 'Amit Singh', email: 'amit@meil-esg.in', code: 'MEIL-2001', role: 'BU_REVIEWER', scope: 'BU: Power Systems', demo: true },
@@ -815,7 +815,8 @@ const DEMO_USERS = [
 ]
 
 const ROLES = [
-  { key: 'SUPER_ADMIN', name: 'Super Admin', phase: 0, description: 'Full system control — every permission.', perms: ['*'] },
+  { key: 'GROUP_ADMIN', name: 'Group Admin', phase: 0, description: 'Group-wide ESG reporting, organizational oversight, reporting timelines, and consolidated reports.', perms: ['*'] },
+  { key: 'SUPER_ADMIN', name: 'Group Admin (Legacy)', phase: 0, description: 'Full system control — every permission.', perms: ['*'] },
   { key: 'PROJECT_DATA_ENTRY', name: 'Project Data Entry', phase: 1, description: 'Enters ESG source data for assigned project.', perms: ['esg.energy.write', 'esg.water.write', 'esg.waste.write', 'esg.people.write', 'esg.safety.write', 'submission.submit', 'evidence.upload'] },
   { key: 'BU_REVIEWER', name: 'BU Reviewer', phase: 2, description: 'Reviews + approves submissions at BU level.', perms: ['submission.review', 'submission.approve', 'submission.reject', 'evidence.verify'] },
   { key: 'SUBSIDIARY_APPROVER', name: 'Subsidiary Approver', phase: 3, description: 'Approves submissions at subsidiary level.', perms: ['submission.approve', 'submission.lock'] },

@@ -17,6 +17,7 @@ import { BrsrManagerDashboard } from '@/components/dashboard/brsr-manager-dashbo
 import { ExecutiveDashboard } from '@/components/dashboard/executive-dashboard'
 import { AuditorDashboard } from '@/components/dashboard/auditor-dashboard'
 import { FinanceDashboard } from '@/components/dashboard/finance-dashboard'
+import { GroupAdminDashboard } from '@/components/dashboard/group-admin-dashboard'
 import { ModuleRouter } from '@/components/modules/module-router'
 import { ErrorBoundary } from '@/components/error-boundary'
 
@@ -24,7 +25,8 @@ import { ErrorBoundary } from '@/components/error-boundary'
 // with a distinct color theme, layout, and information focus.
 function getRoleDashboard(roleKey: string) {
   switch (roleKey) {
-    case 'SUPER_ADMIN': return <ExecutiveDashboard />
+    case 'GROUP_ADMIN':
+    case 'SUPER_ADMIN': return <GroupAdminDashboard />
     case 'PROJECT_USER': return <SiteUserOverview />
     case 'FINANCE_USER': return <FinanceDashboard />
     case 'HR_USER': return <HrDashboard />

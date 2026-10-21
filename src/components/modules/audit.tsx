@@ -529,10 +529,10 @@ export function AuditModule() {
       </div>
 
       {/* ROLE NOTICE */}
-      {user && user.roles[0]?.key !== 'SUPER_ADMIN' && !user.roles.some(r => r.key === 'AUDITOR') && (
+      {user && !['GROUP_ADMIN', 'SUPER_ADMIN'].includes(user.roles[0]?.key) && !user.roles.some(r => r.key === 'AUDITOR') && (
         <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] text-slate-500">
           <ShieldCheck className="h-3.5 w-3.5 text-blue-500" />
-          <span>Read-only audit access — all mutations are logged immutably. Auditor / Super Admin roles have full audit-read access.</span>
+          <span>Read-only audit access — all mutations are logged immutably. Auditor / Group Admin roles have full audit-read access.</span>
         </div>
       )}
     </div>

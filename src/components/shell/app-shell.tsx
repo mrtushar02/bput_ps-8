@@ -53,7 +53,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const roleTint: Record<string, string> = {
-    SUPER_ADMIN: 'from-slate-600 to-slate-800',
+    GROUP_ADMIN: 'from-slate-700 via-indigo-950 to-slate-900',
+    SUPER_ADMIN: 'from-slate-700 via-indigo-950 to-slate-900',
     PROJECT_USER: 'from-sky-500 to-blue-600',
     FINANCE_USER: 'from-blue-600 via-indigo-600 to-purple-600',
     HR_USER: 'from-cyan-500 to-teal-600',
@@ -218,7 +219,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700"><ShieldCheck className="h-3.5 w-3.5 text-blue-600" /> {roleName}</div>
                   </div>
                   <div className="border-t border-slate-200/60 py-1">
-                    {(roleKey === 'SUPER_ADMIN') && (
+                    {(roleKey === 'GROUP_ADMIN' || roleKey === 'SUPER_ADMIN') && (
                       <button onClick={() => { setActiveModule('admin'); setProfileOpen(false) }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-100"><Settings className="h-3.5 w-3.5" /> Admin / Settings</button>
                     )}
                     <button onClick={logout} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-rose-600 transition hover:bg-rose-50"><LogOut className="h-3.5 w-3.5" /> Sign out</button>

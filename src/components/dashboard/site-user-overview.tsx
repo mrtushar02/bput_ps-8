@@ -151,7 +151,7 @@ const STROKE_WATER = '#06B6D4'
 
 /** Seeded MEIL ESG team — 15 demo accounts */
 const SEEDED_TEAM: TeamUser[] = [
-  { name: 'Arjun Mehta',         role: 'Super Admin',          gradient: 'from-slate-700 to-slate-900',  active: true,  email: 'admin@meil-esg.in',     phone: '+91 98200 11221', dept: 'Executive Governance' },
+  { name: 'Arjun Mehta',         role: 'Group Admin',          gradient: 'from-slate-700 to-slate-900',  active: true,  email: 'admin@meil-esg.in',     phone: '+91 98200 11221', dept: 'Executive Governance' },
   { name: 'Rohit Kumar',         role: 'Environment Data User', gradient: 'from-sky-500 to-blue-600',     active: true,  email: 'rohit@meil-esg.in',     phone: '+91 98401 22334', dept: 'Gayatri Solar Site' },
   { name: 'Sunita Rao',          role: 'HR User',              gradient: 'from-cyan-500 to-teal-600',    active: true,  email: 'sunita@meil-esg.in',    phone: '+91 98402 33445', dept: 'Human Capital' },
   { name: 'K. Venkat',           role: 'EHS User',             gradient: 'from-amber-500 to-orange-600', active: true,  email: 'kvenkat@meil-esg.in',   phone: '+91 98403 44556', dept: 'Environment, Health & Safety' },

@@ -23,7 +23,7 @@ const SESSION_COOKIE = 'meil_esg_session'
 // SECURITY: production deployments MUST set SESSION_SECRET. The hardcoded fallback is
 // only for local development demos — anyone knowing it can forge session cookies.
 const SECRET = process.env.SESSION_SECRET ?? 'meil-esg-illustrative-secret-change-in-prod'
-if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build' && !process.env.SESSION_SECRET) {
   throw new Error(
     'SESSION_SECRET environment variable must be set in production — refusing to boot with the insecure demo fallback.'
   )

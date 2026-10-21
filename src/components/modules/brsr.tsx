@@ -475,10 +475,10 @@ export function BrsrModule() {
       </Dialog>
 
       {/* ROLE NOTICE */}
-      {user && !['SUPER_ADMIN', 'BRSR_PREPARER', 'GROUP_CSO', 'ESG_PUBLISHER', 'ESG_MANAGER', 'BRSR_MANAGER'].includes(user.roles[0]?.key) && (
+      {user && !['GROUP_ADMIN', 'SUPER_ADMIN', 'BRSR_PREPARER', 'GROUP_CSO', 'ESG_PUBLISHER', 'ESG_MANAGER', 'BRSR_MANAGER'].includes(user.roles[0]?.key) && (
         <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] text-slate-500">
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-          <span>View-only mode — BRSR report generation requires <code>brsr.generate</code> permission (ESG Manager / BRSR Preparer / CSO / Publisher / Super Admin).</span>
+          <span>View-only mode — BRSR report generation requires <code>brsr.generate</code> permission (Group Admin / ESG Manager / BRSR Preparer / CSO / Publisher).</span>
         </div>
       )}
     </div>

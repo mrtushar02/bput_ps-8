@@ -19,7 +19,7 @@ export async function GET() {
   }[] = []
 
   // 1. Draft submissions (for PROJECT_USER / HR / EHS etc. — data entry roles)
-  const dataEntryRoles = ['PROJECT_USER', 'HR_USER', 'EHS_USER', 'PROCUREMENT_USER', 'CSR_USER', 'COMPLIANCE_USER', 'SUPER_ADMIN']
+  const dataEntryRoles = ['PROJECT_USER', 'HR_USER', 'EHS_USER', 'PROCUREMENT_USER', 'CSR_USER', 'COMPLIANCE_USER', 'GROUP_ADMIN', 'SUPER_ADMIN']
   if (dataEntryRoles.includes(roleKey)) {
     const drafts = await db.submission.findMany({
       where: { status: 'DRAFT' },
@@ -37,7 +37,7 @@ export async function GET() {
   }
 
   // 2. Pending reviews (for reviewers)
-  const reviewerRoles = ['BU_REVIEWER', 'SUBSIDIARY_REVIEWER', 'GROUP_REVIEWER', 'SUPER_ADMIN']
+  const reviewerRoles = ['BU_REVIEWER', 'SUBSIDIARY_REVIEWER', 'GROUP_REVIEWER', 'GROUP_ADMIN', 'SUPER_ADMIN']
   if (reviewerRoles.includes(roleKey)) {
     const pending = await db.submission.findMany({
       where: { status: { in: ['SUBMITTED', 'UNDER_REVIEW', 'BU_APPROVED', 'SUBSIDIARY_APPROVED'] } },
@@ -73,7 +73,7 @@ export async function GET() {
   }
 
   // 4. Open validation exceptions (for ESG_MANAGER, reviewers, admins)
-  const exceptionRoles = ['ESG_MANAGER', 'BU_REVIEWER', 'SUBSIDIARY_REVIEWER', 'GROUP_REVIEWER', 'SUPER_ADMIN']
+  const exceptionRoles = ['ESG_MANAGER', 'BU_REVIEWER', 'SUBSIDIARY_REVIEWER', 'GROUP_REVIEWER', 'GROUP_ADMIN', 'SUPER_ADMIN']
   if (exceptionRoles.includes(roleKey)) {
     const exceptions = await db.validationResult.findMany({
       where: { status: 'OPEN', severity: { in: ['ERROR', 'BLOCKING'] } },
@@ -89,8 +89,8 @@ export async function GET() {
     }
   }
 
-  // 5. BRSR missing items (for BRSR_MANAGER, ESG_MANAGER, GROUP_REVIEWER, SUPER_ADMIN)
-  const brsrRoles = ['BRSR_MANAGER', 'ESG_MANAGER', 'GROUP_REVIEWER', 'SUPER_ADMIN']
+  // 5. BRSR missing items (for BRSR_MANAGER, ESG_MANAGER, GROUP_REVIEWER, GROUP_ADMIN, SUPER_ADMIN)
+  const brsrRoles = ['BRSR_MANAGER', 'ESG_MANAGER', 'GROUP_REVIEWER', 'GROUP_ADMIN', 'SUPER_ADMIN']
   if (brsrRoles.includes(roleKey)) {
     const fw = await db.brsrFramework.findFirst({ where: { status: 'ACTIVE' } })
     if (fw) {

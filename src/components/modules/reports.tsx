@@ -294,10 +294,10 @@ export function ReportsModule() {
       </Sheet>
 
       {/* ROLE NOTICE */}
-      {user && !['SUPER_ADMIN', 'BRSR_PREPARER', 'GROUP_CSO', 'ESG_PUBLISHER', 'AUDITOR', 'BU_REVIEWER', 'SUBSIDIARY_APPROVER'].includes(user.roles[0]?.key) && (
+      {user && !['GROUP_ADMIN', 'SUPER_ADMIN', 'BRSR_PREPARER', 'GROUP_CSO', 'ESG_PUBLISHER', 'AUDITOR', 'BU_REVIEWER', 'SUBSIDIARY_APPROVER'].includes(user.roles[0]?.key) && (
         <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2 text-[11px] text-slate-500">
           <AlertOctagon className="h-3.5 w-3.5 text-amber-500" />
-          <span>Report generation requires <code>report.generate</code> permission (Reviewer / Approver / Auditor / CSO / Publisher / Super Admin). Other roles have read access only.</span>
+          <span>Report generation requires <code>report.generate</code> permission (Group Admin / Reviewer / Approver / Auditor / CSO / Publisher). Other roles have read access only.</span>
         </div>
       )}
     </div>
