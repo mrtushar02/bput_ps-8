@@ -16,6 +16,10 @@ export interface CalculationPayload {
   factorId?: string | null
   factorVersion?: number | null
   methodologyNote?: string | null
+  formula?: string | null
+  calculatedAt?: string | null
+  sourceRecordId?: string | null
+  lineage?: Record<string, any> | null
   normalizedValue?: number | null
   normalizedUnit?: string | null
   sourceValue?: number
@@ -37,7 +41,17 @@ export interface LevelRecord {
   calculationStatus: 'COMPUTED' | 'NOT_APPLICABLE' | 'PENDING'
   calculation: CalculationPayload | null
   issues: ValidationIssue[]
-  status: 'DRAFT' | 'SUBMITTED' | 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'ACTIVE' | 'CORRECTION_REQUESTED' | 'LOCKED'
+  status:
+    | 'DRAFT'
+    | 'SUBMITTED'
+    | 'PENDING'
+    | 'UNDER_REVIEW'
+    | 'APPROVED'
+    | 'ACTIVE'
+    | 'CORRECTION_REQUESTED'
+    | 'RETURNED_FOR_CORRECTION'
+    | 'RECALCULATION_REQUIRED'
+    | 'LOCKED'
   revisionNumber: number
   enteredBy: string
   enteredAt: string

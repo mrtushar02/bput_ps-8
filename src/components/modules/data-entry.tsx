@@ -5321,24 +5321,71 @@ function Level2WaterForm({
    ============================================================ */
 export interface StagedGhgItem {
   id: string
-  emissionDataType: string
+  sourceCategory:
+    | 'fuel_combustion'
+    | 'electricity_grid'
+    | 'freight_logistics'
+    | 'business_travel'
+    | 'air_monitoring'
+    | 'refrigerant_fugitive'
+  emissionDataType: string // 'Scope 1 activity' | 'Scope 2 activity' | 'Scope 3 activity' | 'Air pollutant'
   emissionSource: string
-  fuelEnergyType: string
+  // Fuel combustion specific
+  fuelEnergyType?: string
+  equipmentId?: string
+  // Electricity specific
+  electricityKwh?: string
+  gridFactorRef?: string
+  sourceRecordId?: string | null
+  // Freight logistics specific
+  cargoWeightTonnes?: string
+  transportMode?: string
+  distanceKm?: string
+  tonneKm?: string
+  logisticsProvider?: string
+  originDestination?: string
+  // Business travel specific
+  travelMode?: string
+  travelDistanceKm?: string
+  passengerCount?: string
+  passengerKm?: string
+  // Air pollutant / stack emissions specific
+  pollutantType?: string
+  samplingLocation?: string
+  testDate?: string
+  laboratoryTestMethod?: string
+  laboratory?: string
+  testMethod?: string
+  testResult?: string
+  measuredResult?: string
+  regulatoryBenchmark?: string
+  complianceStatus?: 'COMPLIANT' | 'EXCEEDANCE'
+  // Refrigerants specific
+  refrigerantType?: string
+  quantityLeakedKg?: string
+  gwpSource?: string
+  // Scope 3 Protocol Category
+  scope3Category?: string
+  scope3Applicable?: boolean
+  // Common activity & calculation lineage
   activityQuantity: string
   unit: string
-  pollutantType: string
-  testResult: string
-  samplingLocation: string
-  testDate: string
-  laboratoryTestMethod: string
-  emissionFactorRef: string
-  calculationMethod: string
+  reportingPeriod: string
+  factor: number
+  factorUnit?: string
+  factorSource?: string
+  factorVersion?: number
+  factorConfigured: boolean
+  calculationFormula?: string
+  calculationTimestamp?: string
+  estTco2e: number
   supportingEvidence: string
   remarks: string
   evidenceId: string
+  evidenceIds?: string[]
   evidenceFileName?: string
-  factor: number
-  estTco2e: number
+  evidenceFiles?: any[]
+  status?: string
 }
 
 const L3_SOURCES = [
@@ -5353,169 +5400,232 @@ const L3_SOURCES = [
   'DG Stack Emissions',
 ]
 
-const GHG_SOURCE_PRESETS: Record<
-  string,
-  {
-    scope: string
-    fuel: string
-    unit: string
-    factor: number
-    pollutant: string
-    location: string
-    lab: string
-    ref: string
-    method: string
-    doc: string
-    icon: LucideIcon
-    defaultQty: string
-    defaultResult: string
-  }
-> = {
+export interface GhgPresetConfig {
+  category:
+    | 'fuel_combustion'
+    | 'electricity_grid'
+    | 'freight_logistics'
+    | 'business_travel'
+    | 'air_monitoring'
+    | 'refrigerant_fugitive'
+  scope: string
+  scope3Category?: string
+  fuel: string
+  unit: string
+  factor: number
+  factorUnit: string
+  factorSource: string
+  factorVersion: number
+  pollutant: string
+  location: string
+  equipmentId: string
+  lab: string
+  method: string
+  ref: string
+  doc: string
+  icon: LucideIcon
+  defaultQty: string
+  defaultResult: string
+  standardLimit?: string
+}
+
+const GHG_SOURCE_PRESETS: Record<string, GhgPresetConfig> = {
   'DG Sets & Power Generators': {
+    category: 'fuel_combustion',
     scope: 'Scope 1 activity',
     fuel: 'Diesel (HSD)',
     unit: 'litres',
     factor: 2.637,
+    factorUnit: 'kgCO2e/L',
+    factorSource: 'IPCC Guidelines 2006 Vol 2 Ch 2 / CEA v19',
+    factorVersion: 1,
     pollutant: 'CO₂e',
-    location: 'DG Yard Bay 01 (MEIL-DG-002)',
+    location: 'DG Yard Bay 01',
+    equipmentId: 'MEIL-DG-002',
     lab: 'Internal Telematics / SAP Ledger',
     ref: 'IPCC 2006 / CEA v19',
-    method: 'Activity data × Approved Factor',
-    doc: 'SAP Fuel Procurement Ledger & DG Logbook',
+    method: 'Activity data (litres) × Approved Factor (2.637 kgCO2e/L) ÷ 1000',
+    doc: 'SAP Fuel Procurement Ledger & DG Run Logbook',
     icon: Zap,
     defaultQty: '18650',
-    defaultResult: '186.40 tCO₂e',
+    defaultResult: '49.18 tCO₂e',
   },
   'Boilers & Heating Furnaces': {
+    category: 'fuel_combustion',
     scope: 'Scope 1 activity',
-    fuel: 'Furnace Oil / LPG',
+    fuel: 'Furnace Oil / Boilers',
     unit: 'kg',
     factor: 3.15,
+    factorUnit: 'kgCO2e/kg',
+    factorSource: 'IPCC 2006 Vol 2 Stationary Combustion Table 2.3',
+    factorVersion: 1,
     pollutant: 'CO₂e',
     location: 'Boiler House 02',
-    lab: 'In-house Flow Meter',
+    equipmentId: 'BLR-GJT-001',
+    lab: 'In-house Digital Flow Meter',
     ref: 'IPCC 2006 Guidelines',
-    method: 'Mass of fuel × Heating Factor',
+    method: 'Mass of fuel (kg) × Heating Factor (3.15 kgCO2e/kg) ÷ 1000',
     doc: 'Boiler Feed Log & Fuel Calibration Certificate',
     icon: Flame,
     defaultQty: '6400',
     defaultResult: '20.16 tCO₂e',
   },
   'Construction Equipment Fleet': {
+    category: 'fuel_combustion',
     scope: 'Scope 1 activity',
     fuel: 'Diesel (HSD)',
     unit: 'litres',
     factor: 2.637,
+    factorUnit: 'kgCO2e/L',
+    factorSource: 'IPCC 2006 Mobile Combustion Guidelines',
+    factorVersion: 1,
     pollutant: 'CO₂e',
     location: 'Heavy Machinery Fleet Depot',
+    equipmentId: 'FLT-EXC-04',
     lab: 'Fleet IoT Telematics Log',
     ref: 'IPCC 2006 Mobile Combustion',
-    method: 'Fuel Dispensed × Emission Factor',
+    method: 'Fuel Dispensed (litres) × Emission Factor (2.637 kgCO2e/L) ÷ 1000',
     doc: 'Fuel Dispenser Meter Log & Fleet Run Hours',
     icon: Truck,
     defaultQty: '8200',
     defaultResult: '21.62 tCO₂e',
   },
   'Fugitive Refrigerants': {
+    category: 'refrigerant_fugitive',
     scope: 'Scope 1 activity',
-    fuel: 'R-410A / R-134a Gas',
+    fuel: 'Refrigerant R-410A',
     unit: 'kg',
     factor: 2088.0,
+    factorUnit: 'kgCO2e/kg',
+    factorSource: 'IPCC 5th Assessment Report (AR5) 100-Year GWP',
+    factorVersion: 1,
     pollutant: 'CO₂e',
     location: 'Main Substation & HVAC Chillers',
+    equipmentId: 'CHL-SUB-01',
     lab: 'OEM Refrigerant Top-up Service Report',
     ref: 'IPCC AR5 GWP Values',
-    method: 'Refrigerant Leakage (kg) × GWP',
-    doc: 'HVAC Maintenance Service Log & Gas Invoice',
+    method: 'Refrigerant Top-up (kg) × GWP (2088 kgCO2e/kg) ÷ 1000',
+    doc: 'HVAC Maintenance Service Log & Gas Recharge Invoice',
     icon: Wind,
     defaultQty: '14',
     defaultResult: '29.23 tCO₂e',
   },
   'Purchased Grid Electricity (Scope 2)': {
+    category: 'electricity_grid',
     scope: 'Scope 2 activity',
-    fuel: 'CEA Regional Grid Mix',
+    fuel: 'Grid Electricity (India)',
     unit: 'kWh',
     factor: 0.716,
+    factorUnit: 'kgCO2e/kWh',
+    factorSource: 'Central Electricity Authority (CEA) CO2 Baseline Database v19',
+    factorVersion: 1,
     pollutant: 'CO₂e',
     location: '33kV Site Incomer Substation',
+    equipmentId: 'MTR-GJT-GRID-01',
     lab: 'DISCOM AMR Meter Billing System',
     ref: 'CEA CO₂ Baseline Database v19',
-    method: 'Billed kWh × Grid Emission Factor',
-    doc: 'Monthly Utility Tariff Invoice',
+    method: 'Billed kWh × Grid Emission Factor (0.716 kgCO2e/kWh) ÷ 1000',
+    doc: 'Monthly Utility Tariff Invoice & AMR Meter Log',
     icon: Zap,
     defaultQty: '384000',
     defaultResult: '274.94 tCO₂e',
   },
   'Value Chain & Freight Logistics (Scope 3)': {
+    category: 'freight_logistics',
     scope: 'Scope 3 activity',
+    scope3Category: 'C4 Upstream Transportation and Distribution',
     fuel: 'Heavy Duty Road Freight (Diesel)',
     unit: 'tonne-km',
     factor: 0.114,
+    factorUnit: 'kgCO2e/tonne-km',
+    factorSource: 'Smart Freight Centre GLEC Framework v3.0 / GHG Protocol Scope 3',
+    factorVersion: 1,
     pollutant: 'CO₂e',
-    location: 'Logistics Corridors (Vendor to Site)',
+    location: 'Logistics Corridors (Vendor Balanagar to Site)',
+    equipmentId: 'LOG-TRK-8821',
     lab: 'Supply Chain Transport Manifests',
     ref: 'GLEC Framework / GHG Protocol Corporate Value Chain',
-    method: 'Cargo Weight × Distance × Mode Factor',
-    doc: 'Logistics Partner Consolidated Freight Invoices',
+    method: 'Cargo Weight (tonnes) × Distance (km) × Mode Factor (0.114 kgCO2e/t-km) ÷ 1000',
+    doc: 'Logistics Partner Consolidated Freight Invoices & E-Way Bills',
     icon: Truck,
     defaultQty: '425000',
     defaultResult: '48.45 tCO₂e',
   },
   'Business Travel & Commute (Scope 3)': {
+    category: 'business_travel',
     scope: 'Scope 3 activity',
-    fuel: 'Air & Road Employee Transit',
+    scope3Category: 'C6 Business Travel',
+    fuel: 'Air Travel (Domestic)',
     unit: 'passenger-km',
-    factor: 0.125,
+    factor: 0.18,
+    factorUnit: 'kgCO2e/pass-km',
+    factorSource: 'GHG Protocol Corporate Value Chain Standard Category 6 / DEFRA',
+    factorVersion: 1,
     pollutant: 'CO₂e',
     location: 'Corporate HQ & Regional Site Hubs',
+    equipmentId: 'CORP-TRVL-2026',
     lab: 'Corporate Travel Portal Reconciliations',
     ref: 'DEFRA / GHG Protocol Scope 3 Guidance',
-    method: 'Travel Distance × Passenger Factor',
-    doc: 'Corporate Travel Portal Booking Register',
+    method: 'Travel Distance (km) × Passengers × Factor (0.18 kgCO2e/pass-km) ÷ 1000',
+    doc: 'Corporate Travel Portal Booking Register & Flight Tickets',
     icon: Users,
     defaultQty: '145000',
-    defaultResult: '18.13 tCO₂e',
+    defaultResult: '26.10 tCO₂e',
   },
   'Ambient Air Monitoring': {
+    category: 'air_monitoring',
     scope: 'Air pollutant',
     fuel: 'Ambient Air',
     unit: 'µg/m³',
     factor: 0,
+    factorUnit: 'µg/m³',
+    factorSource: 'CPCB NAAQS 2009 Standards',
+    factorVersion: 1,
     pollutant: 'PM10 / PM2.5',
     location: 'Perimeter Air Monitoring Station 01',
+    equipmentId: 'STN-AIR-PER-01',
     lab: 'Vimta Labs Ltd. (NABL / CPCB Recognized)',
     ref: 'IS 5182 (Part 23) / NAAQS 2009',
-    method: 'High Volume Air Sampler Gravimetric Method',
+    method: 'High Volume Air Sampler Gravimetric Method (IS 5182)',
     doc: 'NABL Certified Ambient Air Quality Report',
     icon: CloudFog,
     defaultQty: '48.2',
-    defaultResult: '48.2 µg/m³ (PM10/PM2.5 Ambient Compliant)',
+    defaultResult: '48.2 µg/m³ (Within NAAQS limit 100 µg/m³)',
+    standardLimit: 'NAAQS 24-hr limit: 100 µg/m³ for PM10; 60 µg/m³ for PM2.5',
   },
   'DG Stack Emissions': {
+    category: 'air_monitoring',
     scope: 'Air pollutant',
     fuel: 'DG Flue Gas Exhaust',
     unit: 'mg/Nm³',
     factor: 0,
+    factorUnit: 'mg/Nm³',
+    factorSource: 'CPCB Guidelines for DG Set Stack Monitoring',
+    factorVersion: 1,
     pollutant: 'NOx',
     location: 'DG Set 1500 kVA Stack No. 01',
+    equipmentId: 'STK-DG-1500-01',
     lab: 'SGS Environmental Testing (NABL)',
     ref: 'CPCB Guidelines for DG Set Stack Monitoring',
-    method: 'Isokinetic Sampling Method',
-    doc: 'DG Stack Emission Testing Memo',
+    method: 'Isokinetic Sampling Method (CPCB Method 5)',
+    doc: 'DG Stack Emission Testing Memo & Gas Analyzer Log',
     icon: Factory,
     defaultQty: '36.5',
-    defaultResult: '36.5 mg/Nm³ (Within CPCB limit 750)',
+    defaultResult: '36.5 mg/Nm³ (Within CPCB limit 750 mg/Nm³)',
+    standardLimit: 'CPCB DG Set Stack Limit: 750 mg/Nm³ for NOx',
   },
 }
 
-function calculateGhgItemEmissions(source: string, scopeType: string, qtyStr: string): { factor: number; estTco2e: number } {
-  const qty = Number(qtyStr) || 0
-  const preset = GHG_SOURCE_PRESETS[source]
-  const factor = preset?.factor ?? (scopeType.includes('1') ? 2.637 : scopeType.includes('3') ? 0.114 : 0.716)
-  const isAir = scopeType.toLowerCase().includes('air')
-  const estTco2e = isAir || factor === 0 ? 0 : (qty * factor) / 1000
-  return { factor, estTco2e: Number(estTco2e.toFixed(3)) }
-}
+const SCOPE_3_CATEGORIES = [
+  { code: 'C1', name: 'C1 Purchased Goods and Services' },
+  { code: 'C2', name: 'C2 Capital Goods' },
+  { code: 'C3', name: 'C3 Fuel and Energy-related Activities' },
+  { code: 'C4', name: 'C4 Upstream Transportation and Distribution' },
+  { code: 'C5', name: 'C5 Waste Generated in Operations' },
+  { code: 'C6', name: 'C6 Business Travel' },
+  { code: 'C7', name: 'C7 Employee Commuting' },
+  { code: 'C8', name: 'C8 Upstream Leased Assets' },
+]
 
 function Level3GhgForm({
   projectId,
@@ -5535,57 +5645,87 @@ function Level3GhgForm({
     if (Array.isArray(initial.items) && initial.items.length > 0) {
       return initial.items
     }
-    if (initial.activityQuantity && Number(initial.activityQuantity) > 0) {
-      const calc = calculateGhgItemEmissions(
-        initial.emissionSource || 'DG Sets & Power Generators',
-        initial.emissionDataType || 'Scope 1 activity',
-        String(initial.activityQuantity)
-      )
-      return [
-        {
-          id: 'item-ghg-initial-1',
-          emissionDataType: initial.emissionDataType || 'Scope 1 activity',
-          emissionSource: initial.emissionSource || 'DG Sets & Power Generators',
-          fuelEnergyType: initial.fuelEnergyType || 'Diesel (HSD)',
-          activityQuantity: String(initial.activityQuantity),
-          unit: initial.unit || 'litres',
-          pollutantType: initial.pollutantType || 'CO₂e',
-          testResult: initial.testResult || '186.40 tCO₂e',
-          samplingLocation: initial.samplingLocation || 'DG Yard Bay 01 (MEIL-DG-002)',
-          testDate: initial.testDate || '2026-09-20',
-          laboratoryTestMethod: initial.laboratoryTestMethod || 'Vimta Labs Ltd. / IS 5182 (Part 23)',
-          emissionFactorRef: initial.emissionFactorRef || 'IPCC 2006 / CEA v19',
-          calculationMethod: initial.calculationMethod || 'Activity data × Approved Factor',
-          supportingEvidence: initial.supportingEvidence || 'SAP Fuel Procurement Ledger & DG Logbook',
-          remarks: initial.remarks || 'Reconciled with fuel inventory and DG run hours.',
-          evidenceId: initial.evidenceId || '',
-          factor: calc.factor,
-          estTco2e: calc.estTco2e,
-        },
-      ]
-    }
-    // Seed standard initial item so form is ready to use
-    const calc = calculateGhgItemEmissions('DG Sets & Power Generators', 'Scope 1 activity', '18650')
+    // Standard initial seed aligned with real project context
     return [
       {
         id: 'item-ghg-seed-1',
+        sourceCategory: 'fuel_combustion',
         emissionDataType: 'Scope 1 activity',
         emissionSource: 'DG Sets & Power Generators',
         fuelEnergyType: 'Diesel (HSD)',
+        equipmentId: 'MEIL-DG-002',
         activityQuantity: '18650',
         unit: 'litres',
-        pollutantType: 'CO₂e',
-        testResult: '49.18 tCO₂e',
-        samplingLocation: 'DG Yard Bay 01 (MEIL-DG-002)',
-        testDate: '2026-09-20',
-        laboratoryTestMethod: 'Vimta Labs Ltd. / IS 5182 (Part 23)',
-        emissionFactorRef: 'IPCC 2006 / CEA v19',
-        calculationMethod: 'Activity data × Approved Factor',
-        supportingEvidence: 'SAP Fuel Procurement Ledger & Stack Emissions Report',
+        reportingPeriod: 'June 2026',
+        factor: 2.637,
+        factorUnit: 'kgCO2e/L',
+        factorSource: 'IPCC Guidelines 2006 Vol 2 Ch 2 (v1)',
+        factorVersion: 1,
+        factorConfigured: true,
+        calculationFormula: '18,650 litres × 2.637 kgCO2e/L ÷ 1,000 = 49.180 tCO₂e',
+        calculationTimestamp: new Date().toISOString(),
+        estTco2e: 49.18,
+        supportingEvidence: 'SAP Fuel Procurement Ledger & DG Run Logbook',
         remarks: 'Scope 1 direct diesel combustion for backup generation.',
         evidenceId: '',
-        factor: calc.factor,
-        estTco2e: calc.estTco2e,
+        evidenceIds: [],
+        status: 'Draft',
+      },
+      {
+        id: 'item-ghg-seed-2',
+        sourceCategory: 'electricity_grid',
+        emissionDataType: 'Scope 2 activity',
+        emissionSource: 'Purchased Grid Electricity (Scope 2)',
+        fuelEnergyType: 'Grid Electricity (India)',
+        equipmentId: 'MTR-GJT-GRID-01',
+        electricityKwh: '384000',
+        gridFactorRef: 'CEA CO2 Baseline Database v19 — 0.716 kgCO2e/kWh',
+        activityQuantity: '384000',
+        unit: 'kWh',
+        reportingPeriod: 'June 2026',
+        factor: 0.716,
+        factorUnit: 'kgCO2e/kWh',
+        factorSource: 'CEA CO2 Baseline Database v19 (v1)',
+        factorVersion: 1,
+        factorConfigured: true,
+        calculationFormula: '384,000 kWh × 0.716 kgCO2e/kWh ÷ 1,000 = 274.944 tCO₂e',
+        calculationTimestamp: new Date().toISOString(),
+        estTco2e: 274.94,
+        supportingEvidence: 'Monthly Utility Tariff Invoice & AMR Meter Log',
+        remarks: 'Scope 2 indirect purchased electricity for 33kV substation.',
+        evidenceId: '',
+        evidenceIds: [],
+        status: 'Draft',
+      },
+      {
+        id: 'item-ghg-seed-3',
+        sourceCategory: 'air_monitoring',
+        emissionDataType: 'Air pollutant',
+        emissionSource: 'Ambient Air Monitoring',
+        pollutantType: 'PM10 / PM2.5',
+        unit: 'µg/m³',
+        samplingLocation: 'Perimeter Air Monitoring Station 01',
+        testDate: '2026-06-15',
+        laboratory: 'Vimta Labs Ltd. (NABL / CPCB Recognized)',
+        testMethod: 'IS 5182 (Part 23) High Volume Gravimetric',
+        laboratoryTestMethod: 'Vimta Labs Ltd. / IS 5182 (Part 23)',
+        testResult: '48.2 µg/m³',
+        measuredResult: '48.2',
+        regulatoryBenchmark: 'NAAQS 24-hr limit: 100 µg/m³ for PM10; 60 µg/m³ for PM2.5',
+        complianceStatus: 'COMPLIANT',
+        activityQuantity: '48.2',
+        reportingPeriod: 'June 2026',
+        factor: 0,
+        factorUnit: 'µg/m³',
+        factorConfigured: true,
+        calculationFormula: 'Ambient concentration monitored per NAAQS 2009 (Not mixed with GHG CO2e)',
+        calculationTimestamp: new Date().toISOString(),
+        estTco2e: 0,
+        supportingEvidence: 'NABL Certified Ambient Air Quality Report',
+        remarks: 'Monitored at site boundary. Compliance with CPCB NAAQS 2009 confirmed.',
+        evidenceId: '',
+        evidenceIds: [],
+        status: 'Draft',
       },
     ]
   })
@@ -5598,126 +5738,550 @@ function Level3GhgForm({
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
 
   // Active form inputs for selected GHG item
-  const [emissionDataType, setEmissionDataType] = useState('Scope 1 activity')
   const [emissionSource, setEmissionSource] = useState('DG Sets & Power Generators')
+  const [sourceCategory, setSourceCategory] = useState<
+    | 'fuel_combustion'
+    | 'electricity_grid'
+    | 'freight_logistics'
+    | 'business_travel'
+    | 'air_monitoring'
+    | 'refrigerant_fugitive'
+  >('fuel_combustion')
+  const [emissionDataType, setEmissionDataType] = useState('Scope 1 activity')
+  const [scope3Category, setScope3Category] = useState('C4 Upstream Transportation and Distribution')
+  const [scope3Applicable, setScope3Applicable] = useState(true)
+
+  // Fuel combustion fields
   const [fuelEnergyType, setFuelEnergyType] = useState('Diesel (HSD)')
+  const [equipmentId, setEquipmentId] = useState('MEIL-DG-002')
+
+  // Electricity fields
+  const [electricityKwh, setElectricityKwh] = useState('384000')
+  const [gridFactorRef, setGridFactorRef] = useState('CEA CO2 Baseline Database v19 — 0.716 kgCO2e/kWh')
+  const [sourceRecordId, setSourceRecordId] = useState<string | null>(null)
+
+  // Freight logistics fields
+  const [cargoWeightTonnes, setCargoWeightTonnes] = useState('500')
+  const [transportMode, setTransportMode] = useState('Heavy Duty Road Truck (Diesel)')
+  const [distanceKm, setDistanceKm] = useState('850')
+  const [tonneKm, setTonneKm] = useState('425000')
+  const [logisticsProvider, setLogisticsProvider] = useState('VRL Logistics Ltd.')
+  const [originDestination, setOriginDestination] = useState('Vendor Balanagar Works -> Gujarat Site (850 km)')
+
+  // Business travel fields
+  const [travelMode, setTravelMode] = useState('Air Travel (Domestic)')
+  const [travelDistanceKm, setTravelDistanceKm] = useState('1450')
+  const [passengerCount, setPassengerCount] = useState('100')
+  const [passengerKm, setPassengerKm] = useState('145000')
+
+  // Ambient air / stack emissions fields
+  const [pollutantType, setPollutantType] = useState('PM10 / PM2.5')
+  const [samplingLocation, setSamplingLocation] = useState('Perimeter Air Monitoring Station 01')
+  const [testDate, setTestDate] = useState('2026-06-15')
+  const [laboratory, setLaboratory] = useState('Vimta Labs Ltd. (NABL / CPCB Recognized)')
+  const [testMethod, setTestMethod] = useState('IS 5182 (Part 23) High Volume Gravimetric')
+  const [measuredResult, setMeasuredResult] = useState('48.2')
+  const [regulatoryBenchmark, setRegulatoryBenchmark] = useState('NAAQS 24-hr limit: 100 µg/m³ for PM10')
+  const [complianceStatus, setComplianceStatus] = useState<'COMPLIANT' | 'EXCEEDANCE'>('COMPLIANT')
+
+  // Refrigerants fields
+  const [refrigerantType, setRefrigerantType] = useState('R-410A')
+  const [quantityLeakedKg, setQuantityLeakedKg] = useState('14')
+  const [gwpSource, setGwpSource] = useState('IPCC AR5 GWP100: 2,088 kgCO2e/kg (R-410A)')
+
+  // Common activity fields
   const [activityQuantity, setActivityQuantity] = useState('18650')
   const [unit, setUnit] = useState('litres')
-  const [pollutantType, setPollutantType] = useState('CO₂e')
-  const [testResult, setTestResult] = useState('49.18 tCO₂e')
-  const [samplingLocation, setSamplingLocation] = useState('DG Yard Bay 01 (MEIL-DG-002)')
-  const [testDate, setTestDate] = useState('2026-09-20')
-  const [laboratoryTestMethod, setLaboratoryTestMethod] = useState('Vimta Labs Ltd. / IS 5182 (Part 23)')
-  const [emissionFactorRef, setEmissionFactorRef] = useState('IPCC 2006 / CEA v19')
-  const [calculationMethod, setCalculationMethod] = useState('Activity data × Approved Factor')
+  const [reportingPeriod, setReportingPeriod] = useState('June 2026')
   const [supportingEvidence, setSupportingEvidence] = useState(
-    'SAP Fuel Procurement Ledger & Stack Emissions Report'
+    'SAP Fuel Procurement Ledger & DG Run Logbook'
   )
   const [remarks, setRemarks] = useState(
-    'Scope 1: 186.40 tCO2e, Scope 2: 274.94 tCO2e, Scope 3: 66.58 tCO2e (Consolidated corporate boundary).'
+    'Scope 1 direct diesel combustion for backup generation.'
   )
-  const [evidenceId, setEvidenceId] = useState('')
+  const [selectedEvidenceIds, setSelectedEvidenceIds] = useState<string[]>([])
+  const [overallWorkflowStatus, setOverallWorkflowStatus] = useState<
+    'Draft' | 'Submitted' | 'Under Review' | 'Approved' | 'Returned for Correction' | 'Recalculation Required'
+  >('Draft')
+
+  // Level 1 Energy quick-import detection
+  const [level1EnergyRecord, setLevel1EnergyRecord] = useState<any | null>(null)
+  const [loadingL1, setLoadingL1] = useState(false)
+
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // Handle source chip click
+  // Load Level 1 Energy record for current project & period if available
+  useEffect(() => {
+    let active = true
+    const checkLevel1 = async () => {
+      try {
+        setLoadingL1(true)
+        const res = await fetch(`/api/data-entry?projectId=${projectId}&periodId=${periodId}&level=1`)
+        if (!res.ok) return
+        const d = await res.json()
+        if (active && Array.isArray(d.records) && d.records.length > 0) {
+          setLevel1EnergyRecord(d.records[0])
+        }
+      } catch (err) {
+        console.warn('Level 1 energy check note:', err)
+      } finally {
+        if (active) setLoadingL1(false)
+      }
+    }
+    checkLevel1()
+    return () => {
+      active = false
+    }
+  }, [projectId, periodId])
+
+  // Calculation Engine helper
+  const getDynamicCalculation = useCallback(
+    (
+      cat: typeof sourceCategory,
+      src: string,
+      fuel: string,
+      u: string,
+      qtyVal: string,
+      passKmVal: string,
+      tonKmVal: string,
+      refrigQtyVal: string,
+      pollutant: string,
+      measResult: string
+    ) => {
+      const preset = GHG_SOURCE_PRESETS[src]
+      const isAir = cat === 'air_monitoring'
+
+      if (isAir) {
+        const valNum = Number(measResult) || 0
+        let isCompliant = true
+        if (pollutant.includes('PM10') && valNum > 100) isCompliant = false
+        if (pollutant.includes('PM2.5') && valNum > 60) isCompliant = false
+        if (pollutant.includes('NOx') && valNum > 750) isCompliant = false
+
+        return {
+          factorValue: 0,
+          factorUnit: u,
+          factorSource: 'CPCB / NAAQS 2009 Standards',
+          factorVersion: 1,
+          factorConfigured: true,
+          formula: `${pollutant} concentration monitored at ${valNum} ${u} (Reported separately per CPCB norms — Not mixed with CO2e)`,
+          calculatedTco2e: 0,
+          complianceStatus: isCompliant ? ('COMPLIANT' as const) : ('EXCEEDANCE' as const),
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      let effQty = Number(qtyVal) || 0
+      let fac = preset?.factor ?? 1
+      let facUnit = preset?.factorUnit ?? 'kgCO2e/unit'
+      let facSource = preset?.factorSource ?? 'IPCC 2006'
+      let facVer = preset?.factorVersion ?? 1
+      let isConfigured = true
+
+      if (cat === 'fuel_combustion') {
+        effQty = Number(qtyVal) || 0
+        if (/diesel|hsd/i.test(fuel)) {
+          fac = 2.637
+          facUnit = 'kgCO2e/L'
+          facSource = 'IPCC Guidelines 2006 Vol 2 Ch 2 Table 2.2'
+        } else if (/furnace oil/i.test(fuel)) {
+          fac = 3.15
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC 2006 Vol 2 Stationary Combustion Table 2.3'
+        } else if (/coal/i.test(fuel)) {
+          fac = 1.9
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC 2006 Vol 2 Stationary Combustion Table 2.4'
+        } else if (/lpg/i.test(fuel)) {
+          fac = 2.98
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC 2006 Guidelines Vol 2 Ch 2'
+        } else if (/cng/i.test(fuel)) {
+          fac = 2.19
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC 2006 Guidelines Vol 2 Ch 2'
+        } else {
+          isConfigured = false
+        }
+      } else if (cat === 'electricity_grid') {
+        effQty = Number(qtyVal) || 0
+        fac = 0.716
+        facUnit = 'kgCO2e/kWh'
+        facSource = 'Central Electricity Authority (CEA) CO2 Baseline Database v19'
+      } else if (cat === 'freight_logistics') {
+        effQty = Number(tonKmVal) || (Number(cargoWeightTonnes) * Number(distanceKm)) || 0
+        fac = 0.114
+        facUnit = 'kgCO2e/tonne-km'
+        facSource = 'Smart Freight Centre GLEC Framework v3.0 / GHG Protocol'
+      } else if (cat === 'business_travel') {
+        effQty = Number(passKmVal) || (Number(travelDistanceKm) * Number(passengerCount)) || 0
+        if (/air/i.test(travelMode)) {
+          fac = 0.18
+          facUnit = 'kgCO2e/pass-km'
+          facSource = 'GHG Protocol Scope 3 Technical Guidance / DEFRA 2024'
+        } else if (/rail/i.test(travelMode)) {
+          fac = 0.04
+          facUnit = 'kgCO2e/pass-km'
+          facSource = 'Indian Railways / GHG Protocol Scope 3 Category 6'
+        } else {
+          fac = 0.11
+          facUnit = 'kgCO2e/pass-km'
+          facSource = 'ARAI Fleet Passenger Tables / GHG Protocol'
+        }
+      } else if (cat === 'refrigerant_fugitive') {
+        effQty = Number(refrigQtyVal) || 0
+        if (/410a/i.test(refrigerantType)) {
+          fac = 2088.0
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC Fifth Assessment Report (AR5) GWP100'
+        } else if (/134a/i.test(refrigerantType)) {
+          fac = 1430.0
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC Fifth Assessment Report (AR5) GWP100'
+        } else if (/22/i.test(refrigerantType)) {
+          fac = 1810.0
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC Fifth Assessment Report (AR5) GWP100'
+        } else if (/32/i.test(refrigerantType)) {
+          fac = 675.0
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC Fifth Assessment Report (AR5) GWP100'
+        } else {
+          fac = 1774.0
+          facUnit = 'kgCO2e/kg'
+          facSource = 'IPCC Fifth Assessment Report (AR5) GWP100'
+        }
+      }
+
+      if (!isConfigured) {
+        return {
+          factorValue: 0,
+          factorUnit: facUnit,
+          factorSource: 'Unconfigured',
+          factorVersion: 0,
+          factorConfigured: false,
+          formula: 'Factor unavailable — ESG Review Required',
+          calculatedTco2e: 0,
+          complianceStatus: 'COMPLIANT' as const,
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      const calculatedTco2e = effQty > 0 ? Number(((effQty * fac) / 1000).toFixed(3)) : 0
+      const formula = `${effQty.toLocaleString()} ${u} × ${fac} ${facUnit} ÷ 1,000 = ${calculatedTco2e.toFixed(3)} tCO₂e`
+
+      return {
+        factorValue: fac,
+        factorUnit: facUnit,
+        factorSource: `${facSource} (v${facVer})`,
+        factorVersion: facVer,
+        factorConfigured: true,
+        formula,
+        calculatedTco2e,
+        complianceStatus: 'COMPLIANT' as const,
+        timestamp: new Date().toISOString(),
+      }
+    },
+    [cargoWeightTonnes, distanceKm, travelDistanceKm, passengerCount, travelMode, refrigerantType]
+  )
+
+  // Live calculation for the active form input
+  const currentCalc = useMemo(() => {
+    return getDynamicCalculation(
+      sourceCategory,
+      emissionSource,
+      fuelEnergyType,
+      unit,
+      activityQuantity,
+      passengerKm,
+      tonneKm,
+      quantityLeakedKg,
+      pollutantType,
+      measuredResult
+    )
+  }, [
+    getDynamicCalculation,
+    sourceCategory,
+    emissionSource,
+    fuelEnergyType,
+    unit,
+    activityQuantity,
+    passengerKm,
+    tonneKm,
+    quantityLeakedKg,
+    pollutantType,
+    measuredResult,
+  ])
+
+  // Handle source pill click
   const handleSelectSource = (src: string) => {
     setError('')
     setEmissionSource(src)
     const existing = stagedItems.find((i) => i.emissionSource === src)
+
     if (existing) {
       setEditingItemId(existing.id)
+      setSourceCategory(existing.sourceCategory)
       setEmissionDataType(existing.emissionDataType)
-      setFuelEnergyType(existing.fuelEnergyType)
+      setScope3Category(existing.scope3Category || 'C4 Upstream Transportation and Distribution')
+      setScope3Applicable(existing.scope3Applicable ?? true)
+      setFuelEnergyType(existing.fuelEnergyType || 'Diesel (HSD)')
+      setEquipmentId(existing.equipmentId || '')
+      setElectricityKwh(existing.electricityKwh || existing.activityQuantity)
+      setGridFactorRef(existing.gridFactorRef || '')
+      setSourceRecordId(existing.sourceRecordId || null)
+      setCargoWeightTonnes(existing.cargoWeightTonnes || '500')
+      setTransportMode(existing.transportMode || 'Heavy Duty Road Truck (Diesel)')
+      setDistanceKm(existing.distanceKm || '850')
+      setTonneKm(existing.tonneKm || existing.activityQuantity)
+      setLogisticsProvider(existing.logisticsProvider || '')
+      setOriginDestination(existing.originDestination || '')
+      setTravelMode(existing.travelMode || 'Air Travel (Domestic)')
+      setTravelDistanceKm(existing.travelDistanceKm || '1450')
+      setPassengerCount(existing.passengerCount || '100')
+      setPassengerKm(existing.passengerKm || existing.activityQuantity)
+      setPollutantType(existing.pollutantType || 'PM10 / PM2.5')
+      setSamplingLocation(existing.samplingLocation || '')
+      setTestDate(existing.testDate || '2026-06-15')
+      setLaboratory(existing.laboratory || 'Vimta Labs Ltd. (NABL / CPCB Recognized)')
+      setTestMethod(existing.testMethod || 'IS 5182 (Part 23) High Volume Gravimetric')
+      setMeasuredResult(existing.measuredResult || existing.activityQuantity)
+      setRegulatoryBenchmark(existing.regulatoryBenchmark || '')
+      setComplianceStatus(existing.complianceStatus || 'COMPLIANT')
+      setRefrigerantType(existing.refrigerantType || 'R-410A')
+      setQuantityLeakedKg(existing.quantityLeakedKg || existing.activityQuantity)
+      setGwpSource(existing.gwpSource || '')
       setActivityQuantity(existing.activityQuantity)
       setUnit(existing.unit)
-      setPollutantType(existing.pollutantType)
-      setTestResult(existing.testResult)
-      setSamplingLocation(existing.samplingLocation)
-      setTestDate(existing.testDate)
-      setLaboratoryTestMethod(existing.laboratoryTestMethod)
-      setEmissionFactorRef(existing.emissionFactorRef)
-      setCalculationMethod(existing.calculationMethod)
+      setReportingPeriod(existing.reportingPeriod)
       setSupportingEvidence(existing.supportingEvidence)
       setRemarks(existing.remarks)
-      setEvidenceId(existing.evidenceId)
+      setSelectedEvidenceIds(existing.evidenceIds || (existing.evidenceId ? [existing.evidenceId] : []))
     } else {
       setEditingItemId(null)
       const preset = GHG_SOURCE_PRESETS[src] || GHG_SOURCE_PRESETS['DG Sets & Power Generators']
+      setSourceCategory(preset.category)
       setEmissionDataType(preset.scope)
+      setScope3Category(preset.scope3Category || 'C4 Upstream Transportation and Distribution')
+      setScope3Applicable(true)
       setFuelEnergyType(preset.fuel)
+      setEquipmentId(preset.equipmentId)
+      setElectricityKwh(preset.category === 'electricity_grid' ? preset.defaultQty : '')
+      setGridFactorRef(preset.category === 'electricity_grid' ? preset.factorSource : '')
+      setSourceRecordId(null)
+      setCargoWeightTonnes(preset.category === 'freight_logistics' ? '500' : '')
+      setTransportMode('Heavy Duty Road Truck (Diesel)')
+      setDistanceKm(preset.category === 'freight_logistics' ? '850' : '')
+      setTonneKm(preset.category === 'freight_logistics' ? preset.defaultQty : '')
+      setLogisticsProvider(preset.category === 'freight_logistics' ? 'VRL Logistics Ltd.' : '')
+      setOriginDestination(preset.category === 'freight_logistics' ? 'Vendor Balanagar Works -> Gujarat Site' : '')
+      setTravelMode('Air Travel (Domestic)')
+      setTravelDistanceKm(preset.category === 'business_travel' ? '1450' : '')
+      setPassengerCount(preset.category === 'business_travel' ? '100' : '')
+      setPassengerKm(preset.category === 'business_travel' ? preset.defaultQty : '')
+      setPollutantType(preset.pollutant)
+      setSamplingLocation(preset.location)
+      setTestDate('2026-06-15')
+      setLaboratory(preset.lab)
+      setTestMethod(preset.method)
+      setMeasuredResult(preset.category === 'air_monitoring' ? preset.defaultQty : '')
+      setRegulatoryBenchmark(preset.standardLimit || '')
+      setComplianceStatus('COMPLIANT')
+      setRefrigerantType(preset.category === 'refrigerant_fugitive' ? 'R-410A' : '')
+      setQuantityLeakedKg(preset.category === 'refrigerant_fugitive' ? preset.defaultQty : '')
+      setGwpSource(preset.category === 'refrigerant_fugitive' ? preset.factorSource : '')
       setActivityQuantity(preset.defaultQty)
       setUnit(preset.unit)
-      setPollutantType(preset.pollutant)
-      setTestResult(preset.defaultResult)
-      setSamplingLocation(preset.location)
-      setLaboratoryTestMethod(preset.lab)
-      setEmissionFactorRef(preset.ref)
-      setCalculationMethod(preset.method)
+      setReportingPeriod('June 2026')
       setSupportingEvidence(preset.doc)
-      setRemarks(`Emissions calculation for ${src} aligned with corporate reporting protocol.`)
-      setEvidenceId('')
+      setRemarks(`Activity emission calculation for ${src} aligned with corporate reporting protocol.`)
+      setSelectedEvidenceIds([])
     }
   }
 
   // Handle data type select (Scope 1, Scope 2, Scope 3, Air pollutant)
   const handleSelectDataType = (newType: string) => {
     setEmissionDataType(newType)
-    // If selecting Scope 3, suggest Scope 3 freight or commute preset if not already set
     if (newType.includes('3') && !emissionSource.includes('Scope 3')) {
       handleSelectSource('Value Chain & Freight Logistics (Scope 3)')
     } else if (newType.includes('2') && !emissionSource.includes('Scope 2')) {
       handleSelectSource('Purchased Grid Electricity (Scope 2)')
     } else if (newType.includes('Air') && !emissionSource.includes('Air') && !emissionSource.includes('Stack')) {
       handleSelectSource('Ambient Air Monitoring')
+    } else if (newType.includes('1') && (emissionSource.includes('Scope 2') || emissionSource.includes('Scope 3') || emissionSource.includes('Air'))) {
+      handleSelectSource('DG Sets & Power Generators')
     }
+  }
+
+  // Import from Level 1 Energy record (Preserves lineage & prevents re-entry)
+  const handleImportLevel1Energy = () => {
+    if (!level1EnergyRecord) return
+    const d = level1EnergyRecord.data || {}
+    const importedQty = String(d.consumptionQuantity || '42800')
+    const importedUnit = d.unit || 'kWh'
+    const importedMeter = d.meterEquipmentId || 'MTR-GJT-GRID-01'
+    const importedDoc = d.sourceDocument || 'Electricity utility bill'
+
+    setActivityQuantity(importedQty)
+    setElectricityKwh(importedQty)
+    setUnit(importedUnit)
+    setEquipmentId(importedMeter)
+    setSourceRecordId(level1EnergyRecord.id)
+    setSupportingEvidence(`Imported from Level 1 Energy (#${level1EnergyRecord.id.slice(-8)}) — ${importedDoc}`)
+    toast.success('Successfully imported Level 1 Energy consumption data!', {
+      description: `Loaded ${Number(importedQty).toLocaleString()} ${importedUnit} (Meter: ${importedMeter}). Source record ID preserved for audit lineage.`,
+    })
+  }
+
+  // Auto-compute tonne-km for freight when weight or distance changes
+  const handleFreightWeightChange = (val: string) => {
+    setCargoWeightTonnes(val)
+    const w = Number(val) || 0
+    const d = Number(distanceKm) || 0
+    const calc = String(w * d)
+    setTonneKm(calc)
+    setActivityQuantity(calc)
+  }
+
+  const handleFreightDistanceChange = (val: string) => {
+    setDistanceKm(val)
+    const w = Number(cargoWeightTonnes) || 0
+    const d = Number(val) || 0
+    const calc = String(w * d)
+    setTonneKm(calc)
+    setActivityQuantity(calc)
+  }
+
+  // Auto-compute passenger-km for travel when distance or headcount changes
+  const handleTravelDistanceChange = (val: string) => {
+    setTravelDistanceKm(val)
+    const d = Number(val) || 0
+    const p = Number(passengerCount) || 0
+    const calc = String(d * p)
+    setPassengerKm(calc)
+    setActivityQuantity(calc)
+  }
+
+  const handlePassengerCountChange = (val: string) => {
+    setPassengerCount(val)
+    const d = Number(travelDistanceKm) || 0
+    const p = Number(val) || 0
+    const calc = String(d * p)
+    setPassengerKm(calc)
+    setActivityQuantity(calc)
   }
 
   // Add / Update item in staged items list
   const handleAddOrUpdateItem = () => {
     setError('')
     const qNum = Number(activityQuantity)
-    if ((!activityQuantity || isNaN(qNum) || qNum <= 0) && !testResult) {
-      setError(`Please enter a valid activity quantity (> 0) or test result for ${emissionSource}.`)
+    const isAir = sourceCategory === 'air_monitoring'
+
+    if (!isAir && (!activityQuantity || isNaN(qNum) || qNum <= 0)) {
+      setError(`Please enter a valid activity quantity (> 0) for ${emissionSource}.`)
       return
     }
 
-    const { factor: f, estTco2e: t } = calculateGhgItemEmissions(emissionSource, emissionDataType, activityQuantity)
-    const attachedEv = evidence.find((e) => e.id === evidenceId)
+    if (isAir && !measuredResult) {
+      setError(`Please enter the laboratory measured result for ${emissionSource}.`)
+      return
+    }
+
+    if (!currentCalc.factorConfigured) {
+      setError(`Emission Factor Not Configured — ESG Review Required. Cannot stage record without verified factor.`)
+      return
+    }
+
+    // Duplicate detection check
+    const existingIndex = stagedItems.findIndex(
+      (i) =>
+        i.emissionSource === emissionSource &&
+        (editingItemId ? i.id !== editingItemId : true) &&
+        (i.equipmentId === equipmentId || i.samplingLocation === samplingLocation)
+    )
+
+    if (existingIndex >= 0) {
+      toast.warning('Potential Duplicate Detected', {
+        description: `An entry for ${emissionSource} with equipment/station '${equipmentId || samplingLocation}' already exists. Staging will update the record.`,
+      })
+    }
+
+    const attachedFiles = evidence.filter((e) => selectedEvidenceIds.includes(e.id))
     const itemPayload: StagedGhgItem = {
       id: editingItemId || `item-ghg-${Date.now()}`,
+      sourceCategory,
       emissionDataType,
       emissionSource,
-      fuelEnergyType,
-      activityQuantity,
+      fuelEnergyType: sourceCategory === 'fuel_combustion' ? fuelEnergyType : undefined,
+      equipmentId: equipmentId || undefined,
+      electricityKwh: sourceCategory === 'electricity_grid' ? electricityKwh : undefined,
+      gridFactorRef: sourceCategory === 'electricity_grid' ? gridFactorRef : undefined,
+      sourceRecordId,
+      cargoWeightTonnes: sourceCategory === 'freight_logistics' ? cargoWeightTonnes : undefined,
+      transportMode: sourceCategory === 'freight_logistics' ? transportMode : undefined,
+      distanceKm: sourceCategory === 'freight_logistics' ? distanceKm : undefined,
+      tonneKm: sourceCategory === 'freight_logistics' ? tonneKm : undefined,
+      logisticsProvider: sourceCategory === 'freight_logistics' ? logisticsProvider : undefined,
+      originDestination: sourceCategory === 'freight_logistics' ? originDestination : undefined,
+      travelMode: sourceCategory === 'business_travel' ? travelMode : undefined,
+      travelDistanceKm: sourceCategory === 'business_travel' ? travelDistanceKm : undefined,
+      passengerCount: sourceCategory === 'business_travel' ? passengerCount : undefined,
+      passengerKm: sourceCategory === 'business_travel' ? passengerKm : undefined,
+      pollutantType: sourceCategory === 'air_monitoring' ? pollutantType : undefined,
+      samplingLocation: sourceCategory === 'air_monitoring' ? samplingLocation : undefined,
+      testDate: sourceCategory === 'air_monitoring' ? testDate : undefined,
+      laboratory: sourceCategory === 'air_monitoring' ? laboratory : undefined,
+      testMethod: sourceCategory === 'air_monitoring' ? testMethod : undefined,
+      laboratoryTestMethod: sourceCategory === 'air_monitoring' ? `${laboratory} / ${testMethod}` : undefined,
+      measuredResult: sourceCategory === 'air_monitoring' ? measuredResult : undefined,
+      testResult:
+        sourceCategory === 'air_monitoring'
+          ? `${measuredResult} ${unit}`
+          : `${currentCalc.calculatedTco2e.toFixed(2)} tCO₂e`,
+      regulatoryBenchmark: sourceCategory === 'air_monitoring' ? regulatoryBenchmark : undefined,
+      complianceStatus: sourceCategory === 'air_monitoring' ? currentCalc.complianceStatus : undefined,
+      refrigerantType: sourceCategory === 'refrigerant_fugitive' ? refrigerantType : undefined,
+      quantityLeakedKg: sourceCategory === 'refrigerant_fugitive' ? quantityLeakedKg : undefined,
+      gwpSource: sourceCategory === 'refrigerant_fugitive' ? gwpSource : undefined,
+      scope3Category: emissionDataType.includes('3') ? scope3Category : undefined,
+      scope3Applicable: emissionDataType.includes('3') ? scope3Applicable : undefined,
+      activityQuantity: String(activityQuantity),
       unit,
-      pollutantType,
-      testResult,
-      samplingLocation,
-      testDate,
-      laboratoryTestMethod,
-      emissionFactorRef,
-      calculationMethod,
+      reportingPeriod,
+      factor: currentCalc.factorValue,
+      factorUnit: currentCalc.factorUnit,
+      factorSource: currentCalc.factorSource,
+      factorVersion: currentCalc.factorVersion,
+      factorConfigured: currentCalc.factorConfigured,
+      calculationFormula: currentCalc.formula,
+      calculationTimestamp: currentCalc.timestamp,
+      estTco2e: currentCalc.calculatedTco2e,
       supportingEvidence,
       remarks,
-      evidenceId,
-      evidenceFileName: attachedEv?.fileName,
-      factor: f,
-      estTco2e: t,
+      evidenceId: selectedEvidenceIds[0] || '',
+      evidenceIds: selectedEvidenceIds,
+      evidenceFileName: attachedFiles.map((f) => f.fileName).join(', ') || undefined,
+      evidenceFiles: attachedFiles,
+      status: overallWorkflowStatus,
     }
 
     let updated: StagedGhgItem[]
     if (editingItemId) {
       updated = stagedItems.map((i) => (i.id === editingItemId ? itemPayload : i))
-      toast.success(`Updated ${emissionSource} draft item.`)
+      toast.success(`Updated ${emissionSource} item in inventory.`)
     } else {
       const idx = stagedItems.findIndex((i) => i.emissionSource === emissionSource)
       if (idx >= 0) {
         updated = stagedItems.map((i, iIdx) => (iIdx === idx ? itemPayload : i))
-        toast.info(`Updated existing ${emissionSource} draft item.`)
+        toast.info(`Updated existing ${emissionSource} record.`)
       } else {
         updated = [...stagedItems, itemPayload]
-        toast.success(`Added ${emissionSource} (${t > 0 ? t.toFixed(2) + ' tCO₂e' : testResult}) to draft items!`)
+        toast.success(
+          `Added ${emissionSource} (${
+            itemPayload.estTco2e > 0 ? itemPayload.estTco2e.toFixed(2) + ' tCO₂e' : itemPayload.testResult
+          }) to draft items!`
+        )
       }
     }
 
@@ -5728,21 +6292,43 @@ function Level3GhgForm({
   const handleEditStagedItem = (item: StagedGhgItem) => {
     setViewStep('ENTRY')
     setEditingItemId(item.id)
-    setEmissionDataType(item.emissionDataType)
+    setSourceCategory(item.sourceCategory)
     setEmissionSource(item.emissionSource)
-    setFuelEnergyType(item.fuelEnergyType)
+    setEmissionDataType(item.emissionDataType)
+    setScope3Category(item.scope3Category || 'C4 Upstream Transportation and Distribution')
+    setScope3Applicable(item.scope3Applicable ?? true)
+    setFuelEnergyType(item.fuelEnergyType || 'Diesel (HSD)')
+    setEquipmentId(item.equipmentId || '')
+    setElectricityKwh(item.electricityKwh || item.activityQuantity)
+    setGridFactorRef(item.gridFactorRef || '')
+    setSourceRecordId(item.sourceRecordId || null)
+    setCargoWeightTonnes(item.cargoWeightTonnes || '500')
+    setTransportMode(item.transportMode || 'Heavy Duty Road Truck (Diesel)')
+    setDistanceKm(item.distanceKm || '850')
+    setTonneKm(item.tonneKm || item.activityQuantity)
+    setLogisticsProvider(item.logisticsProvider || '')
+    setOriginDestination(item.originDestination || '')
+    setTravelMode(item.travelMode || 'Air Travel (Domestic)')
+    setTravelDistanceKm(item.travelDistanceKm || '1450')
+    setPassengerCount(item.passengerCount || '100')
+    setPassengerKm(item.passengerKm || item.activityQuantity)
+    setPollutantType(item.pollutantType || 'PM10 / PM2.5')
+    setSamplingLocation(item.samplingLocation || '')
+    setTestDate(item.testDate || '2026-06-15')
+    setLaboratory(item.laboratory || 'Vimta Labs Ltd. (NABL / CPCB Recognized)')
+    setTestMethod(item.testMethod || 'IS 5182 (Part 23) High Volume Gravimetric')
+    setMeasuredResult(item.measuredResult || item.activityQuantity)
+    setRegulatoryBenchmark(item.regulatoryBenchmark || '')
+    setComplianceStatus(item.complianceStatus || 'COMPLIANT')
+    setRefrigerantType(item.refrigerantType || 'R-410A')
+    setQuantityLeakedKg(item.quantityLeakedKg || item.activityQuantity)
+    setGwpSource(item.gwpSource || '')
     setActivityQuantity(item.activityQuantity)
     setUnit(item.unit)
-    setPollutantType(item.pollutantType)
-    setTestResult(item.testResult)
-    setSamplingLocation(item.samplingLocation)
-    setTestDate(item.testDate)
-    setLaboratoryTestMethod(item.laboratoryTestMethod)
-    setEmissionFactorRef(item.emissionFactorRef)
-    setCalculationMethod(item.calculationMethod)
+    setReportingPeriod(item.reportingPeriod)
     setSupportingEvidence(item.supportingEvidence)
     setRemarks(item.remarks)
-    setEvidenceId(item.evidenceId)
+    setSelectedEvidenceIds(item.evidenceIds || (item.evidenceId ? [item.evidenceId] : []))
     toast.info(`Editing ${item.emissionSource} draft item`)
   }
 
@@ -5754,45 +6340,52 @@ function Level3GhgForm({
     if (editingItemId === id) {
       setEditingItemId(null)
     }
-    toast.warning(`Removed ${target?.emissionSource || 'item'} from staged drafts.`)
+    toast.warning(`Removed ${target?.emissionSource || 'item'} from staged inventory.`)
   }
 
   const handleNextOrganize = () => {
     setError('')
     if (stagedItems.length === 0) {
-      if (!activityQuantity && !testResult) {
-        setError('Please enter activity quantity or test result and click Add (Draft) first.')
+      if (!activityQuantity && !measuredResult) {
+        setError('Please enter activity quantity or test result and click Add Item (Draft) first.')
         return
       }
       handleAddOrUpdateItem()
     }
     setViewStep('ORGANIZED')
     toast.info('Organized GHG Consolidated Summary', {
-      description: 'Review Scope 1, Scope 2, Scope 3, and Air Quality breakdown below.',
+      description: 'Review Scope 1, Scope 2, Scope 3, and separated Air Quality breakdown below.',
     })
   }
 
-  // Aggregate stats across staged items
-  const totalCombinedTco2e = stagedItems.reduce((acc, it) => acc + it.estTco2e, 0)
-  const s1Total = stagedItems
-    .filter((i) => i.emissionDataType.includes('1'))
-    .reduce((acc, it) => acc + it.estTco2e, 0)
-  const s2Total = stagedItems
-    .filter((i) => i.emissionDataType.includes('2'))
-    .reduce((acc, it) => acc + it.estTco2e, 0)
-  const s3Total = stagedItems
-    .filter((i) => i.emissionDataType.includes('3'))
-    .reduce((acc, it) => acc + it.estTco2e, 0)
-  const airCount = stagedItems.filter((i) => i.emissionDataType.toLowerCase().includes('air')).length
+  // AGGREGATE METRICS — STRICT SEPARATION OF AIR POLLUTANTS FROM GHG
+  const ghgOnlyItems = stagedItems.filter((i) => i.sourceCategory !== 'air_monitoring')
+  const airPollutantItems = stagedItems.filter((i) => i.sourceCategory === 'air_monitoring')
 
-  // Sync to formStateRef.current[key]
+  const s1Total = ghgOnlyItems
+    .filter((i) => i.emissionDataType.includes('1') || i.sourceCategory === 'refrigerant_fugitive')
+    .reduce((acc, it) => acc + it.estTco2e, 0)
+  const s2Total = ghgOnlyItems
+    .filter((i) => i.emissionDataType.includes('2') || i.sourceCategory === 'electricity_grid')
+    .reduce((acc, it) => acc + it.estTco2e, 0)
+  const s3Total = ghgOnlyItems
+    .filter(
+      (i) =>
+        i.emissionDataType.includes('3') ||
+        i.sourceCategory === 'freight_logistics' ||
+        i.sourceCategory === 'business_travel'
+    )
+    .reduce((acc, it) => acc + it.estTco2e, 0)
+  const totalCombinedTco2e = s1Total + s2Total + s3Total
+
+  // Sync state to formStateRef.current[key]
   useEffect(() => {
     const itemsToSave = stagedItems.length > 0 ? stagedItems : []
     const scopesList = [
-      itemsToSave.some((i) => i.emissionDataType.includes('1')) && 'Scope 1',
-      itemsToSave.some((i) => i.emissionDataType.includes('2')) && 'Scope 2',
-      itemsToSave.some((i) => i.emissionDataType.includes('3')) && 'Scope 3',
-      itemsToSave.some((i) => i.emissionDataType.toLowerCase().includes('air')) && 'Air Pollutants',
+      s1Total > 0 && 'Scope 1',
+      s2Total > 0 && 'Scope 2',
+      s3Total > 0 && 'Scope 3',
+      airPollutantItems.length > 0 && 'Air Quality Monitoring',
     ]
       .filter(Boolean)
       .join(' + ')
@@ -5804,22 +6397,25 @@ function Level3GhgForm({
       activityQuantity: String(itemsToSave.reduce((sum, i) => sum + (Number(i.activityQuantity) || 0), 0) || activityQuantity),
       unit: itemsToSave[0]?.unit || unit,
       pollutantType: itemsToSave.map((i) => i.pollutantType).filter(Boolean).join(', ') || pollutantType,
-      testResult: itemsToSave.map((i) => i.testResult).filter(Boolean).join(' | ') || testResult,
+      testResult: itemsToSave.map((i) => i.testResult).filter(Boolean).join(' | ') || `${totalCombinedTco2e.toFixed(2)} tCO₂e`,
       samplingLocation,
       testDate,
-      laboratoryTestMethod,
-      emissionFactorRef,
-      calculationMethod,
+      laboratoryTestMethod: `${laboratory} / ${testMethod}`,
+      emissionFactorRef: currentCalc.factorSource,
+      calculationMethod: currentCalc.formula,
       supportingEvidence: itemsToSave.map((i) => i.supportingEvidence).filter(Boolean).join('; ') || supportingEvidence,
-      remarks: remarks || `Consolidated multi-source GHG report (${itemsToSave.length} sources).`,
-      evidenceId: itemsToSave.find((i) => i.evidenceId)?.evidenceId || evidenceId,
+      remarks: remarks || `Consolidated GHG & Air Quality inventory (${itemsToSave.length} streams).`,
+      evidenceId: selectedEvidenceIds[0] || '',
+      evidenceIds: selectedEvidenceIds,
       items: itemsToSave,
       totalTco2e: totalCombinedTco2e,
       s1Total,
       s2Total,
       s3Total,
-      airCount,
+      airCount: airPollutantItems.length,
+      airPollutants: airPollutantItems,
       viewStep,
+      status: overallWorkflowStatus,
     }
   }, [
     key,
@@ -5831,59 +6427,34 @@ function Level3GhgForm({
     activityQuantity,
     unit,
     pollutantType,
-    testResult,
     samplingLocation,
     testDate,
-    laboratoryTestMethod,
-    emissionFactorRef,
-    calculationMethod,
+    laboratory,
+    testMethod,
+    currentCalc,
     supportingEvidence,
     remarks,
-    evidenceId,
+    selectedEvidenceIds,
     totalCombinedTco2e,
     s1Total,
     s2Total,
     s3Total,
-    airCount,
+    airPollutantItems,
+    overallWorkflowStatus,
     formStateRef,
   ])
 
-  // Active item calculations
-  const curCalc = calculateGhgItemEmissions(emissionSource, emissionDataType, activityQuantity)
-
-  // Final Save / Submit
+  // Final Save / Submit to backend
   const save = async (submitForReview = false) => {
     setError('')
     let effectiveItems = [...stagedItems]
     if (effectiveItems.length === 0) {
-      if (!activityQuantity && !testResult) {
+      if (!activityQuantity && !measuredResult) {
         setError('Either activity quantity or measured test result must be provided.')
         return
       }
-      const { factor: f, estTco2e: t } = curCalc
-      effectiveItems = [
-        {
-          id: `item-ghg-${Date.now()}`,
-          emissionDataType,
-          emissionSource,
-          fuelEnergyType,
-          activityQuantity,
-          unit,
-          pollutantType,
-          testResult,
-          samplingLocation,
-          testDate,
-          laboratoryTestMethod,
-          emissionFactorRef,
-          calculationMethod,
-          supportingEvidence,
-          remarks,
-          evidenceId,
-          factor: f,
-          estTco2e: t,
-        },
-      ]
-      setStagedItems(effectiveItems)
+      handleAddOrUpdateItem()
+      effectiveItems = formStateRef.current[key]?.items || effectiveItems
     }
 
     setSubmitting(true)
@@ -5891,6 +6462,7 @@ function Level3GhgForm({
       const payloadData: Record<string, any> = {
         ...formStateRef.current[key],
         items: effectiveItems,
+        status: submitForReview ? 'SUBMITTED' : overallWorkflowStatus,
       }
 
       const res = await fetch('/api/data-entry', {
@@ -5911,7 +6483,9 @@ function Level3GhgForm({
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Failed to save GHG record')
       toast.success(
-        submitForReview ? 'GHG submission sent for BU review!' : 'GHG draft saved successfully!'
+        submitForReview
+          ? 'GHG & Air Quality submission sent for BU review!'
+          : `GHG inventory saved as ${overallWorkflowStatus}!`
       )
       onSaved(d.record, submitForReview)
     } catch (e: any) {
@@ -5942,7 +6516,7 @@ function Level3GhgForm({
             >
               1
             </span>
-            <span>Item Drafting</span>
+            <span>Dynamic Item Drafting</span>
             {stagedItems.length > 0 && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-800">
                 {stagedItems.length}
@@ -5966,7 +6540,7 @@ function Level3GhgForm({
             >
               2
             </span>
-            <span>Organized Summary</span>
+            <span>Organized Consolidated Summary</span>
             {stagedItems.length > 0 && (
               <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                 ✓ Ready
@@ -5981,7 +6555,7 @@ function Level3GhgForm({
             onClick={handleNextOrganize}
             className="group flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:shadow-emerald-500/20 hover:opacity-95 transition active:scale-95"
           >
-            <span>Next: Organize All Items</span>
+            <span>Next: Organize Full Inventory</span>
             <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px] font-mono">
               {stagedItems.length}
             </span>
@@ -6000,7 +6574,7 @@ function Level3GhgForm({
       </div>
 
       {/* ==============================================================
-          VIEW 1: ITEM DRAFT ENTRY (ADD ONE BY ONE, WITH ADD + NEXT)
+          VIEW 1: DYNAMIC ITEM DRAFT ENTRY (SOURCE-SPECIFIC FIELDS)
           ============================================================== */}
       {viewStep === 'ENTRY' && (
         <FormGrid>
@@ -6008,36 +6582,63 @@ function Level3GhgForm({
           <div className="sm:col-span-2 rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/90 via-teal-50/60 to-emerald-50/90 p-4 text-xs text-emerald-950 shadow-sm">
             <div className="flex items-center justify-between font-bold">
               <span className="flex items-center gap-2 text-emerald-900">
-                <Flame className="h-4 w-4 text-emerald-600" /> Active Item Status ·{' '}
+                <Flame className="h-4 w-4 text-emerald-600" /> Active Source Stream ·{' '}
                 <span className="underline decoration-emerald-300 font-extrabold">{emissionSource}</span>
               </span>
               <span className="rounded-full bg-emerald-100/90 px-2.5 py-0.5 text-[10px] text-emerald-800 font-mono font-bold border border-emerald-200">
-                {emissionDataType} · {pollutantType}
+                {emissionDataType} · {sourceCategory.replace('_', ' ').toUpperCase()}
               </span>
             </div>
+
             <div className="mt-3 grid grid-cols-3 gap-3 text-center">
               <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-emerald-100">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
                   Activity Quantity
                 </div>
                 <div className="text-base font-extrabold text-slate-900 mt-0.5">
-                  {Number(activityQuantity) > 0 ? `${Number(activityQuantity).toLocaleString()} ${unit}` : '—'}
+                  {sourceCategory === 'air_monitoring'
+                    ? `${measuredResult || '0'} ${unit}`
+                    : Number(activityQuantity) > 0
+                    ? `${Number(activityQuantity).toLocaleString()} ${unit}`
+                    : '—'}
                 </div>
               </div>
+
               <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-emerald-100">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-                  Est. GHG Footprint
+                  {sourceCategory === 'air_monitoring' ? 'Air Quality Compliance' : 'Est. GHG Footprint'}
                 </div>
                 <div className="text-base font-extrabold text-emerald-800 mt-0.5">
-                  {curCalc.estTco2e > 0 ? `${curCalc.estTco2e.toFixed(2)} tCO₂e` : testResult || 'Measured'}
+                  {sourceCategory === 'air_monitoring' ? (
+                    <span
+                      className={`inline-flex items-center gap-1 font-bold ${
+                        currentCalc.complianceStatus === 'COMPLIANT'
+                          ? 'text-emerald-700'
+                          : 'text-amber-700'
+                      }`}
+                    >
+                      {currentCalc.complianceStatus === 'COMPLIANT' ? 'Within Limits ✓' : 'Exceedance ⚠'}
+                    </span>
+                  ) : currentCalc.calculatedTco2e > 0 ? (
+                    `${currentCalc.calculatedTco2e.toFixed(3)} tCO₂e`
+                  ) : (
+                    '—'
+                  )}
                 </div>
               </div>
+
               <div className="rounded-xl bg-white/95 p-2.5 shadow-xs border border-emerald-100">
                 <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
-                  Emission Scope
+                  Target Scope Classification
                 </div>
                 <div className="text-base font-extrabold text-emerald-900 mt-0.5">
-                  {emissionDataType.includes('1') ? 'Scope 1' : emissionDataType.includes('2') ? 'Scope 2' : emissionDataType.includes('3') ? 'Scope 3' : 'Air Pollutant'}
+                  {sourceCategory === 'air_monitoring'
+                    ? 'Air Pollutant (Separate)'
+                    : emissionDataType.includes('1')
+                    ? 'Scope 1 Direct'
+                    : emissionDataType.includes('2')
+                    ? 'Scope 2 Indirect'
+                    : 'Scope 3 Value Chain'}
                 </div>
               </div>
             </div>
@@ -6049,11 +6650,11 @@ function Level3GhgForm({
               <div className="flex items-center gap-2">
                 <Layers className="h-4 w-4 text-emerald-600" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  Select GHG / Air Emission Source Item to Fill / Draft:
+                  Select Emission Source Item:
                 </span>
               </div>
               <span className="text-[11px] text-slate-500 font-medium">
-                Click any source → Fill details &amp; evidence → Click Add (Draft)
+                Picks source → Auto-renders relevant fields only
               </span>
             </div>
 
@@ -6104,150 +6705,726 @@ function Level3GhgForm({
             </div>
           </div>
 
-          {/* ITEM FORM INPUTS - WITH SCOPE 3 EXPLICITLY IN DROPDOWN */}
-          <FormField label="Emission Data Type" hint="Scope 1, Scope 2, Scope 3, or Air pollutant.">
+          {/* CLASSIFICATION CONTROLLER */}
+          <FormField
+            label="Emission Data Type"
+            hint="Classifies reporting boundary per GHG Protocol Corporate Standard."
+          >
             <select
               value={emissionDataType}
               disabled={readOnly}
               onChange={(e) => handleSelectDataType(e.target.value)}
               className={inputClass}
             >
-              <option value="Scope 1 activity">Scope 1 activity (Direct emissions: fuel, generators, fleet)</option>
-              <option value="Scope 2 activity">Scope 2 activity (Indirect purchased electricity &amp; steam)</option>
-              <option value="Scope 3 activity">Scope 3 activity (Value chain / logistics / upstream &amp; downstream)</option>
-              <option value="Air pollutant">Air pollutant (Stack emissions &amp; ambient air monitoring)</option>
+              <option value="Scope 1 activity">Scope 1 activity (Direct direct emissions from owned/controlled sources)</option>
+              <option value="Scope 2 activity">Scope 2 activity (Indirect emissions from purchased electricity/steam)</option>
+              <option value="Scope 3 activity">Scope 3 activity (Value chain / freight / business travel / upstream &amp; downstream)</option>
+              <option value="Air pollutant">Air pollutant (Stack exhaust &amp; ambient air quality — Tracked separately)</option>
             </select>
           </FormField>
 
-          <FormField label="Emission Source" hint="Selected source name or generator/equipment ID.">
+          <FormField
+            label="Selected Emission Source Stream"
+            hint="Descriptor or specific installation designation."
+          >
             <input
               value={emissionSource}
               disabled={readOnly}
               onChange={(e) => setEmissionSource(e.target.value)}
-              placeholder="e.g. DG Set 750 kVA / Heavy Fleet"
+              placeholder="e.g. DG Sets & Power Generators"
               className={inputClass}
             />
           </FormField>
 
-          <FormField label="Fuel / Energy / Activity Type" hint="Diesel, Grid electricity, Freight transport.">
-            <input
-              value={fuelEnergyType}
-              disabled={readOnly}
-              onChange={(e) => setFuelEnergyType(e.target.value)}
-              placeholder="e.g. Diesel (HSD)"
-              className={inputClass}
-            />
-          </FormField>
+          {/* ==============================================================
+              DYNAMIC FORM SECTION 1: FUEL COMBUSTION (DG, BOILERS, FLEET)
+              (Shows fuel type, quantity, unit, equipment ID, period, evidence)
+              (DO NOT show laboratory testing or freight fields!)
+              ============================================================== */}
+          {sourceCategory === 'fuel_combustion' && (
+            <>
+              <div className="sm:col-span-2 rounded-xl bg-amber-50/70 border border-amber-200 p-2.5 text-xs text-amber-900 font-medium flex items-center justify-between">
+                <span>
+                  🔥 <strong>Fuel Combustion Fields Active:</strong> Only stationary/mobile fuel parameters are shown. Laboratory testing and freight fields are hidden.
+                </span>
+                <span className="font-mono text-[10px] text-amber-800">Scope 1 Direct</span>
+              </div>
 
-          <FormField label="Activity Quantity" hint="Actual measured consumption or transport work.">
-            <input
-              type="number"
-              min="0"
-              step="any"
-              value={activityQuantity}
-              disabled={readOnly}
-              onChange={(e) => setActivityQuantity(e.target.value)}
-              placeholder="e.g. 18650"
-              className={inputClass}
-            />
-          </FormField>
+              <FormField label="Fuel Type" hint="Approved fuel category from Factor Master.">
+                <select
+                  value={fuelEnergyType}
+                  disabled={readOnly}
+                  onChange={(e) => setFuelEnergyType(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="Diesel (HSD)">Diesel (HSD)</option>
+                  <option value="Furnace Oil / Boilers">Furnace Oil / Heavy Fuel Oil</option>
+                  <option value="Petrol (MS)">Petrol (MS)</option>
+                  <option value="Coal (Sub-bituminous)">Coal (Sub-bituminous)</option>
+                  <option value="CNG">Compressed Natural Gas (CNG)</option>
+                  <option value="LPG">Liquefied Petroleum Gas (LPG)</option>
+                </select>
+              </FormField>
 
-          <FormField label="Unit" hint="litres, kWh, tonne-km, passenger-km, kg.">
-            <input
-              value={unit}
-              disabled={readOnly}
-              onChange={(e) => setUnit(e.target.value)}
-              placeholder="litres"
-              className={inputClass}
-            />
-          </FormField>
+              <FormField
+                label="Equipment / Source ID"
+                hint="Designated DG generator number, furnace tag or fleet asset."
+              >
+                <input
+                  value={equipmentId}
+                  disabled={readOnly}
+                  onChange={(e) => setEquipmentId(e.target.value)}
+                  placeholder="e.g. MEIL-DG-002 (DG Yard Bay 01)"
+                  className={inputClass}
+                />
+              </FormField>
 
-          <FormField label="Pollutant Type" hint="Target parameter.">
-            <select
-              value={pollutantType}
-              disabled={readOnly}
-              onChange={(e) => setPollutantType(e.target.value)}
-              className={inputClass}
-            >
-              {['CO₂e', 'PM10 / PM2.5', 'NOx', 'SOx', 'CO', 'VOCs'].map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </FormField>
+              <FormField label="Activity Quantity" hint="Metered or procured volume consumed.">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={activityQuantity}
+                  disabled={readOnly}
+                  onChange={(e) => setActivityQuantity(e.target.value)}
+                  placeholder="18650"
+                  className={inputClass}
+                />
+              </FormField>
 
-          <FormField label="Test Result" hint="For stack or ambient air monitoring (or tCO₂e estimate).">
-            <input
-              value={testResult}
-              disabled={readOnly}
-              onChange={(e) => setTestResult(e.target.value)}
-              placeholder="e.g. 48.2 µg/m³"
-              className={inputClass}
-            />
-          </FormField>
+              <FormField label="Activity Unit" hint="Must correspond to factor unit (L, kg, MT).">
+                <select
+                  value={unit}
+                  disabled={readOnly}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="litres">litres</option>
+                  <option value="kg">kg</option>
+                  <option value="tonnes">tonnes</option>
+                  <option value="m³">m³</option>
+                </select>
+              </FormField>
 
-          <FormField label="Sampling Location" hint="Stack tag or ambient station reference.">
-            <input
-              value={samplingLocation}
-              disabled={readOnly}
-              onChange={(e) => setSamplingLocation(e.target.value)}
-              placeholder="e.g. Perimeter Air Monitoring Station 01"
-              className={inputClass}
-            />
-          </FormField>
+              <FormField label="Reporting Period" hint="Operational reporting timeframe.">
+                <input
+                  value={reportingPeriod}
+                  disabled={readOnly}
+                  onChange={(e) => setReportingPeriod(e.target.value)}
+                  placeholder="e.g. June 2026 / FY 2026-27 Q1"
+                  className={inputClass}
+                />
+              </FormField>
 
-          <FormField label="Test Date" hint="Sampling date or period date.">
-            <input
-              type="date"
-              value={testDate}
-              disabled={readOnly}
-              onChange={(e) => setTestDate(e.target.value)}
-              className={inputClass}
-            />
-          </FormField>
+              <FormField label="Supporting Evidence Reference" hint="Procurement ledger / fuel logbook ref.">
+                <input
+                  value={supportingEvidence}
+                  disabled={readOnly}
+                  onChange={(e) => setSupportingEvidence(e.target.value)}
+                  placeholder="e.g. SAP Fuel Procurement Ledger & DG Logbook"
+                  className={inputClass}
+                />
+              </FormField>
+            </>
+          )}
 
-          <FormField label="Laboratory / Test Method" hint="NABL accredited facility / ISO method.">
-            <input
-              value={laboratoryTestMethod}
-              disabled={readOnly}
-              onChange={(e) => setLaboratoryTestMethod(e.target.value)}
-              placeholder="e.g. Vimta Labs Ltd. / IS 5182"
-              className={inputClass}
-            />
-          </FormField>
+          {/* ==============================================================
+              DYNAMIC FORM SECTION 2: PURCHASED ELECTRICITY (SCOPE 2)
+              (Shows kWh, reporting period, grid factor, bill/meter evidence)
+              (Includes quick 1-click import from Level 1 Energy!)
+              ============================================================== */}
+          {sourceCategory === 'electricity_grid' && (
+            <>
+              <div className="sm:col-span-2 rounded-xl bg-blue-50/70 border border-blue-200 p-2.5 text-xs text-blue-900 font-medium flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span>
+                  ⚡ <strong>Purchased Electricity Fields Active:</strong> Grid consumption and CEA baseline accounting. Ordinary freight and laboratory fields are hidden.
+                </span>
 
-          <FormField label="Emission Factor Reference" hint="IPCC, CEA, GLEC or DEFRA reference.">
-            <input
-              value={emissionFactorRef}
-              disabled={readOnly}
-              onChange={(e) => setEmissionFactorRef(e.target.value)}
-              placeholder="e.g. IPCC 2006 / CEA v19"
-              className={inputClass}
-            />
-          </FormField>
+                {level1EnergyRecord && (
+                  <button
+                    type="button"
+                    onClick={handleImportLevel1Energy}
+                    disabled={readOnly || loadingL1}
+                    className="self-start sm:self-auto flex items-center gap-1.5 rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-xs hover:bg-blue-700 transition"
+                    title="Load from existing Level 1 Energy record without re-entering"
+                  >
+                    <Download className="h-3 w-3" />
+                    <span>Import from Level 1 Energy ({Number(level1EnergyRecord.data?.consumptionQuantity || 42800).toLocaleString()} kWh)</span>
+                  </button>
+                )}
+              </div>
 
-          <FormField label="Calculation Method" hint="Calculation equation or certified protocol.">
-            <input
-              value={calculationMethod}
-              disabled={readOnly}
-              onChange={(e) => setCalculationMethod(e.target.value)}
-              placeholder="e.g. Activity data × Approved Factor"
-              className={inputClass}
-            />
-          </FormField>
+              {sourceRecordId && (
+                <div className="sm:col-span-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-[11px] text-emerald-800 flex items-center justify-between">
+                  <span>✓ <strong>Source Record Lineage Linked:</strong> Level 1 Energy Record #{sourceRecordId.slice(-8)}. Dependent calculations tracked.</span>
+                  <span className="text-[10px] text-emerald-600 font-mono">ID: {sourceRecordId}</span>
+                </div>
+              )}
 
-          <FormField label="Supporting Evidence" hint="Logbooks, invoices, lab reports description." full>
-            <input
-              value={supportingEvidence}
-              disabled={readOnly}
-              onChange={(e) => setSupportingEvidence(e.target.value)}
-              placeholder="e.g. SAP Fuel Procurement Ledger & Stack Emissions Report"
-              className={inputClass}
-            />
-          </FormField>
+              <FormField label="Electricity Consumption (kWh)" hint="Metered or utility billed kilowatt-hours.">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={activityQuantity}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setActivityQuantity(e.target.value)
+                    setElectricityKwh(e.target.value)
+                  }}
+                  placeholder="384000"
+                  className={inputClass}
+                />
+              </FormField>
 
-          <FormField label="Remarks" hint="Boundary notes, transport modes, or audit observations." full>
+              <FormField label="Substation / Meter Reference ID" hint="Utility meter reference.">
+                <input
+                  value={equipmentId}
+                  disabled={readOnly}
+                  onChange={(e) => setEquipmentId(e.target.value)}
+                  placeholder="e.g. MTR-GJT-GRID-01"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Reporting Period" hint="Monthly billing period.">
+                <input
+                  value={reportingPeriod}
+                  disabled={readOnly}
+                  onChange={(e) => setReportingPeriod(e.target.value)}
+                  placeholder="June 2026"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Applicable Grid Emission Factor Ref" hint="CEA statutory baseline database.">
+                <input
+                  value={gridFactorRef}
+                  disabled={readOnly}
+                  onChange={(e) => setGridFactorRef(e.target.value)}
+                  placeholder="CEA CO2 Baseline Database v19 — 0.716 kgCO2e/kWh"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Utility Bill / Meter Evidence Reference" hint="DISCOM bill invoice reference." full>
+                <input
+                  value={supportingEvidence}
+                  disabled={readOnly}
+                  onChange={(e) => setSupportingEvidence(e.target.value)}
+                  placeholder="e.g. Monthly Utility Tariff Invoice #891204 & AMR Meter Log"
+                  className={inputClass}
+                />
+              </FormField>
+            </>
+          )}
+
+          {/* ==============================================================
+              DYNAMIC FORM SECTION 3: FREIGHT LOGISTICS (SCOPE 3)
+              (Shows cargo weight, mode, distance, tonne-km, provider, origin/dest)
+              (Includes Scope 3 category selector and boundary applicability)
+              ============================================================== */}
+          {sourceCategory === 'freight_logistics' && (
+            <>
+              <div className="sm:col-span-2 rounded-xl bg-purple-50/70 border border-purple-200 p-2.5 text-xs text-purple-900 font-medium">
+                🚚 <strong>Freight Logistics Fields Active:</strong> Upstream/downstream value chain logistics. Laboratory testing and electricity fields are hidden.
+              </div>
+
+              <FormField label="Scope 3 GHG Protocol Category" hint="Select protocol value chain category.">
+                <select
+                  value={scope3Category}
+                  disabled={readOnly}
+                  onChange={(e) => setScope3Category(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="C4 Upstream Transportation and Distribution">
+                    C4: Upstream Transportation &amp; Distribution (Tier 1 suppliers to site)
+                  </option>
+                  <option value="C9 Downstream Transportation and Distribution">
+                    C9: Downstream Transportation &amp; Distribution (Outbound shipments)
+                  </option>
+                  <option value="C1 Purchased Goods and Services">
+                    C1: Purchased Goods Freight Embedded
+                  </option>
+                </select>
+              </FormField>
+
+              <div className="flex flex-col justify-center">
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Project Boundary Applicability
+                </label>
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer mt-1">
+                  <input
+                    type="checkbox"
+                    checked={scope3Applicable}
+                    disabled={readOnly}
+                    onChange={(e) => setScope3Applicable(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-400"
+                  />
+                  <span>Category Applicable to Project Reporting Boundary</span>
+                </label>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Allows configurable Scope 3 reporting boundaries per entity.
+                </p>
+              </div>
+
+              <FormField label="Cargo / Material Weight (Tonnes)" hint="Gross weight transported.">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={cargoWeightTonnes}
+                  disabled={readOnly}
+                  onChange={(e) => handleFreightWeightChange(e.target.value)}
+                  placeholder="500"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Transport Mode" hint="Mode factor per GLEC framework.">
+                <select
+                  value={transportMode}
+                  disabled={readOnly}
+                  onChange={(e) => setTransportMode(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="Heavy Duty Road Truck (Diesel)">Heavy Duty Road Truck (Diesel - 0.114 kg/t-km)</option>
+                  <option value="Freight Rail (Electric/Diesel)">Freight Rail (0.028 kg/t-km)</option>
+                  <option value="Coastal Shipping">Coastal Shipping (0.016 kg/t-km)</option>
+                  <option value="Air Cargo">Air Cargo (0.602 kg/t-km)</option>
+                </select>
+              </FormField>
+
+              <FormField label="Distance (km)" hint="Origin to site road/rail distance.">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={distanceKm}
+                  disabled={readOnly}
+                  onChange={(e) => handleFreightDistanceChange(e.target.value)}
+                  placeholder="850"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Transport Work (Tonne-km)" hint="Auto-calculated (Weight × Distance) or manual entry.">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={activityQuantity}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setTonneKm(e.target.value)
+                    setActivityQuantity(e.target.value)
+                  }}
+                  placeholder="425000"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Logistics Service Provider" hint="Carrier / 3PL transporter name.">
+                <input
+                  value={logisticsProvider}
+                  disabled={readOnly}
+                  onChange={(e) => setLogisticsProvider(e.target.value)}
+                  placeholder="e.g. VRL Logistics Ltd. / CONCOR"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Origin & Destination" hint="Corridor routing description.">
+                <input
+                  value={originDestination}
+                  disabled={readOnly}
+                  onChange={(e) => setOriginDestination(e.target.value)}
+                  placeholder="e.g. Vendor Balanagar Works -> Gujarat Site"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Supporting Transport Records" hint="E-way bill, LR copy, invoice reference." full>
+                <input
+                  value={supportingEvidence}
+                  disabled={readOnly}
+                  onChange={(e) => setSupportingEvidence(e.target.value)}
+                  placeholder="e.g. Consolidated E-Way Bills & Freight Invoices #FWD-9910"
+                  className={inputClass}
+                />
+              </FormField>
+            </>
+          )}
+
+          {/* ==============================================================
+              DYNAMIC FORM SECTION 4: BUSINESS TRAVEL & COMMUTE (SCOPE 3)
+              (Shows travel mode, distance, passenger-km, travel evidence)
+              ============================================================== */}
+          {sourceCategory === 'business_travel' && (
+            <>
+              <div className="sm:col-span-2 rounded-xl bg-purple-50/70 border border-purple-200 p-2.5 text-xs text-purple-900 font-medium">
+                👥 <strong>Business Travel &amp; Commute Fields Active:</strong> GHG Protocol Categories C6 &amp; C7. Cargo, laboratory, and fuel fields are hidden.
+              </div>
+
+              <FormField label="Scope 3 Category" hint="Business travel vs employee transit.">
+                <select
+                  value={scope3Category}
+                  disabled={readOnly}
+                  onChange={(e) => setScope3Category(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="C6 Business Travel">C6: Business Travel (Corporate travel, flights, client transit)</option>
+                  <option value="C7 Employee Commuting">C7: Employee Commuting (Daily staff bus &amp; workforce transit)</option>
+                </select>
+              </FormField>
+
+              <div className="flex flex-col justify-center">
+                <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                  Project Boundary Applicability
+                </label>
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-800 cursor-pointer mt-1">
+                  <input
+                    type="checkbox"
+                    checked={scope3Applicable}
+                    disabled={readOnly}
+                    onChange={(e) => setScope3Applicable(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-purple-600 focus:ring-purple-400"
+                  />
+                  <span>Category Applicable to Project Reporting Boundary</span>
+                </label>
+              </div>
+
+              <FormField label="Travel Mode" hint="Mode factor per GHG Protocol / DEFRA.">
+                <select
+                  value={travelMode}
+                  disabled={readOnly}
+                  onChange={(e) => setTravelMode(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="Air Travel (Domestic)">Air Travel (Domestic - 0.18 kgCO2e/p-km)</option>
+                  <option value="Air Travel (Long-Haul)">Air Travel (Long-Haul - 0.15 kgCO2e/p-km)</option>
+                  <option value="Rail Travel">Rail Travel (0.04 kgCO2e/p-km)</option>
+                  <option value="Road Travel (Fleet Car)">Road Travel (Fleet Taxi / Car - 0.11 kgCO2e/p-km)</option>
+                  <option value="Employee Bus Transit">Employee Bus Transit (0.068 kgCO2e/p-km)</option>
+                </select>
+              </FormField>
+
+              <FormField label="Total One-way / Round-trip Distance (km)" hint="Route distance.">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={travelDistanceKm}
+                  disabled={readOnly}
+                  onChange={(e) => handleTravelDistanceChange(e.target.value)}
+                  placeholder="1450"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Passenger Count" hint="Total travelers in reporting period.">
+                <input
+                  type="number"
+                  min="1"
+                  value={passengerCount}
+                  disabled={readOnly}
+                  onChange={(e) => handlePassengerCountChange(e.target.value)}
+                  placeholder="100"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Activity Data (Passenger-km)" hint="Auto-calculated (Distance × Passengers).">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={activityQuantity}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setPassengerKm(e.target.value)
+                    setActivityQuantity(e.target.value)
+                  }}
+                  placeholder="145000"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Travel Records & Booking Evidence" hint="Corporate portal logs & tickets." full>
+                <input
+                  value={supportingEvidence}
+                  disabled={readOnly}
+                  onChange={(e) => setSupportingEvidence(e.target.value)}
+                  placeholder="e.g. Corporate Travel Booking Register & Flight Tickets"
+                  className={inputClass}
+                />
+              </FormField>
+            </>
+          )}
+
+          {/* ==============================================================
+              DYNAMIC FORM SECTION 5: AMBIENT AIR & STACK EMISSIONS
+              (Shows pollutant, unit, sampling location, test date, lab, method, result)
+              (DO NOT combine with GHG CO2e totals!)
+              ============================================================== */}
+          {sourceCategory === 'air_monitoring' && (
+            <>
+              <div className="sm:col-span-2 rounded-xl bg-teal-50/80 border border-teal-200 p-3 text-xs text-teal-950 font-medium">
+                <div className="flex items-center gap-1.5 font-bold text-teal-900">
+                  <CloudFog className="h-4 w-4 text-teal-600" />
+                  <span>Ambient Air Monitoring &amp; Stack Emissions (Tracked Separately)</span>
+                </div>
+                <p className="mt-1 text-[11px] text-teal-800">
+                  Air pollutant measurements (PM10, PM2.5, NOx, SO2) are statutory environmental compliance metrics under CPCB &amp; State Pollution Control Board guidelines. <strong>These values are strictly maintained separate and never mixed into corporate GHG CO2e totals.</strong>
+                </p>
+              </div>
+
+              <FormField label="Pollutant Parameter" hint="Target criteria pollutant.">
+                <select
+                  value={pollutantType}
+                  disabled={readOnly}
+                  onChange={(e) => setPollutantType(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="PM10 / PM2.5">Particulate Matter (PM10 / PM2.5)</option>
+                  <option value="NOx">Nitrogen Oxides (NOx)</option>
+                  <option value="SO2">Sulphur Dioxide (SO2)</option>
+                  <option value="CO">Carbon Monoxide (CO)</option>
+                  <option value="VOCs">Volatile Organic Compounds (VOCs)</option>
+                </select>
+              </FormField>
+
+              <FormField label="Measurement Unit" hint="Concentration standard unit.">
+                <select
+                  value={unit}
+                  disabled={readOnly}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="µg/m³">µg/m³ (Ambient air concentration)</option>
+                  <option value="mg/Nm³">mg/Nm³ (Stack exhaust flue concentration)</option>
+                  <option value="ppm">ppm (Parts per million)</option>
+                </select>
+              </FormField>
+
+              <FormField label="Sampling Location / Stack ID" hint="Station or stack chimney tag.">
+                <input
+                  value={samplingLocation}
+                  disabled={readOnly}
+                  onChange={(e) => setSamplingLocation(e.target.value)}
+                  placeholder="e.g. Perimeter Air Monitoring Station 01"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Test Date" hint="Sampling field test date.">
+                <input
+                  type="date"
+                  value={testDate}
+                  disabled={readOnly}
+                  onChange={(e) => setTestDate(e.target.value)}
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Testing Laboratory" hint="NABL / CPCB accredited facility.">
+                <input
+                  value={laboratory}
+                  disabled={readOnly}
+                  onChange={(e) => setLaboratory(e.target.value)}
+                  placeholder="e.g. Vimta Labs Ltd. (NABL / CPCB Recognized)"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Test Method" hint="Standard testing protocol.">
+                <input
+                  value={testMethod}
+                  disabled={readOnly}
+                  onChange={(e) => setTestMethod(e.target.value)}
+                  placeholder="e.g. IS 5182 (Part 23) High Volume Sampler Gravimetric"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Measured Result" hint="Laboratory certified test value.">
+                <input
+                  value={measuredResult}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setMeasuredResult(e.target.value)
+                    setActivityQuantity(e.target.value)
+                  }}
+                  placeholder="e.g. 48.2"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Regulatory Standard Limit" hint="Statutory CPCB / NAAQS benchmark.">
+                <input
+                  value={regulatoryBenchmark}
+                  disabled={readOnly}
+                  onChange={(e) => setRegulatoryBenchmark(e.target.value)}
+                  placeholder="e.g. NAAQS 24-hr limit: 100 µg/m³ for PM10"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Supporting Lab Report" hint="NABL report number & certificate ref." full>
+                <input
+                  value={supportingEvidence}
+                  disabled={readOnly}
+                  onChange={(e) => setSupportingEvidence(e.target.value)}
+                  placeholder="e.g. NABL Certified Ambient Air Quality Report #VMT-2026-06-18"
+                  className={inputClass}
+                />
+              </FormField>
+            </>
+          )}
+
+          {/* ==============================================================
+              DYNAMIC FORM SECTION 6: FUGITIVE REFRIGERANTS
+              (Shows refrigerant type, quantity leaked/replenished, GWP source, evidence)
+              (DO NOT show laboratory testing or cargo fields!)
+              ============================================================== */}
+          {sourceCategory === 'refrigerant_fugitive' && (
+            <>
+              <div className="sm:col-span-2 rounded-xl bg-cyan-50/70 border border-cyan-200 p-2.5 text-xs text-cyan-900 font-medium">
+                ❄️ <strong>Fugitive Refrigerant Gas Fields Active:</strong> Scope 1 fugitive chiller gas loss accounting. Laboratory testing, cargo, and freight fields are hidden.
+              </div>
+
+              <FormField label="Refrigerant Gas Type" hint="Chemical blend / HFC designation.">
+                <select
+                  value={refrigerantType}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setRefrigerantType(e.target.value)
+                    setFuelEnergyType(`Refrigerant ${e.target.value}`)
+                  }}
+                  className={inputClass}
+                >
+                  <option value="R-410A">R-410A (GWP: 2,088 kgCO2e/kg)</option>
+                  <option value="R-134a">R-134a (GWP: 1,430 kgCO2e/kg)</option>
+                  <option value="R-22">R-22 (GWP: 1,810 kgCO2e/kg)</option>
+                  <option value="R-32">R-32 (GWP: 675 kgCO2e/kg)</option>
+                  <option value="R-407C">R-407C (GWP: 1,774 kgCO2e/kg)</option>
+                </select>
+              </FormField>
+
+              <FormField label="Equipment / Chiller Unit ID" hint="HVAC asset identifier.">
+                <input
+                  value={equipmentId}
+                  disabled={readOnly}
+                  onChange={(e) => setEquipmentId(e.target.value)}
+                  placeholder="e.g. Main Substation Chiller Unit 01 (CHL-001)"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Quantity Leaked / Top-Up (kg)" hint="Net gas added during maintenance.">
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={activityQuantity}
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    setQuantityLeakedKg(e.target.value)
+                    setActivityQuantity(e.target.value)
+                  }}
+                  placeholder="14"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Applicable GWP Reference" hint="Statutory IPCC AR5 100-year GWP.">
+                <input
+                  value={gwpSource}
+                  disabled={readOnly}
+                  onChange={(e) => setGwpSource(e.target.value)}
+                  placeholder="IPCC AR5 GWP100: 2,088 kgCO2e/kg"
+                  className={inputClass}
+                />
+              </FormField>
+
+              <FormField label="Service Log & Invoices Evidence" hint="HVAC contractor work sheet." full>
+                <input
+                  value={supportingEvidence}
+                  disabled={readOnly}
+                  onChange={(e) => setSupportingEvidence(e.target.value)}
+                  placeholder="e.g. HVAC Maintenance Service Log & Gas Recharge Invoice #VOL-8812"
+                  className={inputClass}
+                />
+              </FormField>
+            </>
+          )}
+
+          {/* CALCULATION LINEAGE & AUDIT TRAIL CARD */}
+          <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 p-4 shadow-xs">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Calculator className="h-4 w-4 text-emerald-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Deterministic Calculation Engine Lineage
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {currentCalc.timestamp.slice(0, 19).replace('T', ' ')} UTC
+              </span>
+            </div>
+
+            {currentCalc.factorConfigured ? (
+              <div className="mt-3 space-y-2 text-xs">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/80">
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Applied Factor</span>
+                    <div className="font-mono font-bold text-emerald-800 mt-0.5">
+                      {currentCalc.factorValue > 0
+                        ? `${currentCalc.factorValue} ${currentCalc.factorUnit}`
+                        : 'Lab Certified'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/80">
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Factor Source &amp; Ver</span>
+                    <div className="text-[11px] font-semibold text-slate-800 truncate mt-0.5" title={currentCalc.factorSource}>
+                      {currentCalc.factorSource}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/80">
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Calculated Footprint</span>
+                    <div className="font-bold text-emerald-900 mt-0.5">
+                      {sourceCategory === 'air_monitoring'
+                        ? '0.00 tCO₂e (Separate)'
+                        : `${currentCalc.calculatedTco2e.toFixed(3)} tCO₂e`}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-white p-2.5 border border-slate-200/80">
+                    <span className="text-[9px] uppercase font-bold text-slate-400">Lineage Status</span>
+                    <div className="font-semibold text-emerald-700 mt-0.5 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>Verified Master</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-slate-100/90 p-2 font-mono text-[11px] text-slate-700 border border-slate-200">
+                  <span className="font-bold text-slate-900">Formula Lineage:</span> {currentCalc.formula}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900 font-medium flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+                <span>
+                  <strong>Emission Factor Not Configured — ESG Review Required.</strong> No verified factor matching &apos;{fuelEnergyType}&apos; in unit &apos;{unit}&apos; is active in the Emission Factor Master.
+                </span>
+              </div>
+            )}
+          </div>
+
+          <FormField label="Operational Remarks & Audit Notes" hint="Boundary justifications or methodology observations." full>
             <textarea
               value={remarks}
               disabled={readOnly}
@@ -6257,7 +7434,7 @@ function Level3GhgForm({
             />
           </FormField>
 
-          {/* ITEM EVIDENCE ATTACHMENT SECTION */}
+          {/* ITEM EVIDENCE ATTACHMENT SECTION (MULTI-ATTACHMENT ENABLED) */}
           <div className="sm:col-span-2">
             <FormEvidenceAttachSection
               projectId={projectId}
@@ -6265,24 +7442,24 @@ function Level3GhgForm({
               moduleKey="EMISSIONS"
               evidence={evidence}
               onUploaded={onEvidenceUploaded || (async () => {})}
-              selectedEvidenceId={evidenceId || null}
-              onSelectEvidence={(id) => setEvidenceId(id || '')}
+              selectedEvidenceIds={selectedEvidenceIds}
+              onSelectEvidenceIds={setSelectedEvidenceIds}
               onReview={onReviewEvidence}
               readOnly={readOnly}
             />
           </div>
 
-          {/* SPECIAL ACTION BUTTONS: ADD (DRAFT) + NEXT (ORGANIZE) */}
+          {/* DRAFTING ACTION RIBBON: ADD (DRAFT) + NEXT (ORGANIZE) */}
           <div className="sm:col-span-2 rounded-2xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/90 via-teal-50/50 to-blue-50/90 p-4 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Sparkles className="h-4 w-4 text-emerald-600" />
-                  <span>Item Draft Actions · {emissionSource}</span>
+                  <span>Item Actions · {emissionSource}</span>
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Fill details and attach evidence, then click <strong>Add Item (Draft)</strong> to stage it.
-                  When all sources are added, click <strong>Next: Organize All Items</strong>.
+                  Fill details and attach documents, then click <strong>Add Item (Draft)</strong> to stage it.
+                  When all sources are added, click <strong>Next: Organize Full Inventory</strong>.
                 </p>
               </div>
 
@@ -6295,7 +7472,7 @@ function Level3GhgForm({
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>
-                    {editingItemId ? `Update ${emissionSource} Draft` : `Add ${emissionSource} (Draft)`}
+                    {editingItemId ? `Update ${emissionSource}` : `Add ${emissionSource} (Draft)`}
                   </span>
                 </button>
 
@@ -6304,7 +7481,7 @@ function Level3GhgForm({
                   onClick={handleNextOrganize}
                   className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-700 to-teal-800 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-600/20 hover:opacity-95 transition active:scale-95"
                 >
-                  <span>Next: Organize All Items</span>
+                  <span>Next: Organize Full Inventory</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
@@ -6317,7 +7494,7 @@ function Level3GhgForm({
             )}
           </div>
 
-          {/* STAGED DRAFT ITEMS TABLE / LIST */}
+          {/* STAGED DRAFT ITEMS TABLE (STEP 1) */}
           {stagedItems.length > 0 && (
             <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
@@ -6327,7 +7504,7 @@ function Level3GhgForm({
                   </div>
                   <div>
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Staged Draft Items ({stagedItems.length} Sources Added)
+                      Staged Inventory Items ({stagedItems.length} Streams Configured)
                     </h4>
                     <p className="text-[10px] text-slate-500">
                       Draft emission sources. Click edit to adjust or click Next to organize the full inventory.
@@ -6337,7 +7514,7 @@ function Level3GhgForm({
 
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-800 border border-emerald-200">
-                    Total: {totalCombinedTco2e.toFixed(2)} tCO₂e ({stagedItems.length} Sources)
+                    GHG Total: {totalCombinedTco2e.toFixed(2)} tCO₂e ({ghgOnlyItems.length} streams + {airPollutantItems.length} air monitoring)
                   </span>
                   <button
                     type="button"
@@ -6355,7 +7532,7 @@ function Level3GhgForm({
                   <thead className="bg-slate-50 text-[10px] uppercase tracking-wider text-slate-500 border-y border-slate-100">
                     <tr>
                       <th className="py-2 px-2.5">Source &amp; Scope</th>
-                      <th className="py-2 px-2.5">Fuel / Pollutant &amp; Location</th>
+                      <th className="py-2 px-2.5">Fuel / Stream / Equipment ID</th>
                       <th className="py-2 px-2.5">Activity Quantity</th>
                       <th className="py-2 px-2.5">Est. Footprint</th>
                       <th className="py-2 px-2.5">Evidence</th>
@@ -6364,58 +7541,71 @@ function Level3GhgForm({
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {stagedItems.map((item) => {
-                      const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                      const attachedEvs = item.evidenceFiles && item.evidenceFiles.length > 0
+                        ? item.evidenceFiles
+                        : evidence.filter((ev) => item.evidenceIds?.includes(ev.id) || ev.id === item.evidenceId)
+                      const isAir = item.sourceCategory === 'air_monitoring'
+
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-2.5 px-2.5">
                             <div className="font-bold text-slate-900">{item.emissionSource}</div>
                             <span
                               className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
-                                item.emissionDataType.includes('1')
+                                isAir
+                                  ? 'bg-teal-100 text-teal-800'
+                                  : item.emissionDataType.includes('1')
                                   ? 'bg-amber-100 text-amber-800'
                                   : item.emissionDataType.includes('2')
                                   ? 'bg-blue-100 text-blue-800'
-                                  : item.emissionDataType.includes('3')
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-purple-100 text-purple-800'
                               }`}
                             >
-                              {item.emissionDataType}
+                              {isAir ? 'Air Pollutant (Separate)' : item.emissionDataType}
                             </span>
                           </td>
                           <td className="py-2.5 px-2.5">
-                            <div className="font-semibold text-slate-800">{item.fuelEnergyType || item.pollutantType}</div>
+                            <div className="font-semibold text-slate-800">
+                              {item.fuelEnergyType || item.pollutantType || item.refrigerantType}
+                            </div>
                             <div className="text-[10px] font-mono text-slate-500">
-                              {item.samplingLocation || '—'}
+                              {item.equipmentId || item.samplingLocation || '—'}
                             </div>
                           </td>
                           <td className="py-2.5 px-2.5 font-bold text-slate-900">
-                            {Number(item.activityQuantity) > 0
+                            {isAir
+                              ? `${item.measuredResult || item.activityQuantity} ${item.unit}`
+                              : Number(item.activityQuantity) > 0
                               ? `${Number(item.activityQuantity).toLocaleString()} ${item.unit}`
-                              : item.testResult || '—'}
+                              : '—'}
                           </td>
                           <td className="py-2.5 px-2.5 font-bold text-emerald-900">
-                            {item.estTco2e > 0 ? `${item.estTco2e.toFixed(2)} tCO₂e` : item.testResult}
+                            {isAir ? (
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  item.complianceStatus === 'COMPLIANT'
+                                    ? 'text-teal-700'
+                                    : 'text-amber-700'
+                                }`}
+                              >
+                                {item.testResult}
+                              </span>
+                            ) : (
+                              `${item.estTco2e.toFixed(3)} tCO₂e`
+                            )}
                           </td>
                           <td className="py-2.5 px-2.5">
-                            {attachedEv ? (
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className="truncate max-w-[120px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
-                                  title={attachedEv.fileName}
-                                >
-                                  {attachedEv.fileName}
-                                </span>
-                                {onReviewEvidence && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onReviewEvidence(attachedEv)}
-                                    className="text-blue-600 hover:text-blue-800 p-0.5"
-                                    title="Review evidence (flips engine preview)"
+                            {attachedEvs.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {attachedEvs.map((ev) => (
+                                  <span
+                                    key={ev.id}
+                                    className="truncate max-w-[100px] rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 border border-emerald-200"
+                                    title={ev.fileName}
                                   >
-                                    <Eye className="h-3 w-3" />
-                                  </button>
-                                )}
+                                    {ev.fileName}
+                                  </span>
+                                ))}
                               </div>
                             ) : (
                               <span className="text-[10px] text-slate-400 italic">None attached</span>
@@ -6462,7 +7652,8 @@ function Level3GhgForm({
       )}
 
       {/* ==============================================================
-          VIEW 2: ORGANIZED CONSOLIDATED SUMMARY
+          VIEW 2: ORGANIZED CONSOLIDATED SUMMARY (STEP 2)
+          (Separate Air Quality from GHG emissions)
           ============================================================== */}
       {viewStep === 'ORGANIZED' && (
         <div className="space-y-4">
@@ -6475,12 +7666,12 @@ function Level3GhgForm({
                     Step 2: Consolidated
                   </span>
                   <h3 className="text-sm font-bold text-slate-900">
-                    All GHG &amp; Air Emission Sources Organized in One View
+                    All GHG Emissions &amp; Air Quality Streams Organized in One View
                   </h3>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-1">
-                  Compiled {stagedItems.length} emission source items across Scope 1, Scope 2, Scope 3, and Air Quality monitoring into an integrated inventory.
-                  Review the summary, attach any final documentation, and click Save Draft or Submit for Review.
+                  Compiled {stagedItems.length} source streams across Scope 1, Scope 2, Scope 3, and Ambient/Stack Air Quality monitoring.
+                  Air pollutant measurements (PM10, NOx, SO2) are monitored separately and are not combined with GHG CO2e totals.
                 </p>
               </div>
 
@@ -6490,12 +7681,12 @@ function Level3GhgForm({
                 className="self-start sm:self-auto flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs"
               >
                 <Plus className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Add / Edit More Sources</span>
+                <span>Add / Edit More Streams</span>
               </button>
             </div>
           </div>
 
-          {/* 4 Consolidated Executive Metric Tiles */}
+          {/* 4 Executive KPI Metric Tiles */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-xl border border-amber-200 bg-white p-3 shadow-xs">
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -6504,7 +7695,7 @@ function Level3GhgForm({
               <div className="text-base font-extrabold text-amber-950 mt-1">
                 {s1Total.toFixed(2)} tCO₂e
               </div>
-              <div className="text-[10px] text-amber-700 mt-0.5">DG, Furnaces &amp; Fleet</div>
+              <div className="text-[10px] text-amber-700 mt-0.5">DG Sets, Boilers &amp; Fleet</div>
             </div>
 
             <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-xs">
@@ -6529,25 +7720,30 @@ function Level3GhgForm({
 
             <div className="rounded-xl border border-emerald-200 bg-white p-3 shadow-xs">
               <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Consolidated Footprint
+                Total GHG Footprint
               </div>
               <div className="text-base font-extrabold text-emerald-900 mt-1">
                 {totalCombinedTco2e.toFixed(2)} tCO₂e
               </div>
               <div className="text-[10px] text-emerald-700 mt-0.5">
-                {stagedItems.length} sources ({airCount} air monitoring)
+                {ghgOnlyItems.length} GHG Streams ({airPollutantItems.length} Air Monitoring)
               </div>
             </div>
           </div>
 
-          {/* Consolidated Master Table of All Items */}
+          {/* Consolidated Master Table of GHG Streams */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                Consolidated Emission Inventory Breakdown
-              </h4>
-              <span className="text-[10px] text-slate-500">
-                All emission streams will be saved into the master draft and submitted together
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                  Consolidated GHG Emission Streams (Scope 1, 2 &amp; 3)
+                </h4>
+                <p className="text-[10px] text-slate-500">
+                  Deterministic calculations verified with backend Emission Factor Master
+                </p>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                Total: {totalCombinedTco2e.toFixed(2)} tCO₂e
               </span>
             </div>
 
@@ -6557,18 +7753,21 @@ function Level3GhgForm({
                   <tr>
                     <th className="py-2.5 px-3">#</th>
                     <th className="py-2.5 px-3">Emission Source</th>
-                    <th className="py-2.5 px-3">Scope / Type</th>
-                    <th className="py-2.5 px-3">Fuel / Pollutant</th>
+                    <th className="py-2.5 px-3">Scope / Category</th>
+                    <th className="py-2.5 px-3">Fuel / Activity</th>
                     <th className="py-2.5 px-3">Activity Quantity</th>
-                    <th className="py-2.5 px-3">Emission Factor</th>
-                    <th className="py-2.5 px-3">Est. tCO₂e / Result</th>
+                    <th className="py-2.5 px-3">Applied Factor</th>
+                    <th className="py-2.5 px-3">Est. Footprint</th>
                     <th className="py-2.5 px-3">Attached Evidence</th>
                     <th className="py-2.5 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {stagedItems.map((item, idx) => {
-                    const attachedEv = evidence.find((ev) => ev.id === item.evidenceId)
+                  {ghgOnlyItems.map((item, idx) => {
+                    const attachedEvs = item.evidenceFiles && item.evidenceFiles.length > 0
+                      ? item.evidenceFiles
+                      : evidence.filter((ev) => item.evidenceIds?.includes(ev.id) || ev.id === item.evidenceId)
+
                     return (
                       <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-2.5 px-3 font-mono text-[10px] text-slate-400">
@@ -6576,9 +7775,9 @@ function Level3GhgForm({
                         </td>
                         <td className="py-2.5 px-3 font-bold text-slate-900">
                           {item.emissionSource}
-                          {item.remarks && (
-                            <div className="text-[10px] font-normal text-slate-500 line-clamp-1">
-                              {item.remarks}
+                          {item.equipmentId && (
+                            <div className="text-[10px] font-normal text-slate-500">
+                              Asset: {item.equipmentId}
                             </div>
                           )}
                         </td>
@@ -6589,52 +7788,42 @@ function Level3GhgForm({
                                 ? 'bg-amber-100 text-amber-800'
                                 : item.emissionDataType.includes('2')
                                 ? 'bg-blue-100 text-blue-800'
-                                : item.emissionDataType.includes('3')
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-emerald-100 text-emerald-800'
+                                : 'bg-purple-100 text-purple-800'
                             }`}
                           >
-                            {item.emissionDataType}
+                            {item.scope3Category ? item.scope3Category.split(' ')[0] : item.emissionDataType}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-slate-700">
-                          {item.fuelEnergyType || item.pollutantType}
-                          {item.samplingLocation && (
-                            <div className="text-[10px] text-slate-400">
-                              {item.samplingLocation}
-                            </div>
-                          )}
+                          {item.fuelEnergyType || item.transportMode || item.travelMode || item.refrigerantType}
                         </td>
                         <td className="py-2.5 px-3 font-bold text-slate-900">
-                          {Number(item.activityQuantity) > 0
-                            ? `${Number(item.activityQuantity).toLocaleString()} ${item.unit}`
-                            : item.testResult || '—'}
+                          {Number(item.activityQuantity).toLocaleString()} {item.unit}
                         </td>
                         <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
-                          {item.factor > 0 ? `${item.factor} kg/${item.unit}` : 'Standard lab test'}
+                          <div>{item.factor} {item.factorUnit}</div>
+                          <div className="text-[9px] text-slate-400 truncate max-w-[120px]" title={item.factorSource}>
+                            {item.factorSource}
+                          </div>
                         </td>
                         <td className="py-2.5 px-3 font-bold text-emerald-950">
-                          {item.estTco2e > 0 ? `${item.estTco2e.toFixed(2)} t` : item.testResult}
+                          {item.estTco2e.toFixed(3)} t
                         </td>
                         <td className="py-2.5 px-3">
-                          {attachedEv ? (
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className="truncate max-w-[110px] rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200"
-                                title={attachedEv.fileName}
-                              >
-                                {attachedEv.fileName}
-                              </span>
-                              {onReviewEvidence && (
+                          {attachedEvs.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {attachedEvs.map((ev) => (
                                 <button
+                                  key={ev.id}
                                   type="button"
-                                  onClick={() => onReviewEvidence(attachedEv)}
-                                  className="text-blue-600 hover:text-blue-800 p-0.5"
-                                  title="Review evidence (flips engine preview)"
+                                  onClick={() => onReviewEvidence && onReviewEvidence(ev)}
+                                  className="flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition"
+                                  title="Review evidence (flips card 180°)"
                                 >
-                                  <Eye className="h-3 w-3" />
+                                  <Eye className="h-2.5 w-2.5" />
+                                  <span className="max-w-[80px] truncate">{ev.fileName}</span>
                                 </button>
-                              )}
+                              ))}
                             </div>
                           ) : (
                             <span className="text-[10px] text-slate-400 italic">None attached</span>
@@ -6656,7 +7845,7 @@ function Level3GhgForm({
                 <tfoot className="bg-slate-50 font-bold text-slate-900 border-t border-slate-200">
                   <tr>
                     <td colSpan={4} className="py-2.5 px-3 text-right text-[11px] uppercase tracking-wider text-slate-500">
-                      Consolidated GHG Total:
+                      Consolidated GHG Footprint (Scope 1 + 2 + 3):
                     </td>
                     <td colSpan={2} className="py-2.5 px-3 text-slate-700 text-xs">
                       S1: {s1Total.toFixed(2)} t | S2: {s2Total.toFixed(2)} t | S3: {s3Total.toFixed(2)} t
@@ -6665,7 +7854,7 @@ function Level3GhgForm({
                       {totalCombinedTco2e.toFixed(2)} tCO₂e
                     </td>
                     <td colSpan={2} className="py-2.5 px-3 text-right text-[10px] text-slate-500">
-                      {stagedItems.length} emission streams combined
+                      {ghgOnlyItems.length} streams aggregated
                     </td>
                   </tr>
                 </tfoot>
@@ -6673,18 +7862,155 @@ function Level3GhgForm({
             </div>
           </div>
 
-          {/* Overall Remarks / Summary Note */}
-          <div className="rounded-xl border border-slate-200 bg-white/80 p-3">
-            <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
-              Consolidated Submission Remarks &amp; Audit Trail Note
-            </label>
-            <textarea
-              value={remarks}
-              disabled={readOnly}
-              onChange={(e) => setRemarks(e.target.value)}
-              placeholder="e.g. Consolidated Scope 1, Scope 2, Scope 3 and ambient stack emissions inventory reconciled with central MRV protocols."
-              className={inputClass + ' min-h-[55px] resize-y'}
-            />
+          {/* DEDICATED AIR QUALITY & STACK COMPLIANCE MONITORING SECTION */}
+          {airPollutantItems.length > 0 && (
+            <div className="rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50/50 via-white to-teal-50/30 p-4 shadow-sm">
+              <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700">
+                    <CloudFog className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-teal-950">
+                      Air Quality &amp; Stack Emission Monitoring (Statutory Separate Record)
+                    </h4>
+                    <p className="text-[10px] text-slate-500">
+                      Monitored in compliance with CPCB / State Pollution Control Board guidelines. Strictly segregated from CO2e totals.
+                    </p>
+                  </div>
+                </div>
+
+                <span className="rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold px-2.5 py-1 border border-teal-200 self-start sm:self-auto">
+                  {airPollutantItems.length} Air Sampling Records
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-teal-50/60 text-[10px] uppercase tracking-wider text-teal-900 border-y border-teal-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Location / Stack</th>
+                      <th className="py-2.5 px-3">Pollutant</th>
+                      <th className="py-2.5 px-3">Measured Concentration</th>
+                      <th className="py-2.5 px-3">CPCB / NAAQS Standard</th>
+                      <th className="py-2.5 px-3">Testing Lab &amp; Method</th>
+                      <th className="py-2.5 px-3">Compliance</th>
+                      <th className="py-2.5 px-3">Evidence</th>
+                      <th className="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-teal-100">
+                    {airPollutantItems.map((item) => {
+                      const attachedEvs = item.evidenceFiles && item.evidenceFiles.length > 0
+                        ? item.evidenceFiles
+                        : evidence.filter((ev) => item.evidenceIds?.includes(ev.id) || ev.id === item.evidenceId)
+
+                      return (
+                        <tr key={item.id} className="hover:bg-teal-50/40 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-slate-800">
+                            {item.samplingLocation || item.emissionSource}
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-teal-950">
+                            {item.pollutantType}
+                          </td>
+                          <td className="py-2.5 px-3 font-mono font-bold text-slate-900">
+                            {item.measuredResult || item.activityQuantity} {item.unit}
+                          </td>
+                          <td className="py-2.5 px-3 text-[10px] text-slate-600">
+                            {item.regulatoryBenchmark || 'NAAQS Limit'}
+                          </td>
+                          <td className="py-2.5 px-3 text-[10px] text-slate-600">
+                            <div>{item.laboratory || 'Vimta Labs Ltd.'}</div>
+                            <div className="text-slate-400">{item.testMethod || 'IS 5182 (Part 23)'}</div>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${
+                                item.complianceStatus === 'COMPLIANT'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {item.complianceStatus === 'COMPLIANT' ? 'Within Limits ✓' : 'Exceedance ⚠'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3">
+                            {attachedEvs.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {attachedEvs.map((ev) => (
+                                  <button
+                                    key={ev.id}
+                                    type="button"
+                                    onClick={() => onReviewEvidence && onReviewEvidence(ev)}
+                                    className="flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-800 border border-teal-200 hover:bg-teal-100 transition"
+                                    title="Review evidence (flips card 180°)"
+                                  >
+                                    <Eye className="h-2.5 w-2.5" />
+                                    <span className="max-w-[70px] truncate">{ev.fileName}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 italic">None attached</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleEditStagedItem(item)}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 transition"
+                            >
+                              Edit
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* REVIEW & WORKFLOW STATUS CONTROLLER */}
+          <div className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
+                  Workflow Review &amp; Approval Status
+                </label>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Set workflow lifecycle status for this consolidated reporting period.
+                </p>
+              </div>
+
+              <select
+                value={overallWorkflowStatus}
+                disabled={readOnly}
+                onChange={(e: any) => setOverallWorkflowStatus(e.target.value)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-xs outline-none focus:border-emerald-400"
+              >
+                <option value="Draft">Draft (In Progress)</option>
+                <option value="Submitted">Submitted (Sent for BU Review)</option>
+                <option value="Under Review">Under Review (ESG Lead Audit)</option>
+                <option value="Approved">Approved (Final Sign-off)</option>
+                <option value="Returned for Correction">Returned for Correction</option>
+                <option value="Recalculation Required">Recalculation Required</option>
+              </select>
+            </div>
+
+            <div className="mt-3">
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                Consolidated Submission Remarks &amp; Audit Trail Note
+              </label>
+              <textarea
+                value={remarks}
+                disabled={readOnly}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="e.g. Scope 1, Scope 2, Scope 3, and ambient stack emissions inventory reconciled with central MRV protocols."
+                className={inputClass + ' min-h-[55px] resize-y'}
+              />
+            </div>
           </div>
 
           {/* Primary Save Draft & Submit for Review buttons */}

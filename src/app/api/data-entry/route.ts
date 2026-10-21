@@ -257,53 +257,224 @@ export async function POST(req: NextRequest) {
       }
 
       case 3: {
-        // GHG & Air Quality
+        // GHG & Air Quality — Enhanced Calculation Engine with DB Factor Master Lineage
+        const activeFactors = await db.emissionFactor.findMany({
+          where: { status: 'ACTIVE' },
+          orderBy: { version: 'desc' },
+        })
+
+        const findDbFactor = (sourceStr: string, fuelStr: string, unitStr: string) => {
+          const s = (sourceStr || '').toLowerCase()
+          const f = (fuelStr || '').toLowerCase()
+          const u = (unitStr || '').toLowerCase()
+
+          // 1. Direct name / fuel match
+          let matched = activeFactors.find(
+            (fac) =>
+              (f && fac.name.toLowerCase().includes(f)) ||
+              (f && (fac.fuelType || '').toLowerCase() === f) ||
+              (s && fac.name.toLowerCase().includes(s))
+          )
+
+          // 2. Keyword heuristic fallback
+          if (!matched) {
+            if (/diesel|hsd/i.test(s) || /diesel|hsd/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name === 'Diesel (HSD)')
+            } else if (/boiler|furnace oil|furnace/i.test(s) || /furnace oil/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('Furnace Oil'))
+            } else if (/grid|purchased electricity/i.test(s) || u === 'kwh') {
+              matched = activeFactors.find((fac) => fac.name.includes('Grid Electricity'))
+            } else if (/freight|logistics|cargo/i.test(s) || u.includes('tonne-km')) {
+              matched = activeFactors.find((fac) => fac.name.includes('Road Freight'))
+            } else if (/flight|air travel/i.test(s) || /air travel/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('Air Travel'))
+            } else if (/rail/i.test(s) || /rail/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('Rail Travel'))
+            } else if (/commute|travel/i.test(s) || /car/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('Road Travel'))
+            } else if (/r-?410a/i.test(s) || /r-?410a/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('R-410A'))
+            } else if (/r-?134a/i.test(s) || /r-?134a/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('R-134a'))
+            } else if (/r-?22/i.test(s) || /r-?22/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('R-22'))
+            } else if (/r-?32/i.test(s) || /r-?32/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('R-32'))
+            } else if (/r-?407c/i.test(s) || /r-?407c/i.test(f)) {
+              matched = activeFactors.find((fac) => fac.name.includes('R-407C'))
+            }
+          }
+          return matched || null
+        }
+
+        const isUnitCompatible = (facUnit: string, actUnit: string): boolean => {
+          const fu = facUnit.toLowerCase()
+          const au = actUnit.toLowerCase().trim()
+          if (fu.includes('/l') || fu.includes('/litre')) {
+            return ['l', 'litres', 'litre', 'liters', 'liter', 'kl'].includes(au)
+          }
+          if (fu.includes('/kwh')) {
+            return ['kwh', 'mwh'].includes(au)
+          }
+          if (fu.includes('/kg')) {
+            return ['kg', 'kilogram', 'ton', 'tonne', 'tonnes', 'mt'].includes(au)
+          }
+          if (fu.includes('tonne-km')) {
+            return ['tonne-km', 't-km', 'ton-km'].includes(au)
+          }
+          if (fu.includes('pass-km') || fu.includes('passenger-km')) {
+            return ['pass-km', 'passenger-km', 'p-km'].includes(au)
+          }
+          return false
+        }
+
         if (Array.isArray(data.items) && data.items.length > 0) {
-          let totalTco2e = 0
           let s1Tco2e = 0
           let s2Tco2e = 0
           let s3Tco2e = 0
           let totalActQty = 0
-          const srcList: string[] = []
+          const lineageItems: any[] = []
+          const airQualityItems: any[] = []
+          const duplicateTracker = new Set<string>()
 
           for (const it of data.items) {
-            const iQty = Number(it.activityQuantity) || 0
-            totalActQty += iQty
             const dt = String(it.emissionDataType || '')
-            const isS1 = dt.includes('1') || dt.includes('Direct')
-            const isS3 = dt.includes('3') || dt.includes('Value Chain')
-            const isAir = dt.toLowerCase().includes('air')
+            const isAir = dt.toLowerCase().includes('air') || it.pollutantType === 'PM10 / PM2.5' || it.pollutantType === 'NOx' || it.pollutantType === 'SOx'
 
-            let itTco2e = 0
-            if (isS1) {
-              itTco2e = (iQty * 2.637) / 1000
-              s1Tco2e += itTco2e
-            } else if (isS3) {
-              itTco2e = (iQty * 1.85) / 1000 // Supply chain / logistics standard factor
-              s3Tco2e += itTco2e
-            } else if (!isAir) {
-              itTco2e = (iQty * 0.716) / 1000 // Scope 2 grid factor
-              s2Tco2e += itTco2e
+            // Duplicate detection across staged items
+            const dupKey = `${(it.emissionSource || '').toLowerCase()}::${(it.equipmentId || it.samplingLocation || '').toLowerCase()}`
+            if (dupKey !== '::') {
+              if (duplicateTracker.has(dupKey)) {
+                issues.push({
+                  ruleCode: 'GHG-DUPLICATE-DETECTED',
+                  severity: 'WARNING',
+                  message: `Potential Duplicate Detected: Record for '${it.emissionSource}' (${it.equipmentId || it.samplingLocation}) already staged in this inventory.`,
+                  suggestedAction: 'Verify that this is a distinct monitoring station or separate meter run.',
+                })
+              } else {
+                duplicateTracker.add(dupKey)
+              }
             }
-            totalTco2e += itTco2e
-            srcList.push(`${it.emissionSource || 'Source'} (${itTco2e > 0 ? itTco2e.toFixed(2) + ' tCO2e' : it.testResult || 'Measured'})`)
+
+            if (isAir) {
+              // AIR POLLUTANT: Strictly separated from GHG emissions total
+              const measuredVal = Number(String(it.testResult || '').replace(/[^0-9.]/g, '')) || 0
+              let compliant = true
+              let benchmark = 'NAAQS / CPCB Norm'
+              if (String(it.pollutantType).includes('PM10') && measuredVal > 100) {
+                compliant = false
+                benchmark = 'NAAQS 24-hr PM10 limit: 100 µg/m³'
+              } else if (String(it.pollutantType).includes('PM2.5') && measuredVal > 60) {
+                compliant = false
+                benchmark = 'NAAQS 24-hr PM2.5 limit: 60 µg/m³'
+              } else if (String(it.pollutantType).includes('NOx') && measuredVal > 750 && it.unit?.includes('mg/Nm³')) {
+                compliant = false
+                benchmark = 'CPCB DG Stack NOx limit: 750 mg/Nm³'
+              }
+
+              if (!compliant) {
+                issues.push({
+                  ruleCode: 'AIR-LIMIT-EXCEEDANCE',
+                  severity: 'WARNING',
+                  message: `Air Quality Exceedance: ${it.emissionSource} reported ${it.testResult} which exceeds ${benchmark}.`,
+                  field: 'testResult',
+                  suggestedAction: 'Notify site environmental engineer and submit corrective action report.',
+                })
+              }
+
+              airQualityItems.push({
+                source: it.emissionSource,
+                pollutant: it.pollutantType,
+                result: it.testResult,
+                location: it.samplingLocation,
+                lab: it.laboratoryTestMethod,
+                compliant,
+              })
+            } else {
+              // GHG STREAM: Verify against DB Factor Master
+              const iQty = Number(it.activityQuantity) || 0
+              totalActQty += iQty
+
+              const factor = findDbFactor(it.emissionSource, it.fuelEnergyType, it.unit)
+              if (!factor) {
+                issues.push({
+                  ruleCode: 'GHG-FACTOR-UNCONFIGURED',
+                  severity: 'WARNING',
+                  message: `Emission Factor Not Configured — ESG Review Required for '${it.emissionSource}'.`,
+                  suggestedAction: 'Configure verified factor in Emission Factor Master.',
+                })
+              } else if (!isUnitCompatible(factor.factorUnit, it.unit || '')) {
+                issues.push({
+                  ruleCode: 'GHG-UNIT-MISMATCH',
+                  severity: 'WARNING',
+                  message: `Activity unit '${it.unit}' for '${it.emissionSource}' does not match Factor Master unit '${factor.factorUnit}'.`,
+                  suggestedAction: `Convert activity data to match ${factor.factorUnit}.`,
+                })
+              }
+
+              const factorVal = factor ? factor.factorValue : (dt.includes('1') ? 2.637 : dt.includes('3') ? 0.114 : 0.716)
+              const factorName = factor ? factor.name : 'Central Default'
+              const factorDoc = factor ? (factor.sourceDocument || factor.methodology || factor.source) : 'IPCC 2006'
+
+              const itTco2e = (iQty * factorVal) / 1000
+              const roundedItTco2e = Math.round(itTco2e * 1000) / 1000
+
+              if (dt.includes('1') || factor?.scope === 'SCOPE_1') {
+                s1Tco2e += roundedItTco2e
+              } else if (dt.includes('2') || factor?.scope === 'SCOPE_2') {
+                s2Tco2e += roundedItTco2e
+              } else if (dt.includes('3') || factor?.scope === 'SCOPE_3') {
+                s3Tco2e += roundedItTco2e
+              } else {
+                s1Tco2e += roundedItTco2e
+              }
+
+              lineageItems.push({
+                source: it.emissionSource,
+                scope: dt,
+                fuel: it.fuelEnergyType,
+                quantity: iQty,
+                unit: it.unit,
+                factorName,
+                factorValue: factorVal,
+                factorUnit: factor ? factor.factorUnit : 'kgCO2e/unit',
+                factorSource: factorDoc,
+                factorVersion: factor ? factor.version : 1,
+                calculatedTco2e: roundedItTco2e,
+                sourceRecordId: it.sourceRecordId || null,
+              })
+            }
           }
 
-          const hasS1 = s1Tco2e > 0
-          const hasS2 = s2Tco2e > 0
-          const hasS3 = s3Tco2e > 0
-          const scopes = [hasS1 && 'Scope 1', hasS2 && 'Scope 2', hasS3 && 'Scope 3'].filter(Boolean).join(' + ') || 'Scope 1 & 2'
+          const totalTco2e = Math.round((s1Tco2e + s2Tco2e + s3Tco2e) * 1000) / 1000
+          const scopes = [
+            s1Tco2e > 0 && 'Scope 1',
+            s2Tco2e > 0 && 'Scope 2',
+            s3Tco2e > 0 && 'Scope 3',
+          ].filter(Boolean).join(' + ') || 'Scope 1 & 2'
 
           calculation = {
-            calculatedValue: Number(totalTco2e.toFixed(3)),
-            resultUnit: 'tCO2e Consolidated',
+            calculatedValue: totalTco2e,
+            resultUnit: 'tCO2e GHG Total',
             scope: scopes.toUpperCase().replace(/\s+/g, '_'),
-            factorId: `MULTI-GHG-${data.items.length}-SOURCES`,
-            methodologyNote: `Consolidated GHG multi-source: Scope 1: ${s1Tco2e.toFixed(2)} tCO2e, Scope 2: ${s2Tco2e.toFixed(2)} tCO2e, Scope 3: ${s3Tco2e.toFixed(2)} tCO2e across ${data.items.length} emission sources.`,
+            factorId: `EMISSION-MASTER-V${lineageItems[0]?.factorVersion || 1}`,
+            factorVersion: lineageItems[0]?.factorVersion || 1,
+            methodologyNote: `Consolidated GHG Protocol Inventory: Scope 1: ${s1Tco2e.toFixed(2)} tCO2e, Scope 2: ${s2Tco2e.toFixed(2)} tCO2e, Scope 3: ${s3Tco2e.toFixed(2)} tCO2e. Air pollutants (${airQualityItems.length} streams) tracked separately per CPCB norms.`,
+            formula: `Sum(Activity Qty × Approved Factor ÷ 1,000) across ${lineageItems.length} GHG sources`,
+            calculatedAt: new Date().toISOString(),
             sourceValue: totalActQty,
             sourceUnit: data.unit || 'units',
-            normalizedValue: Number(totalTco2e.toFixed(2)),
+            normalizedValue: totalTco2e,
             normalizedUnit: 'tCO2e',
+            lineage: {
+              ghgItems: lineageItems,
+              airPollutants: airQualityItems,
+              scopeBreakdown: {
+                scope1Tco2e: s1Tco2e,
+                scope2Tco2e: s2Tco2e,
+                scope3Tco2e: s3Tco2e,
+              },
+            },
           }
         } else {
           const actQty = Number(data.activityQuantity) || 0
@@ -316,17 +487,23 @@ export async function POST(req: NextRequest) {
             })
           }
           const dt = String(data.emissionDataType || '')
-          const isScope1 = dt.includes('Scope 1')
-          const isScope3 = dt.includes('Scope 3')
-          const factor = isScope1 ? 2.637 : isScope3 ? 1.85 : 0.716
-          const tco2e = actQty > 0 ? (actQty * factor) / 1000 : 0
-          const targetScope = isScope1 ? 'SCOPE_1' : isScope3 ? 'SCOPE_3' : 'SCOPE_2'
+          const isAir = dt.toLowerCase().includes('air')
+          const factor = findDbFactor(data.emissionSource, data.fuelEnergyType, data.unit)
+          const factorVal = factor ? factor.factorValue : (dt.includes('1') ? 2.637 : dt.includes('3') ? 0.114 : 0.716)
+          const tco2e = !isAir && actQty > 0 ? (actQty * factorVal) / 1000 : 0
+          const targetScope = dt.includes('1') ? 'SCOPE_1' : dt.includes('3') ? 'SCOPE_3' : 'SCOPE_2'
 
           calculation = {
             calculatedValue: Number(tco2e.toFixed(3)),
-            resultUnit: data.testResult ? 'Test Result Logged' : 'tCO2e',
+            resultUnit: isAir ? 'Concentration Logged' : 'tCO2e',
             scope: targetScope,
-            methodologyNote: data.calculationMethod || `Central ESG emission factors model (${factor} kgCO2e/unit)`,
+            factorId: factor ? factor.id : 'DEFAULT-FACTOR',
+            factorVersion: factor ? factor.version : 1,
+            methodologyNote: factor
+              ? `${factor.name} v${factor.version} (${factor.factorValue} ${factor.factorUnit}) via ${factor.sourceDocument || factor.methodology}`
+              : `Default factor (${factorVal} kgCO2e/unit)`,
+            formula: `${actQty} ${data.unit} × ${factorVal} ÷ 1,000`,
+            calculatedAt: new Date().toISOString(),
             sourceValue: actQty,
             sourceUnit: data.unit || 'litres',
           }
